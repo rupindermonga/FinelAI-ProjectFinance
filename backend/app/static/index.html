@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finel AI Invoice Extractor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body class="bg-gray-50 font-sans" x-data="app()" x-init="init()">
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LOGIN / REGISTER PAGE
+  ══════════════════════════════════════════════════════════════ -->
+  <div x-show="view === 'login'" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+          <i class="fa-solid fa-file-invoice-dollar text-blue-700 text-2xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-800">Finel AI Invoice Extractor</h1>
+        <p class="text-gray-500 text-sm mt-1">AI-powered invoice processing</p>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex border-b mb-6">
+        <button @click="authTab='login'" :class="authTab==='login' ? 'border-b-2 border-blue-600 text-blue-600 font-semibold' : 'text-gray-500'" class="flex-1 py-2 text-sm transition">Sign In</button>
+        <button @click="authTab='register'" :class="authTab==='register' ? 'border-b-2 border-blue-600 text-blue-600 font-semibold' : 'text-gray-500'" class="flex-1 py-2 text-sm transition">Create Account</button>
+      </div>
+
+      <!-- Login form -->
+      <form x-show="authTab==='login'" @submit.prevent="login()">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+          <input x-model="loginForm.username" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="your username" required />
+        </div>
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input x-model="loginForm.password" type="password" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••" required />
+        </div>
+        <div x-show="authError" class="mb-4 text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="authError"></div>
+        <button type="submit" :disabled="authLoading" class="w-full bg-blue-700 text-white rounded-lg py-2.5 font-semibold text-sm hover:bg-blue-800 disabled:opacity-50 transition">
+          <span x-show="!authLoading">Sign In</span>
+          <span x-show="authLoading"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Signing in...</span>
+        </button>
+      </form>
+
+      <!-- Register form -->
+      <form x-show="authTab==='register'" @submit.prevent="register()">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+          <input x-model="regForm.username" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="choose a username" required />
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input x-model="regForm.email" type="email" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="you@company.com" required />
+        </div>
+        <div class="mb-6">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input x-model="regForm.password" type="password" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="min 6 characters" required minlength="6" />
+        </div>
+        <div x-show="authError" class="mb-4 text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="authError"></div>
+        <button type="submit" :disabled="authLoading" class="w-full bg-blue-700 text-white rounded-lg py-2.5 font-semibold text-sm hover:bg-blue-800 disabled:opacity-50 transition">
+          <span x-show="!authLoading">Create Account</span>
+          <span x-show="authLoading"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Creating...</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       MAIN APP SHELL
+  ══════════════════════════════════════════════════════════════ -->
+  <div x-show="view !== 'login'" class="flex h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-56 bg-blue-900 text-white flex flex-col flex-shrink-0">
+      <div class="px-5 py-5 border-b border-blue-800">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-file-invoice-dollar text-blue-300 text-xl"></i>
+          <span class="font-bold text-base leading-tight">Finel AI<br>Invoices</span>
+        </div>
+      </div>
+      <nav class="flex-1 py-4 space-y-1 px-3">
+        <button @click="view='dashboard'" :class="view==='dashboard' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-table-columns w-4"></i> Dashboard
+        </button>
+        <button @click="view='columns'" :class="view==='columns' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-sliders w-4"></i> Manage Columns
+        </button>
+        <button @click="view='categories'; loadCategories()" :class="view==='categories' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-tags w-4"></i> Categories
+        </button>
+        <button @click="view='settings'" :class="view==='settings' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-gear w-4"></i> Settings
+        </button>
+      </nav>
+      <div class="px-5 py-4 border-t border-blue-800">
+        <div class="text-xs text-blue-300 mb-1">Signed in as</div>
+        <div class="text-sm font-medium truncate" x-text="user?.username"></div>
+        <button @click="logout()" class="mt-2 text-xs text-blue-300 hover:text-white transition">
+          <i class="fa-solid fa-right-from-bracket mr-1"></i> Sign out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 overflow-auto bg-gray-50">
+
+      <!-- ── DASHBOARD ─────────────────────────────────────────────── -->
+      <div x-show="view==='dashboard'" class="p-6">
+
+        <!-- Page header -->
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800">Invoices</h2>
+            <p class="text-sm text-gray-500">Extract and manage invoice data with Gemini AI</p>
+          </div>
+          <button @click="showUploadModal=true" class="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 transition flex items-center gap-2">
+            <i class="fa-solid fa-upload"></i> Upload Invoices
+          </button>
+        </div>
+
+        <!-- Stats bar -->
+        <div class="grid grid-cols-4 gap-4 mb-6">
+          <div class="bg-white rounded-xl border p-4">
+            <div class="text-2xl font-bold text-gray-800" x-text="stats.total ?? '—'"></div>
+            <div class="text-xs text-gray-500 mt-1">Total Invoices</div>
+          </div>
+          <div class="bg-white rounded-xl border p-4">
+            <div class="text-2xl font-bold text-green-600" x-text="stats.processed ?? '—'"></div>
+            <div class="text-xs text-gray-500 mt-1">Processed</div>
+          </div>
+          <div class="bg-white rounded-xl border p-4">
+            <div class="text-2xl font-bold text-amber-500" x-text="stats.pending ?? '—'"></div>
+            <div class="text-xs text-gray-500 mt-1">Processing</div>
+          </div>
+          <div class="bg-white rounded-xl border p-4">
+            <div class="text-2xl font-bold text-red-500" x-text="stats.errors ?? '—'"></div>
+            <div class="text-xs text-gray-500 mt-1">Errors</div>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-xl border p-4 mb-4">
+          <div class="flex flex-wrap items-end gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">From Date</label>
+              <input type="date" x-model="filters.start_date" class="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">To Date</label>
+              <input type="date" x-model="filters.end_date" class="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Vendor</label>
+              <input type="text" x-model="filters.vendor" placeholder="Search vendor..." class="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Currency</label>
+              <select x-model="filters.currency" class="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="">All</option>
+                <option value="CAD">CAD</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+              <select x-model="filters.status" class="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="">All</option>
+                <option value="processed">Processed</option>
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="error">Error</option>
+              </select>
+            </div>
+            <button @click="loadInvoices()" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+              <i class="fa-solid fa-magnifying-glass mr-1"></i>Search
+            </button>
+            <button @click="clearFilters()" class="bg-gray-100 text-gray-600 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-200 transition">
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Export bar -->
+        <div class="bg-white rounded-xl border p-4 mb-4 flex flex-wrap items-end gap-3">
+          <div class="text-sm font-medium text-gray-700 mr-2"><i class="fa-solid fa-download mr-1 text-gray-400"></i>Export filtered results:</div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">From</label>
+            <input type="date" x-model="exportDates.start" class="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">To</label>
+            <input type="date" x-model="exportDates.end" class="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+          <button @click="exportData('excel')" class="flex items-center gap-2 bg-green-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700 transition">
+            <i class="fa-solid fa-file-excel"></i> Excel (.xlsx)
+          </button>
+          <button @click="exportData('json')" class="flex items-center gap-2 bg-orange-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-600 transition">
+            <i class="fa-solid fa-file-code"></i> JSON
+          </button>
+        </div>
+
+        <!-- Processing live feed -->
+        <div x-show="processingQueue.length > 0" class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+          <div class="text-sm font-semibold text-blue-800 mb-2"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>Processing invoices...</div>
+          <div class="space-y-1.5 max-h-40 overflow-y-auto">
+            <template x-for="item in processingQueue" :key="item.id">
+              <div class="flex items-center gap-3 text-xs">
+                <span x-show="item.status==='processing'" class="text-amber-500"><i class="fa-solid fa-spinner fa-spin"></i></span>
+                <span x-show="item.status==='processed'" class="text-green-600"><i class="fa-solid fa-circle-check"></i></span>
+                <span x-show="item.status==='error'" class="text-red-500"><i class="fa-solid fa-circle-xmark"></i></span>
+                <span class="font-medium text-gray-700" x-text="item.filename"></span>
+                <span x-show="item.invoice_number" class="text-gray-500">· <span x-text="item.invoice_number"></span></span>
+                <span x-show="item.vendor_name" class="text-gray-500">· <span x-text="item.vendor_name"></span></span>
+                <span x-show="item.total_due" class="text-gray-700 font-medium">· <span x-text="item.currency || ''"></span> <span x-text="item.total_due ? item.total_due.toLocaleString('en-CA', {minimumFractionDigits:2}) : ''"></span></span>
+                <span x-show="item.status==='error'" class="text-red-500" x-text="'Error: ' + (item.error || '')"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Invoice table -->
+        <div class="bg-white rounded-xl border overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b">
+                <tr>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">File</th>
+                  <template x-for="col in activeColumns" :key="col.id">
+                    <th x-show="col.field_key !== 'line_items'" class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap" x-text="col.field_label"></th>
+                  </template>
+                  <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                  <th class="px-4 py-3 w-16"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-if="invoices.length === 0">
+                  <tr>
+                    <td :colspan="activeColumns.length + 4" class="text-center py-16 text-gray-400">
+                      <i class="fa-solid fa-inbox text-4xl mb-3 block text-gray-300"></i>
+                      No invoices found. Upload some PDFs to get started.
+                    </td>
+                  </tr>
+                </template>
+                <template x-for="(inv, idx) in invoices" :key="inv.id">
+                  <tr class="hover:bg-blue-50 cursor-pointer transition" @click="openInvoice(inv)">
+                    <td class="px-4 py-3 text-gray-400 text-xs" x-text="(pagination.page-1)*pagination.limit + idx + 1"></td>
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-file-pdf text-red-400 text-base"></i>
+                        <span class="text-gray-700 max-w-40 truncate text-xs" x-text="inv.original_filename || inv.source_file"></span>
+                      </div>
+                    </td>
+                    <template x-for="col in activeColumns" :key="col.id">
+                      <td x-show="col.field_key !== 'line_items'" class="px-4 py-3 text-gray-700 whitespace-nowrap">
+                        <span x-text="getCellValue(inv, col)"></span>
+                      </td>
+                    </template>
+                    <td class="px-4 py-3">
+                      <span :class="statusBadge(inv.status)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium">
+                        <span x-text="inv.status"></span>
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <button @click.stop="deleteInvoice(inv.id)" class="text-gray-300 hover:text-red-500 transition">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="border-t px-4 py-3 flex items-center justify-between text-sm text-gray-500">
+            <div x-text="`${invoices.length} of ${pagination.total} invoices`"></div>
+            <div class="flex items-center gap-2">
+              <button @click="changePage(-1)" :disabled="pagination.page <= 1" class="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 transition">
+                <i class="fa-solid fa-chevron-left text-xs"></i>
+              </button>
+              <span x-text="`Page ${pagination.page} of ${pagination.pages}`" class="text-xs"></span>
+              <button @click="changePage(1)" :disabled="pagination.page >= pagination.pages" class="px-3 py-1 border rounded text-sm disabled:opacity-40 hover:bg-gray-50 transition">
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /dashboard -->
+
+
+      <!-- ── COLUMN MANAGER ────────────────────────────────────────── -->
+      <div x-show="view==='columns'" class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800">Manage Columns</h2>
+            <p class="text-sm text-gray-500">Choose which fields Gemini extracts and which columns appear in the table</p>
+          </div>
+          <button @click="showAddColumnModal=true" class="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 transition flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Add Column
+          </button>
+        </div>
+
+        <div class="bg-white rounded-xl border overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Order</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Field Key</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Display Label</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Type</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Description (for AI)</th>
+                <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Active</th>
+                <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase">System</th>
+                <th class="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="col in allColumns" :key="col.id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-5 py-3 text-gray-500 text-xs w-12" x-text="col.display_order"></td>
+                  <td class="px-5 py-3 font-mono text-xs text-blue-700" x-text="col.field_key"></td>
+                  <td class="px-5 py-3 text-gray-800 font-medium" x-text="col.field_label"></td>
+                  <td class="px-5 py-3">
+                    <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs" x-text="col.field_type"></span>
+                  </td>
+                  <td class="px-5 py-3 text-gray-500 text-xs max-w-xs truncate" x-text="col.field_description || '—'"></td>
+                  <td class="px-5 py-3 text-center">
+                    <button @click="toggleColumn(col)" :class="col.is_active ? 'bg-green-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors">
+                      <span :class="col.is_active ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"></span>
+                    </button>
+                  </td>
+                  <td class="px-5 py-3 text-center">
+                    <span x-show="col.is_system" class="text-blue-400 text-xs"><i class="fa-solid fa-lock"></i></span>
+                    <span x-show="!col.is_system" class="text-gray-300 text-xs">—</span>
+                  </td>
+                  <td class="px-5 py-3 text-right flex items-center justify-end gap-2">
+                    <button @click="openEditColumn(col)" class="text-gray-400 hover:text-blue-600 transition" title="Edit">
+                      <i class="fa-solid fa-pen text-xs"></i>
+                    </button>
+                    <button @click="deleteColumn(col)" x-show="!col.is_system" class="text-gray-300 hover:text-red-500 transition" title="Delete">
+                      <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /columns -->
+
+
+      <!-- ── CATEGORY MANAGER ─────────────────────────────────────────── -->
+      <div x-show="view==='categories'" class="p-6">
+        <div class="mb-6">
+          <h2 class="text-xl font-bold text-gray-800">Categories</h2>
+          <p class="text-sm text-gray-500 mt-1">
+            Define categories, sub-categories, and sub-divisions. Gemini will use these to classify each invoice automatically.
+          </p>
+        </div>
+
+        <!-- How-to note -->
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-800">
+          <i class="fa-solid fa-circle-info mr-2"></i>
+          <strong>How it works:</strong> Add your <strong>Categories</strong> first (e.g. Materials, Labour). Then click a category to add <strong>Sub-Categories</strong> under it (e.g. Electrical, Mechanical). For construction invoices, click a sub-category to add <strong>Sub-Divisions</strong> (e.g. Rough Framing, Concrete). Gemini will pick the correct values automatically when processing invoices.
+        </div>
+
+        <div class="grid grid-cols-3 gap-5">
+
+          <!-- Column 1: Categories -->
+          <div class="bg-white rounded-xl border overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+              <span class="font-semibold text-gray-700 text-sm">Categories</span>
+              <button @click="openAddCategory('category', null)" class="bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-800 transition">
+                <i class="fa-solid fa-plus mr-1"></i>Add
+              </button>
+            </div>
+            <div class="divide-y max-h-96 overflow-y-auto">
+              <template x-if="categoryTree.length === 0">
+                <div class="text-center py-8 text-gray-400 text-sm">No categories yet</div>
+              </template>
+              <template x-for="cat in categoryTree" :key="cat.id">
+                <div
+                  :class="selectedCategory?.id === cat.id ? 'bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'"
+                  class="cursor-pointer transition">
+                  <!-- Main row -->
+                  <div @click="selectCategory(cat)" class="flex items-center justify-between px-4 py-2.5">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span :class="cat.is_active ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'" class="w-2 h-2 rounded-full flex-shrink-0 inline-block"></span>
+                      <span class="text-sm font-medium text-gray-800 truncate" x-text="cat.name"></span>
+                    </div>
+                    <div class="flex gap-1 flex-shrink-0 ml-2">
+                      <button @click.stop="toggleCategoryActive(cat)" :title="cat.is_active ? 'Disable' : 'Enable'" class="text-gray-300 hover:text-amber-500 transition text-xs px-1">
+                        <i :class="cat.is_active ? 'fa-eye' : 'fa-eye-slash'" class="fa-solid"></i>
+                      </button>
+                      <button @click.stop="deleteCategoryItem(cat)" class="text-gray-300 hover:text-red-500 transition text-xs px-1">
+                        <i class="fa-solid fa-trash-can"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <!-- Requires Sub-Division toggle (only when category is selected) -->
+                  <div x-show="selectedCategory?.id === cat.id" class="px-4 pb-2.5 flex items-center gap-2">
+                    <button
+                      @click.stop="toggleRequiresSubDivision(cat)"
+                      :class="cat.requires_sub_division ? 'bg-purple-600' : 'bg-gray-300'"
+                      class="relative inline-flex h-4 w-8 items-center rounded-full transition-colors flex-shrink-0">
+                      <span :class="cat.requires_sub_division ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform"></span>
+                    </button>
+                    <span class="text-xs" :class="cat.requires_sub_division ? 'text-purple-700 font-medium' : 'text-gray-400'">
+                      <span x-text="cat.requires_sub_division ? 'Sub-Division required — shows Not Available if missing' : 'Sub-Division not required — blank if missing'"></span>
+                    </span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Column 2: Sub-Categories -->
+          <div class="bg-white rounded-xl border overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+              <span class="font-semibold text-gray-700 text-sm">
+                Sub-Categories
+                <span x-show="selectedCategory" class="font-normal text-gray-400 ml-1">of <span class="text-blue-600" x-text="selectedCategory?.name"></span></span>
+              </span>
+              <button @click="openAddCategory('sub_category', selectedCategory)" :disabled="!selectedCategory" class="bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-800 transition disabled:opacity-40">
+                <i class="fa-solid fa-plus mr-1"></i>Add
+              </button>
+            </div>
+            <div class="divide-y max-h-96 overflow-y-auto">
+              <template x-if="!selectedCategory">
+                <div class="text-center py-8 text-gray-400 text-sm">← Select a category</div>
+              </template>
+              <template x-if="selectedCategory && subCategories.length === 0">
+                <div class="text-center py-8 text-gray-400 text-sm">No sub-categories yet</div>
+              </template>
+              <template x-for="sc in subCategories" :key="sc.id">
+                <div
+                  @click="selectSubCategory(sc)"
+                  :class="selectedSubCategory?.id === sc.id ? 'bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-gray-50'"
+                  class="flex items-center justify-between px-4 py-3 cursor-pointer transition">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span :class="sc.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'" class="w-2 h-2 rounded-full flex-shrink-0 inline-block"></span>
+                    <span class="text-sm text-gray-800 truncate" x-text="sc.name"></span>
+                    <span x-show="sc.children?.length > 0" class="text-xs text-gray-400" x-text="`(${sc.children.length})`"></span>
+                  </div>
+                  <div class="flex gap-1 flex-shrink-0 ml-2">
+                    <button @click.stop="toggleCategoryActive(sc)" class="text-gray-300 hover:text-amber-500 transition text-xs px-1">
+                      <i :class="sc.is_active ? 'fa-eye' : 'fa-eye-slash'" class="fa-solid"></i>
+                    </button>
+                    <button @click.stop="deleteCategoryItem(sc)" class="text-gray-300 hover:text-red-500 transition text-xs px-1">
+                      <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Column 3: Sub-Divisions (tied to Category, independent of Sub-Category) -->
+          <div class="bg-white rounded-xl border overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+              <span class="font-semibold text-gray-700 text-sm">
+                Sub-Divisions
+                <span x-show="selectedCategory" class="font-normal text-gray-400 ml-1">of <span class="text-blue-600" x-text="selectedCategory?.name"></span></span>
+              </span>
+              <button @click="openAddCategory('sub_division', selectedCategory)" :disabled="!selectedCategory" class="bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-800 transition disabled:opacity-40">
+                <i class="fa-solid fa-plus mr-1"></i>Add
+              </button>
+            </div>
+            <div class="divide-y max-h-96 overflow-y-auto">
+              <template x-if="!selectedCategory">
+                <div class="text-center py-8 text-gray-400 text-sm">← Select a category</div>
+              </template>
+              <template x-if="selectedCategory && subDivisions.length === 0">
+                <div class="text-center py-8 text-gray-400 text-sm">No sub-divisions yet.<br><span class="text-xs text-gray-300">e.g. Division 1, Division 2…</span></div>
+              </template>
+              <template x-for="sd in subDivisions" :key="sd.id">
+                <div class="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span :class="sd.is_active ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'" class="w-2 h-2 rounded-full flex-shrink-0 inline-block"></span>
+                    <span class="text-sm text-gray-800 truncate" x-text="sd.name"></span>
+                  </div>
+                  <div class="flex gap-1 flex-shrink-0 ml-2">
+                    <button @click="toggleCategoryActive(sd)" class="text-gray-300 hover:text-amber-500 transition text-xs px-1">
+                      <i :class="sd.is_active ? 'fa-eye' : 'fa-eye-slash'" class="fa-solid"></i>
+                    </button>
+                    <button @click="deleteCategoryItem(sd)" class="text-gray-300 hover:text-red-500 transition text-xs px-1">
+                      <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div><!-- /grid -->
+      </div><!-- /categories -->
+
+
+      <!-- ── SETTINGS ───────────────────────────────────────────────── -->
+      <div x-show="view==='settings'" class="p-6 max-w-xl">
+        <h2 class="text-xl font-bold text-gray-800 mb-6">Settings</h2>
+        <div class="bg-white rounded-xl border p-6 space-y-5">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Gemini API Key</label>
+            <div class="flex gap-2">
+              <input x-model="settings.geminiKey" :type="showApiKey ? 'text' : 'password'" class="flex-1 border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="AIza..." />
+              <button @click="showApiKey=!showApiKey" class="border rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-50">
+                <i :class="showApiKey ? 'fa-eye-slash' : 'fa-eye'" class="fa-solid"></i>
+              </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">Get your key at <span class="text-blue-600">aistudio.google.com</span></p>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Gemini Model</label>
+            <select x-model="settings.geminiModel" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="gemini-1.5-pro">gemini-1.5-pro (recommended)</option>
+              <option value="gemini-2.0-flash">gemini-2.0-flash (faster)</option>
+              <option value="gemini-1.5-flash">gemini-1.5-flash (faster)</option>
+            </select>
+          </div>
+          <div x-show="settingsSaved" class="text-green-600 text-sm"><i class="fa-solid fa-circle-check mr-1"></i>Settings saved to .env file — restart the server to apply.</div>
+          <button @click="saveSettings()" class="bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 transition">Save Settings</button>
+        </div>
+      </div><!-- /settings -->
+
+    </main>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       UPLOAD MODAL
+  ══════════════════════════════════════════════════════════════ -->
+  <div x-show="showUploadModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showUploadModal=false">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-lg font-bold text-gray-800">Upload Invoices</h3>
+        <button @click="showUploadModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <!-- Drop zone -->
+      <div
+        class="border-2 border-dashed rounded-xl p-8 text-center transition"
+        :class="isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'"
+        @dragover.prevent="isDragging=true"
+        @dragleave="isDragging=false"
+        @drop.prevent="handleDrop($event)"
+      >
+        <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-300 mb-3 block"></i>
+        <p class="text-sm text-gray-600 mb-1">Drag &amp; drop files here, or</p>
+        <label class="cursor-pointer text-blue-600 text-sm font-semibold hover:underline">
+          browse files
+          <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.webp" class="hidden" @change="handleFileSelect($event)" />
+        </label>
+        <p class="text-xs text-gray-400 mt-2">PDF, JPG, PNG, TIFF, WEBP · max 50 MB each</p>
+      </div>
+
+      <!-- Selected files -->
+      <div x-show="uploadFiles.length > 0" class="mt-4 space-y-2 max-h-44 overflow-y-auto">
+        <template x-for="(f, i) in uploadFiles" :key="i">
+          <div class="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-file-pdf text-red-400"></i>
+              <span class="text-gray-700 truncate max-w-xs" x-text="f.name"></span>
+              <span class="text-gray-400 text-xs" x-text="formatBytes(f.size)"></span>
+            </div>
+            <button @click="uploadFiles.splice(i,1)" class="text-gray-300 hover:text-red-500 transition"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </template>
+      </div>
+
+      <div x-show="uploadError" class="mt-3 text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="uploadError"></div>
+
+      <div class="flex gap-3 mt-6">
+        <button @click="showUploadModal=false" class="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+        <button @click="submitUpload()" :disabled="uploadFiles.length===0 || uploadLoading" class="flex-1 bg-blue-700 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-800 disabled:opacity-50 transition">
+          <span x-show="!uploadLoading"><i class="fa-solid fa-robot mr-1"></i> Extract with AI</span>
+          <span x-show="uploadLoading"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Uploading...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       INVOICE DETAIL MODAL
+  ══════════════════════════════════════════════════════════════ -->
+  <div x-show="showInvoiceDetail" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showInvoiceDetail=false">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b">
+        <h3 class="text-lg font-bold text-gray-800">
+          Invoice Detail
+          <span x-show="selectedInvoice?.invoice_number" class="text-blue-600 ml-2 text-base" x-text="'#' + selectedInvoice?.invoice_number"></span>
+        </h3>
+        <button @click="showInvoiceDetail=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div class="overflow-y-auto flex-1 p-6">
+        <div x-show="selectedInvoice" class="space-y-5">
+          <!-- Meta -->
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-gray-50 rounded-lg p-3">
+              <div class="text-xs text-gray-400 mb-1">Source File</div>
+              <div class="text-sm font-medium text-gray-700" x-text="selectedInvoice?.original_filename"></div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+              <div class="text-xs text-gray-400 mb-1">Confidence</div>
+              <div class="text-sm font-medium" :class="(selectedInvoice?.confidence_score||0) > 0.8 ? 'text-green-600' : (selectedInvoice?.confidence_score||0) > 0.5 ? 'text-amber-500' : 'text-red-500'">
+                <span x-text="selectedInvoice?.confidence_score ? Math.round(selectedInvoice.confidence_score * 100) + '%' : '—'"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- All extracted fields -->
+          <div class="border rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b">
+                <tr>
+                  <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Field</th>
+                  <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Value</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="col in activeColumns.filter(c => c.field_key !== 'line_items')" :key="col.id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2.5 text-gray-500 font-medium w-40" x-text="col.field_label"></td>
+                    <td class="px-4 py-2.5 text-gray-800" x-text="getCellValue(selectedInvoice, col) || '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Line items -->
+          <div x-show="selectedInvoice?.extracted_data?.line_items?.length > 0">
+            <h4 class="font-semibold text-gray-700 mb-2 text-sm">Line Items</h4>
+            <div class="border rounded-xl overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead class="bg-gray-50 border-b">
+                  <tr>
+                    <th class="text-left px-3 py-2 text-gray-500">#</th>
+                    <th class="text-left px-3 py-2 text-gray-500">SKU</th>
+                    <th class="text-left px-3 py-2 text-gray-500">Description</th>
+                    <th class="text-right px-3 py-2 text-gray-500">Qty</th>
+                    <th class="text-left px-3 py-2 text-gray-500">Unit</th>
+                    <th class="text-right px-3 py-2 text-gray-500">Unit Price</th>
+                    <th class="text-right px-3 py-2 text-gray-500">Tax %</th>
+                    <th class="text-right px-3 py-2 text-gray-500">Total</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="(item, i) in selectedInvoice?.extracted_data?.line_items || []" :key="i">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-3 py-2 text-gray-400" x-text="item.line_no || (i+1)"></td>
+                      <td class="px-3 py-2 text-gray-500" x-text="item.sku || '—'"></td>
+                      <td class="px-3 py-2 text-gray-800 max-w-xs" x-text="item.description"></td>
+                      <td class="px-3 py-2 text-right text-gray-700" x-text="item.quantity"></td>
+                      <td class="px-3 py-2 text-gray-500" x-text="item.unit || '—'"></td>
+                      <td class="px-3 py-2 text-right text-gray-700" x-text="fmtNum(item.unit_price)"></td>
+                      <td class="px-3 py-2 text-right text-gray-500" x-text="item.tax_rate != null ? item.tax_rate + '%' : '—'"></td>
+                      <td class="px-3 py-2 text-right font-medium text-gray-800" x-text="fmtNum(item.line_total)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Error -->
+          <div x-show="selectedInvoice?.status === 'error'" class="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div class="text-sm font-semibold text-red-700 mb-1"><i class="fa-solid fa-circle-exclamation mr-1"></i>Extraction Error</div>
+            <div class="text-sm text-red-600" x-text="selectedInvoice?.error_message"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       ADD COLUMN MODAL
+  ══════════════════════════════════════════════════════════════ -->
+  <div x-show="showAddColumnModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showAddColumnModal=false">
+    <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-lg font-bold text-gray-800" x-text="editingColumn ? 'Edit Column' : 'Add Column'"></h3>
+        <button @click="closeColumnModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <form @submit.prevent="saveColumn()">
+        <div class="space-y-4">
+          <div x-show="!editingColumn">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Field Key <span class="text-gray-400 text-xs">(no spaces, e.g. contract_number)</span></label>
+            <input x-model="columnForm.field_key" type="text" pattern="[a-z0-9_]+" class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="contract_number" :required="!editingColumn" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Display Label</label>
+            <input x-model="columnForm.field_label" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Contract Number" required />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <select x-model="columnForm.field_type" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="string">Text (string)</option>
+              <option value="number">Number</option>
+              <option value="date">Date</option>
+              <option value="boolean">Yes/No (boolean)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">AI Extraction Description</label>
+            <textarea x-model="columnForm.field_description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none" placeholder="Describe what Gemini should look for on the invoice..."></textarea>
+            <p class="text-xs text-gray-400 mt-1">This tells Gemini exactly what to extract. Be specific.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Display Order</label>
+            <input x-model.number="columnForm.display_order" type="number" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+        </div>
+        <div x-show="columnFormError" class="mt-4 text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="columnFormError"></div>
+        <div class="flex gap-3 mt-6">
+          <button type="button" @click="closeColumnModal()" class="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+          <button type="submit" :disabled="columnFormLoading" class="flex-1 bg-blue-700 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-800 disabled:opacity-50 transition">
+            <span x-show="!columnFormLoading" x-text="editingColumn ? 'Save Changes' : 'Add Column'"></span>
+            <span x-show="columnFormLoading"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ADD CATEGORY MODAL -->
+  <div x-show="showAddCategoryModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showAddCategoryModal=false">
+    <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-sm">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-lg font-bold text-gray-800" x-text="addCategoryLevel === 'category' ? 'Add Category' : addCategoryLevel === 'sub_category' ? 'Add Sub-Category' : 'Add Sub-Division'"></h3>
+        <button @click="showAddCategoryModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div x-show="addCategoryParent" class="mb-4 text-sm text-gray-500">
+        Under: <span class="font-semibold text-blue-700" x-text="addCategoryParent?.name"></span>
+      </div>
+      <form @submit.prevent="submitAddCategory()">
+        <div class="mb-5">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+          <input x-model="addCategoryName" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" :placeholder="addCategoryLevel === 'category' ? 'e.g. Materials, Labour, Equipment' : addCategoryLevel === 'sub_category' ? 'e.g. Electrical, Mechanical, Civil' : 'e.g. Division 1, Division 2, Site Work'" required autofocus />
+        </div>
+        <div x-show="addCategoryError" class="mb-4 text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="addCategoryError"></div>
+        <div class="flex gap-3">
+          <button type="button" @click="showAddCategoryModal=false" class="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="submit" :disabled="addCategoryLoading" class="flex-1 bg-blue-700 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
+            <span x-show="!addCategoryLoading">Add</span>
+            <span x-show="addCategoryLoading"><i class="fa-solid fa-spinner fa-spin mr-1"></i></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
