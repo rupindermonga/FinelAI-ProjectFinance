@@ -33,12 +33,27 @@ def _get_filtered_invoices(db, user_id, start_date, end_date, vendor, currency, 
 
 
 def _get_active_columns(db, user_id):
+    """Return columns that are both active (in table) AND marked for export."""
     return (
         db.query(ColumnConfig)
-        .filter(ColumnConfig.user_id == user_id, ColumnConfig.is_active == True)
+        .filter(
+            ColumnConfig.user_id == user_id,
+            ColumnConfig.is_active == True,
+            ColumnConfig.is_exportable == True,
+        )
         .order_by(ColumnConfig.display_order)
         .all()
     )
+
+
+_FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _safe_cell(val):
+    """Prevent Excel formula injection by prefixing dangerous strings with a single quote."""
+    if isinstance(val, str) and val and val[0] in _FORMULA_PREFIXES:
+        return "'" + val
+    return val
 
 
 def _get_cell_value(invoice: Invoice, field_key: str):
@@ -49,7 +64,7 @@ def _get_cell_value(invoice: Invoice, field_key: str):
         val = getattr(invoice, field_key, None)
     if isinstance(val, list):
         return json.dumps(val)
-    return val
+    return _safe_cell(val)
 
 
 def _auth_from_token(token: Optional[str], db: Session, authorization: Optional[str] = None) -> User:
@@ -151,7 +166,7 @@ def export_excel(
                     item.get("line_total"),
                 ]
                 for col_idx, val in enumerate(row_data, start=1):
-                    ws_lines.cell(row=line_row, column=col_idx, value=val)
+                    ws_lines.cell(row=line_row, column=col_idx, value=_safe_cell(val))
                 line_row += 1
 
     for col_idx in range(1, len(line_headers) + 1):

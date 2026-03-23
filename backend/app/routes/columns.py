@@ -67,8 +67,10 @@ def update_column(
     if not col:
         raise HTTPException(status_code=404, detail="Column not found")
 
+    _ALLOWED = {"field_label", "field_description", "field_type", "is_active", "is_exportable", "display_order"}
     for field, value in body.model_dump(exclude_unset=True).items():
-        setattr(col, field, value)
+        if field in _ALLOWED:
+            setattr(col, field, value)
 
     db.commit()
     db.refresh(col)
@@ -112,3 +114,22 @@ def toggle_column(
     db.commit()
     db.refresh(col)
     return {"id": col.id, "is_active": col.is_active}
+
+
+@router.put("/{col_id}/toggle-export")
+def toggle_export(
+    col_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    col = db.query(ColumnConfig).filter(
+        ColumnConfig.id == col_id,
+        ColumnConfig.user_id == current_user.id
+    ).first()
+    if not col:
+        raise HTTPException(status_code=404, detail="Column not found")
+
+    col.is_exportable = not col.is_exportable
+    db.commit()
+    db.refresh(col)
+    return {"id": col.id, "is_exportable": col.is_exportable}

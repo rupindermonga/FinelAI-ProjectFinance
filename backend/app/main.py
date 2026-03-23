@@ -10,19 +10,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import engine, Base
-from .routes import auth, invoices, upload, columns, export, categories
+from .routes import auth, invoices, upload, columns, export, categories, admin
 
 
 def _run_migrations():
     """Add any missing columns to existing tables (safe to run on every start)."""
     from sqlalchemy import text
     with engine.connect() as conn:
-        # Add requires_sub_division to category_configs if not present
-        try:
-            conn.execute(text("ALTER TABLE category_configs ADD COLUMN requires_sub_division BOOLEAN DEFAULT 0"))
-            conn.commit()
-        except Exception:
-            pass  # Column already exists
+        for stmt in [
+            "ALTER TABLE category_configs ADD COLUMN requires_sub_division BOOLEAN DEFAULT 0",
+            "ALTER TABLE column_configs ADD COLUMN is_exportable BOOLEAN DEFAULT 1",
+            "ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0",
+        ]:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                pass  # Column already exists
 
 
 @asynccontextmanager
@@ -46,7 +50,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "https://cdn.tailwindcss.com https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; "
             "font-src 'self' https://cdnjs.cloudflare.com; "
-            "img-src 'self' data:; "
+            "img-src 'self' data: blob:; "
+            "object-src blob:; "
+            "frame-src blob:; "
             "connect-src 'self'; "
             "frame-ancestors 'none';"
         )
@@ -79,6 +85,7 @@ app.include_router(upload.router)
 app.include_router(columns.router)
 app.include_router(categories.router)
 app.include_router(export.router)
+app.include_router(admin.router)
 
 # Serve static frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")

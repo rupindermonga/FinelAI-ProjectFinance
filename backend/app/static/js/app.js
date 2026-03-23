@@ -18,6 +18,7 @@ function app() {
     filters: { start_date: '', end_date: '', vendor: '', currency: '', status: '' },
     exportDates: { start: '', end: '' },
     pagination: { page: 1, limit: 50, total: 0, pages: 0 },
+    viewMode: 'summary',   // 'summary' | 'lines'
 
     // ── Upload ────────────────────────────────────────────────────
     showUploadModal: false,
@@ -29,6 +30,10 @@ function app() {
     // ── Invoice detail ────────────────────────────────────────────
     showInvoiceDetail: false,
     selectedInvoice: null,
+    activeDetailTab: 'fields',   // 'fields' | 'preview'
+    previewUrl: null,
+    previewType: null,           // 'pdf' | 'image'
+    previewLoading: false,
 
     // ── Columns ───────────────────────────────────────────────────
     allColumns: [],
@@ -43,9 +48,12 @@ function app() {
     processingQueue: [],
     sseSource: null,
 
-    // ── Settings ──────────────────────────────────────────────────
-    settings: { geminiKey: '', geminiModel: 'gemini-1.5-pro' },
-    showApiKey: false,
+    // ── Settings / Admin API Keys ─────────────────────────────────
+    adminApiKeys: [],
+    showApiKeyModal: false,
+    apiKeyForm: { label: '', key_value: '', priority: 100, is_active: true },
+    apiKeyFormError: '',
+    apiKeyFormLoading: false,
     settingsSaved: false,
 
     // ── Categories ────────────────────────────────────────────────
@@ -69,6 +77,7 @@ function app() {
         this.user = JSON.parse(savedUser);
         this.view = 'dashboard';
         await Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories()]);
+        if (this.user?.is_admin) await this.loadApiKeys();
       }
     },
 
@@ -106,7 +115,8 @@ function app() {
       localStorage.setItem('invoice_token', this.token);
       localStorage.setItem('invoice_user', JSON.stringify(this.user));
       this.view = 'dashboard';
-      Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories()]);
+      Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories()])
+        .then(() => { if (this.user?.is_admin) this.loadApiKeys(); });
     },
 
     logout() {
@@ -152,7 +162,45 @@ function app() {
 
     openInvoice(inv) {
       this.selectedInvoice = inv;
+      this.activeDetailTab = 'fields';
+      // Revoke any previous blob URL
+      if (this.previewUrl) { URL.revokeObjectURL(this.previewUrl); this.previewUrl = null; }
+      this.previewType = null;
       this.showInvoiceDetail = true;
+    },
+
+    closeInvoiceDetail() {
+      if (this.previewUrl) { URL.revokeObjectURL(this.previewUrl); this.previewUrl = null; }
+      this.showInvoiceDetail = false;
+    },
+
+    async switchToPreview() {
+      this.activeDetailTab = 'preview';
+      if (!this.previewUrl && !this.previewLoading) {
+        await this.loadPreview();
+      }
+    },
+
+    async loadPreview() {
+      if (!this.selectedInvoice) return;
+      this.previewLoading = true;
+      try {
+        const res = await fetch(`/api/invoices/${this.selectedInvoice.id}/file`, { headers: this._headers() });
+        if (!res.ok) throw new Error('File not available on server');
+        const blob = await res.blob();
+        // Detect type: content-type header → blob.type → filename extension
+        const ct = res.headers.get('content-type') || blob.type || '';
+        const fname = (this.selectedInvoice.original_filename || '').toLowerCase();
+        const imageExts = ['.jpg', '.jpeg', '.png', '.webp', '.tiff', '.tif'];
+        const isImageExt = imageExts.some(e => fname.endsWith(e));
+        this.previewType = (ct.startsWith('image/') || isImageExt) ? 'image' : 'pdf';
+        this.previewUrl = URL.createObjectURL(blob);
+      } catch (e) {
+        alert('Cannot preview: ' + e.message);
+        this.activeDetailTab = 'fields';
+      } finally {
+        this.previewLoading = false;
+      }
     },
 
     async deleteInvoice(id) {
@@ -162,6 +210,22 @@ function app() {
         this.invoices = this.invoices.filter(i => i.id !== id);
         this.loadStats();
       } catch (e) { alert('Could not delete invoice: ' + e.message); }
+    },
+
+    // Line-items flat view: each line item becomes its own row
+    get lineItemsFlat() {
+      const rows = [];
+      for (const inv of this.invoices) {
+        const items = inv.extracted_data?.line_items;
+        if (Array.isArray(items) && items.length > 0) {
+          for (const item of items) {
+            rows.push({ inv, item });
+          }
+        } else {
+          rows.push({ inv, item: null });
+        }
+      }
+      return rows;
     },
 
 
@@ -179,6 +243,13 @@ function app() {
         col.is_active = res.is_active;
         this.activeColumns = this.allColumns.filter(c => c.is_active);
       } catch (e) { alert('Could not toggle column: ' + e.message); }
+    },
+
+    async toggleColumnExport(col) {
+      try {
+        const res = await this.put(`/api/columns/${col.id}/toggle-export`, {});
+        col.is_exportable = res.is_exportable;
+      } catch (e) { alert('Could not toggle export flag: ' + e.message); }
     },
 
     openEditColumn(col) {
@@ -329,6 +400,53 @@ function app() {
     },
 
 
+    // ── Admin: API key management ─────────────────────────────────
+    async loadApiKeys() {
+      try { this.adminApiKeys = await this.get('/api/admin/api-keys'); } catch (e) { console.error(e); }
+    },
+
+    openApiKeyModal() {
+      this.apiKeyForm = { label: '', key_value: '', priority: 100, is_active: true };
+      this.apiKeyFormError = '';
+      this.showApiKeyModal = true;
+    },
+
+    closeApiKeyModal() {
+      this.showApiKeyModal = false;
+      this.apiKeyFormError = '';
+    },
+
+    async saveApiKey() {
+      this.apiKeyFormLoading = true;
+      this.apiKeyFormError = '';
+      try {
+        const key = await this.post('/api/admin/api-keys', this.apiKeyForm);
+        this.adminApiKeys.push(key);
+        this.adminApiKeys.sort((a, b) => a.priority - b.priority || a.id - b.id);
+        this.closeApiKeyModal();
+      } catch (e) {
+        this.apiKeyFormError = e.message;
+      } finally {
+        this.apiKeyFormLoading = false;
+      }
+    },
+
+    async toggleApiKey(key) {
+      try {
+        const res = await this.put(`/api/admin/api-keys/${key.id}/toggle`, {});
+        key.is_active = res.is_active;
+      } catch (e) { alert('Error: ' + e.message); }
+    },
+
+    async deleteApiKey(key) {
+      if (!confirm(`Delete API key "${key.label}"? This cannot be undone.`)) return;
+      try {
+        await this.del(`/api/admin/api-keys/${key.id}`);
+        this.adminApiKeys = this.adminApiKeys.filter(k => k.id !== key.id);
+      } catch (e) { alert('Error: ' + e.message); }
+    },
+
+
     // ── Categories ────────────────────────────────────────────────
     async loadCategories() {
       try {
@@ -344,12 +462,10 @@ function app() {
     },
 
     get subCategories() {
-      // Children of selected category with level = sub_category
       return (this.selectedCategory?.children || []).filter(c => c.level === 'sub_category');
     },
 
     get subDivisions() {
-      // Sub-divisions are direct children of the selected CATEGORY (not sub-category)
       return (this.selectedCategory?.children || []).filter(c => c.level === 'sub_division');
     },
 
@@ -383,11 +499,9 @@ function app() {
         });
         this.showAddCategoryModal = false;
         await this.loadCategories();
-        // Re-select parent after reload
         if (this.addCategoryLevel === 'sub_category' && this.addCategoryParent) {
           this.selectedCategory = this.categoryTree.find(c => c.id === this.addCategoryParent.id) || null;
         } else if (this.addCategoryLevel === 'sub_division' && this.addCategoryParent) {
-          // Sub-division parent is a category — keep category selected
           this.selectedCategory = this.categoryTree.find(c => c.id === this.addCategoryParent.id) || null;
         }
       } catch (e) {
@@ -408,7 +522,6 @@ function app() {
       try {
         await this.put(`/api/categories/${cat.id}`, { requires_sub_division: !cat.requires_sub_division });
         await this.loadCategories();
-        // Re-select so the toggle reflects the new state
         this.selectedCategory = this.categoryTree.find(c => c.id === cat.id) || null;
       } catch (e) { alert('Error: ' + e.message); }
     },
@@ -430,7 +543,6 @@ function app() {
 
     // ── Settings ──────────────────────────────────────────────────
     async saveSettings() {
-      // Settings are stored in .env on the server; for now just show a note
       this.settingsSaved = true;
       setTimeout(() => this.settingsSaved = false, 5000);
     },
@@ -442,7 +554,6 @@ function app() {
       const data = inv.extracted_data || {};
       let val = data[col.field_key];
       if (val === undefined || val === null) {
-        // Try indexed columns
         val = inv[col.field_key];
       }
       if (val === null || val === undefined) return '';

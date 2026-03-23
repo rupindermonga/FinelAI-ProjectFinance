@@ -25,12 +25,19 @@ db  = SessionLocal()
 
 existing = db.query(User).filter(User.username == USERNAME).first()
 if existing:
-    print(f"User '{USERNAME}' already exists.")
+    # Ensure is_admin flag is set even for pre-existing admin user
+    if not existing.is_admin:
+        existing.is_admin = True
+        db.commit()
+        print(f"User '{USERNAME}' already exists — is_admin flag set to True.")
+    else:
+        print(f"User '{USERNAME}' already exists.")
 else:
     user = User(
         username=USERNAME,
         email=EMAIL,
         hashed_password=pwd.hash(PASSWORD),
+        is_admin=True,
     )
     db.add(user)
     db.commit()

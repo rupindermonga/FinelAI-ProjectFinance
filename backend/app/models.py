@@ -12,6 +12,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     invoices = relationship("Invoice", back_populates="user", cascade="all, delete-orphan")
@@ -63,6 +64,7 @@ class ColumnConfig(Base):
     field_type = Column(String, default="string")     # string | number | date | array | boolean
     is_active = Column(Boolean, default=True)         # shown in table + extracted
     is_system = Column(Boolean, default=False)        # cannot be deleted, only toggled
+    is_exportable = Column(Boolean, default=True)     # included in Excel/JSON export
     display_order = Column(Integer, default=100)
 
     user = relationship("User", back_populates="column_configs")
@@ -92,3 +94,15 @@ class CategoryConfig(Base):
     user = relationship("User", back_populates="category_configs")
     parent = relationship("CategoryConfig", remote_side=[id], back_populates="children")
     children = relationship("CategoryConfig", back_populates="parent", cascade="all, delete-orphan")
+
+
+class GeminiApiKey(Base):
+    """Admin-managed pool of Gemini API keys — tried in priority order with fallback."""
+    __tablename__ = "gemini_api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    label = Column(String, nullable=False)        # e.g. "Primary Key", "Backup Key 1"
+    key_value = Column(String, nullable=False)    # actual API key (admin-only access)
+    priority = Column(Integer, default=100)       # lower number = tried first
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

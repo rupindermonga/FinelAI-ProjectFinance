@@ -1,17 +1,23 @@
 import asyncio
 import json
 import os
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from typing import Optional
 from math import ceil
+import aiofiles
+from dotenv import load_dotenv
 
 from ..database import get_db
 from ..models import Invoice, User
 from ..schemas import InvoiceOut, InvoiceListResponse
 from ..dependencies import get_current_user
+
+load_dotenv()
+_UPLOAD_DIR = os.path.abspath(os.getenv("UPLOAD_FOLDER", "./uploads"))
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
 
@@ -131,6 +137,56 @@ def get_invoice(
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
     return inv
+
+
+_FILE_MIME = {
+    ".pdf":  "application/pdf",
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png":  "image/png",
+    ".tiff": "image/tiff",
+    ".tif":  "image/tiff",
+    ".webp": "image/webp",
+}
+
+
+@router.get("/{invoice_id}/file")
+async def get_invoice_file(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stream the original uploaded file so the browser can preview it inline."""
+    inv = db.query(Invoice).filter(
+        Invoice.id == invoice_id, Invoice.user_id == current_user.id
+    ).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if not inv.source_file or not os.path.isfile(inv.source_file):
+        raise HTTPException(status_code=404, detail="Source file not available on disk")
+
+    # Path traversal guard: ensure file is inside the upload directory
+    safe_path = os.path.abspath(inv.source_file)
+    if not safe_path.startswith(_UPLOAD_DIR + os.sep) and safe_path != _UPLOAD_DIR:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    ext = Path(safe_path).suffix.lower()
+    media_type = _FILE_MIME.get(ext, "application/octet-stream")
+    filename = inv.original_filename or os.path.basename(inv.source_file)
+
+    async def _streamer():
+        async with aiofiles.open(safe_path, "rb") as f:
+            while True:
+                chunk = await f.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+
+    return StreamingResponse(
+        _streamer(),
+        media_type=media_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @router.delete("/{invoice_id}")

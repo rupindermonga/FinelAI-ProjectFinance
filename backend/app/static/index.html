@@ -101,7 +101,10 @@
       </nav>
       <div class="px-5 py-4 border-t border-blue-800">
         <div class="text-xs text-blue-300 mb-1">Signed in as</div>
-        <div class="text-sm font-medium truncate" x-text="user?.username"></div>
+        <div class="flex items-center gap-1.5">
+          <div class="text-sm font-medium truncate" x-text="user?.username"></div>
+          <span x-show="user?.is_admin" class="text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded font-bold">Admin</span>
+        </div>
         <button @click="logout()" class="mt-2 text-xs text-blue-300 hover:text-white transition">
           <i class="fa-solid fa-right-from-bracket mr-1"></i> Sign out
         </button>
@@ -227,10 +230,33 @@
           </div>
         </div>
 
-        <!-- Invoice table -->
+        <!-- View mode toggle + table -->
         <div class="bg-white rounded-xl border overflow-hidden">
+
+          <!-- Table toolbar -->
+          <div class="flex items-center justify-between px-4 py-2.5 border-b bg-gray-50">
+            <div class="text-xs text-gray-500" x-text="`${pagination.total} invoice${pagination.total !== 1 ? 's' : ''}`"></div>
+            <!-- View mode toggle -->
+            <div class="flex items-center gap-1 bg-gray-200 rounded-lg p-0.5">
+              <button
+                @click="viewMode='summary'"
+                :class="viewMode==='summary' ? 'bg-white shadow text-blue-700 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+                class="px-3 py-1 rounded-md text-xs transition">
+                <i class="fa-solid fa-list mr-1"></i>Invoice View
+              </button>
+              <button
+                @click="viewMode='lines'"
+                :class="viewMode==='lines' ? 'bg-white shadow text-blue-700 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+                class="px-3 py-1 rounded-md text-xs transition">
+                <i class="fa-solid fa-table-list mr-1"></i>Line Items
+              </button>
+            </div>
+          </div>
+
           <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+
+            <!-- ── Summary / Invoice View ── -->
+            <table x-show="viewMode==='summary'" class="w-full text-sm">
               <thead class="bg-gray-50 border-b">
                 <tr>
                   <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
@@ -257,7 +283,7 @@
                     <td class="px-4 py-3">
                       <div class="flex items-center gap-2">
                         <i class="fa-solid fa-file-pdf text-red-400 text-base"></i>
-                        <span class="text-gray-700 max-w-40 truncate text-xs" x-text="inv.original_filename || inv.source_file"></span>
+                        <span class="text-gray-700 max-w-40 truncate text-xs" x-text="inv.original_filename"></span>
                       </div>
                     </td>
                     <template x-for="col in activeColumns" :key="col.id">
@@ -279,6 +305,53 @@
                 </template>
               </tbody>
             </table>
+
+            <!-- ── Line Items View ── -->
+            <table x-show="viewMode==='lines'" class="w-full text-xs">
+              <thead class="bg-gray-50 border-b">
+                <tr>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Invoice #</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Date</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Vendor</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Curr</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Total</th>
+                  <th class="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Line #</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">SKU</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Description</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Qty</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Unit</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Unit Price</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Tax%</th>
+                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Line Total</th>
+                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Sub-Division</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <template x-if="lineItemsFlat.length === 0">
+                  <tr><td colspan="14" class="text-center py-16 text-gray-400">No invoices found.</td></tr>
+                </template>
+                <template x-for="(row, i) in lineItemsFlat" :key="i">
+                  <tr class="hover:bg-blue-50 cursor-pointer transition" @click="openInvoice(row.inv)">
+                    <td class="px-3 py-2 text-blue-700 font-medium whitespace-nowrap" x-text="row.inv.invoice_number || '—'"></td>
+                    <td class="px-3 py-2 text-gray-600 whitespace-nowrap" x-text="row.inv.invoice_date || '—'"></td>
+                    <td class="px-3 py-2 text-gray-700 max-w-[140px] truncate" x-text="row.inv.vendor_name || '—'"></td>
+                    <td class="px-3 py-2 text-gray-500" x-text="row.inv.currency || '—'"></td>
+                    <td class="px-3 py-2 text-right font-medium text-gray-800" x-text="fmtNum(row.inv.total_due)"></td>
+                    <!-- Line item columns — blank if invoice has no items -->
+                    <td class="px-3 py-2 text-center text-gray-400" x-text="row.item ? (row.item.line_no ?? '—') : '—'"></td>
+                    <td class="px-3 py-2 text-gray-500 font-mono" x-text="row.item?.sku || '—'"></td>
+                    <td class="px-3 py-2 text-gray-700 max-w-xs truncate" x-text="row.item?.description || (row.item ? '—' : '(no line items)')"></td>
+                    <td class="px-3 py-2 text-right text-gray-700" x-text="row.item?.qty ?? '—'"></td>
+                    <td class="px-3 py-2 text-gray-500" x-text="row.item?.unit || '—'"></td>
+                    <td class="px-3 py-2 text-right text-gray-700" x-text="row.item ? fmtNum(row.item.unit_price) : '—'"></td>
+                    <td class="px-3 py-2 text-right text-gray-500" x-text="row.item?.tax_rate != null ? row.item.tax_rate + '%' : '—'"></td>
+                    <td class="px-3 py-2 text-right font-medium text-gray-800" x-text="row.item ? fmtNum(row.item.line_total) : '—'"></td>
+                    <td class="px-3 py-2 text-gray-500" x-text="row.item?.sub_division || '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+
           </div>
 
           <!-- Pagination -->
@@ -304,7 +377,7 @@
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="text-xl font-bold text-gray-800">Manage Columns</h2>
-            <p class="text-sm text-gray-500">Choose which fields Gemini extracts and which columns appear in the table</p>
+            <p class="text-sm text-gray-500">Control which fields Gemini extracts, which appear in the table, and which are included in exports</p>
           </div>
           <button @click="showAddColumnModal=true" class="bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 transition flex items-center gap-2">
             <i class="fa-solid fa-plus"></i> Add Column
@@ -321,6 +394,7 @@
                 <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Type</th>
                 <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Description (for AI)</th>
                 <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Active</th>
+                <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase" title="Include in Excel/JSON exports">Export</th>
                 <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase">System</th>
                 <th class="px-5 py-3"></th>
               </tr>
@@ -335,9 +409,16 @@
                     <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs" x-text="col.field_type"></span>
                   </td>
                   <td class="px-5 py-3 text-gray-500 text-xs max-w-xs truncate" x-text="col.field_description || '—'"></td>
+                  <!-- Active toggle -->
                   <td class="px-5 py-3 text-center">
-                    <button @click="toggleColumn(col)" :class="col.is_active ? 'bg-green-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors">
+                    <button @click="toggleColumn(col)" :class="col.is_active ? 'bg-green-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors" title="Show in table & extract">
                       <span :class="col.is_active ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"></span>
+                    </button>
+                  </td>
+                  <!-- Export toggle -->
+                  <td class="px-5 py-3 text-center">
+                    <button @click="toggleColumnExport(col)" :class="col.is_exportable ? 'bg-blue-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors" title="Include in Excel/JSON export">
+                      <span :class="col.is_exportable ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"></span>
                     </button>
                   </td>
                   <td class="px-5 py-3 text-center">
@@ -357,6 +438,7 @@
             </tbody>
           </table>
         </div>
+        <p class="text-xs text-gray-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i><strong>Active</strong> = field is extracted by Gemini and shown in the invoice table. <strong>Export</strong> = field is included in Excel / JSON downloads. Both can be toggled independently.</p>
       </div><!-- /columns -->
 
 
@@ -451,7 +533,6 @@
                   <div class="flex items-center gap-2 min-w-0">
                     <span :class="sc.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'" class="w-2 h-2 rounded-full flex-shrink-0 inline-block"></span>
                     <span class="text-sm text-gray-800 truncate" x-text="sc.name"></span>
-                    <span x-show="sc.children?.length > 0" class="text-xs text-gray-400" x-text="`(${sc.children.length})`"></span>
                   </div>
                   <div class="flex gap-1 flex-shrink-0 ml-2">
                     <button @click.stop="toggleCategoryActive(sc)" class="text-gray-300 hover:text-amber-500 transition text-xs px-1">
@@ -466,7 +547,7 @@
             </div>
           </div>
 
-          <!-- Column 3: Sub-Divisions (tied to Category, independent of Sub-Category) -->
+          <!-- Column 3: Sub-Divisions -->
           <div class="bg-white rounded-xl border overflow-hidden">
             <div class="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
               <span class="font-semibold text-gray-700 text-sm">
@@ -508,29 +589,73 @@
 
 
       <!-- ── SETTINGS ───────────────────────────────────────────────── -->
-      <div x-show="view==='settings'" class="p-6 max-w-xl">
+      <div x-show="view==='settings'" class="p-6 max-w-2xl">
         <h2 class="text-xl font-bold text-gray-800 mb-6">Settings</h2>
-        <div class="bg-white rounded-xl border p-6 space-y-5">
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Gemini API Key</label>
-            <div class="flex gap-2">
-              <input x-model="settings.geminiKey" :type="showApiKey ? 'text' : 'password'" class="flex-1 border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="AIza..." />
-              <button @click="showApiKey=!showApiKey" class="border rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-50">
-                <i :class="showApiKey ? 'fa-eye-slash' : 'fa-eye'" class="fa-solid"></i>
-              </button>
+
+        <!-- Gemini API Keys (admin only) -->
+        <div x-show="user?.is_admin" class="bg-white rounded-xl border p-6 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-semibold text-gray-800">Gemini API Keys</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Keys are tried in priority order (lowest number first). If one fails, the next is used automatically.</p>
             </div>
-            <p class="text-xs text-gray-400 mt-1">Get your key at <span class="text-blue-600">aistudio.google.com</span></p>
+            <button @click="openApiKeyModal()" class="bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-800 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-plus"></i> Add Key
+            </button>
           </div>
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Gemini Model</label>
-            <select x-model="settings.geminiModel" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-              <option value="gemini-1.5-pro">gemini-1.5-pro (recommended)</option>
-              <option value="gemini-2.0-flash">gemini-2.0-flash (faster)</option>
-              <option value="gemini-1.5-flash">gemini-1.5-flash (faster)</option>
-            </select>
+
+          <!-- Keys table -->
+          <div x-show="adminApiKeys.length === 0" class="text-center py-8 text-gray-400 text-sm border rounded-xl">
+            <i class="fa-solid fa-key text-3xl mb-2 block text-gray-200"></i>
+            No API keys configured yet.<br>
+            <span class="text-xs">Add at least one key to enable invoice processing.</span>
           </div>
-          <div x-show="settingsSaved" class="text-green-600 text-sm"><i class="fa-solid fa-circle-check mr-1"></i>Settings saved to .env file — restart the server to apply.</div>
-          <button @click="saveSettings()" class="bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 transition">Save Settings</button>
+          <div x-show="adminApiKeys.length > 0" class="border rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b">
+                <tr>
+                  <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Priority</th>
+                  <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Label</th>
+                  <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Key (masked)</th>
+                  <th class="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Active</th>
+                  <th class="px-4 py-2.5"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <template x-for="key in adminApiKeys" :key="key.id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2.5 text-gray-500 text-sm font-mono" x-text="key.priority"></td>
+                    <td class="px-4 py-2.5 text-gray-800 font-medium" x-text="key.label"></td>
+                    <td class="px-4 py-2.5 text-gray-500 font-mono text-xs" x-text="key.key_preview"></td>
+                    <td class="px-4 py-2.5 text-center">
+                      <button @click="toggleApiKey(key)" :class="key.is_active ? 'bg-green-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors">
+                        <span :class="key.is_active ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"></span>
+                      </button>
+                    </td>
+                    <td class="px-4 py-2.5 text-right">
+                      <button @click="deleteApiKey(key)" class="text-gray-300 hover:text-red-500 transition">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-xs text-gray-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i>API keys are stored securely on the server and never sent to the browser. The masked preview shows only first 8 + last 4 characters.</p>
+        </div>
+
+        <!-- Non-admin note -->
+        <div x-show="!user?.is_admin" class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-800">
+          <i class="fa-solid fa-lock mr-2"></i>API key management is restricted to admin users.
+        </div>
+
+        <!-- Gemini Model selector (all users can see which model is in use) -->
+        <div class="bg-white rounded-xl border p-6">
+          <h3 class="font-semibold text-gray-800 mb-4">Gemini Model</h3>
+          <p class="text-xs text-gray-400 mb-3">The model is set via <code class="bg-gray-100 px-1 rounded">GEMINI_MODEL</code> in the server's .env file. Current value shown below for reference.</p>
+          <div class="bg-gray-50 rounded-lg px-4 py-2 font-mono text-sm text-gray-700">gemini-1.5-pro (default)</div>
+          <div x-show="settingsSaved" class="text-green-600 text-sm mt-3"><i class="fa-solid fa-circle-check mr-1"></i>Saved.</div>
         </div>
       </div><!-- /settings -->
 
@@ -593,24 +718,55 @@
 
 
   <!-- ══════════════════════════════════════════════════════════════
-       INVOICE DETAIL MODAL
+       INVOICE DETAIL MODAL (with file preview tab)
   ══════════════════════════════════════════════════════════════ -->
-  <div x-show="showInvoiceDetail" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showInvoiceDetail=false">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-      <div class="flex items-center justify-between px-6 py-4 border-b">
-        <h3 class="text-lg font-bold text-gray-800">
-          Invoice Detail
-          <span x-show="selectedInvoice?.invoice_number" class="text-blue-600 ml-2 text-base" x-text="'#' + selectedInvoice?.invoice_number"></span>
-        </h3>
-        <button @click="showInvoiceDetail=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+  <div x-show="showInvoiceDetail" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="closeInvoiceDetail()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <h3 class="text-lg font-bold text-gray-800">
+            Invoice Detail
+            <span x-show="selectedInvoice?.invoice_number" class="text-blue-600 ml-2 text-base" x-text="'#' + selectedInvoice?.invoice_number"></span>
+          </h3>
+          <span :class="statusBadge(selectedInvoice?.status)" class="px-2 py-0.5 rounded-full text-xs font-medium" x-text="selectedInvoice?.status"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="closeInvoiceDetail()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
       </div>
+
+      <!-- Tab bar -->
+      <div class="flex border-b flex-shrink-0">
+        <button
+          @click="activeDetailTab='fields'"
+          :class="activeDetailTab==='fields' ? 'border-b-2 border-blue-600 text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+          class="px-6 py-2.5 text-sm transition">
+          <i class="fa-solid fa-table-list mr-1.5"></i>Fields
+        </button>
+        <button
+          @click="switchToPreview()"
+          :class="activeDetailTab==='preview' ? 'border-b-2 border-blue-600 text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+          class="px-6 py-2.5 text-sm transition">
+          <i class="fa-solid fa-eye mr-1.5"></i>Preview File
+        </button>
+      </div>
+
+      <!-- Body -->
       <div class="overflow-y-auto flex-1 p-6">
-        <div x-show="selectedInvoice" class="space-y-5">
-          <!-- Meta -->
-          <div class="grid grid-cols-2 gap-4">
+
+        <!-- ── Fields tab ── -->
+        <div x-show="activeDetailTab==='fields'" class="space-y-5">
+          <!-- Meta row -->
+          <div class="grid grid-cols-3 gap-4">
             <div class="bg-gray-50 rounded-lg p-3">
               <div class="text-xs text-gray-400 mb-1">Source File</div>
-              <div class="text-sm font-medium text-gray-700" x-text="selectedInvoice?.original_filename"></div>
+              <div class="text-sm font-medium text-gray-700 truncate" x-text="selectedInvoice?.original_filename || '—'"></div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-3">
+              <div class="text-xs text-gray-400 mb-1">Processed At</div>
+              <div class="text-sm text-gray-700" x-text="selectedInvoice?.processed_at ? new Date(selectedInvoice.processed_at).toLocaleString() : '—'"></div>
             </div>
             <div class="bg-gray-50 rounded-lg p-3">
               <div class="text-xs text-gray-400 mb-1">Confidence</div>
@@ -630,9 +786,9 @@
                 </tr>
               </thead>
               <tbody class="divide-y">
-                <template x-for="col in activeColumns.filter(c => c.field_key !== 'line_items')" :key="col.id">
+                <template x-for="col in allColumns.filter(c => c.is_active && c.field_key !== 'line_items')" :key="col.id">
                   <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-2.5 text-gray-500 font-medium w-40" x-text="col.field_label"></td>
+                    <td class="px-4 py-2.5 text-gray-500 font-medium w-44" x-text="col.field_label"></td>
                     <td class="px-4 py-2.5 text-gray-800" x-text="getCellValue(selectedInvoice, col) || '—'"></td>
                   </tr>
                 </template>
@@ -642,32 +798,40 @@
 
           <!-- Line items -->
           <div x-show="selectedInvoice?.extracted_data?.line_items?.length > 0">
-            <h4 class="font-semibold text-gray-700 mb-2 text-sm">Line Items</h4>
+            <h4 class="font-semibold text-gray-700 mb-2 text-sm">Line Items
+              <span class="text-gray-400 font-normal ml-1" x-text="`(${selectedInvoice?.extracted_data?.line_items?.length || 0} items)`"></span>
+            </h4>
             <div class="border rounded-xl overflow-x-auto">
               <table class="w-full text-xs">
                 <thead class="bg-gray-50 border-b">
                   <tr>
                     <th class="text-left px-3 py-2 text-gray-500">#</th>
+                    <th class="text-left px-3 py-2 text-gray-500">Manufacturer</th>
                     <th class="text-left px-3 py-2 text-gray-500">SKU</th>
                     <th class="text-left px-3 py-2 text-gray-500">Description</th>
                     <th class="text-right px-3 py-2 text-gray-500">Qty</th>
                     <th class="text-left px-3 py-2 text-gray-500">Unit</th>
                     <th class="text-right px-3 py-2 text-gray-500">Unit Price</th>
+                    <th class="text-right px-3 py-2 text-gray-500">Discount</th>
                     <th class="text-right px-3 py-2 text-gray-500">Tax %</th>
                     <th class="text-right px-3 py-2 text-gray-500">Total</th>
+                    <th class="text-left px-3 py-2 text-gray-500">Sub-Division</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y">
                   <template x-for="(item, i) in selectedInvoice?.extracted_data?.line_items || []" :key="i">
                     <tr class="hover:bg-gray-50">
                       <td class="px-3 py-2 text-gray-400" x-text="item.line_no || (i+1)"></td>
-                      <td class="px-3 py-2 text-gray-500" x-text="item.sku || '—'"></td>
+                      <td class="px-3 py-2 text-gray-500" x-text="item.manufacturer || '—'"></td>
+                      <td class="px-3 py-2 text-gray-500 font-mono" x-text="item.sku || '—'"></td>
                       <td class="px-3 py-2 text-gray-800 max-w-xs" x-text="item.description"></td>
-                      <td class="px-3 py-2 text-right text-gray-700" x-text="item.quantity"></td>
+                      <td class="px-3 py-2 text-right text-gray-700" x-text="item.qty ?? '—'"></td>
                       <td class="px-3 py-2 text-gray-500" x-text="item.unit || '—'"></td>
                       <td class="px-3 py-2 text-right text-gray-700" x-text="fmtNum(item.unit_price)"></td>
+                      <td class="px-3 py-2 text-right text-gray-500" x-text="fmtNum(item.discount_amount)"></td>
                       <td class="px-3 py-2 text-right text-gray-500" x-text="item.tax_rate != null ? item.tax_rate + '%' : '—'"></td>
                       <td class="px-3 py-2 text-right font-medium text-gray-800" x-text="fmtNum(item.line_total)"></td>
+                      <td class="px-3 py-2 text-gray-500" x-text="item.sub_division || '—'"></td>
                     </tr>
                   </template>
                 </tbody>
@@ -681,6 +845,32 @@
             <div class="text-sm text-red-600" x-text="selectedInvoice?.error_message"></div>
           </div>
         </div>
+
+        <!-- ── Preview tab ── -->
+        <div x-show="activeDetailTab==='preview'">
+          <!-- Loading spinner -->
+          <div x-show="previewLoading" class="flex flex-col items-center justify-center py-20 text-gray-400">
+            <i class="fa-solid fa-spinner fa-spin text-3xl mb-3 text-blue-500"></i>
+            <p class="text-sm">Loading file preview...</p>
+          </div>
+
+          <!-- PDF preview -->
+          <div x-show="!previewLoading && previewType === 'pdf'" class="w-full" style="height: 70vh;">
+            <iframe :src="previewUrl" class="w-full h-full rounded-xl border" style="min-height:60vh;"></iframe>
+          </div>
+
+          <!-- Image preview -->
+          <div x-show="!previewLoading && previewType === 'image'" class="flex justify-center">
+            <img :src="previewUrl" alt="Invoice preview" class="max-w-full max-h-[70vh] rounded-xl border shadow-sm object-contain" />
+          </div>
+
+          <!-- No file available -->
+          <div x-show="!previewLoading && !previewType && !previewUrl" class="flex flex-col items-center justify-center py-20 text-gray-400">
+            <i class="fa-solid fa-file-circle-xmark text-4xl mb-3 text-gray-200"></i>
+            <p class="text-sm">File preview not available.</p>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -758,6 +948,44 @@
           <button type="submit" :disabled="addCategoryLoading" class="flex-1 bg-blue-700 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-800 disabled:opacity-50">
             <span x-show="!addCategoryLoading">Add</span>
             <span x-show="addCategoryLoading"><i class="fa-solid fa-spinner fa-spin mr-1"></i></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       ADD API KEY MODAL (admin only)
+  ══════════════════════════════════════════════════════════════ -->
+  <div x-show="showApiKeyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="closeApiKeyModal()">
+    <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-lg font-bold text-gray-800">Add Gemini API Key</h3>
+        <button @click="closeApiKeyModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <form @submit.prevent="saveApiKey()">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Label</label>
+            <input x-model="apiKeyForm.label" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="e.g. Primary Key, Backup Key 1" required />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+            <input x-model="apiKeyForm.key_value" type="password" class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="AIza..." required />
+            <p class="text-xs text-gray-400 mt-1">The key will be masked after saving. It is never sent back to the browser.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Priority <span class="text-gray-400 text-xs">(lower = tried first)</span></label>
+            <input x-model.number="apiKeyForm.priority" type="number" min="1" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+        </div>
+        <div x-show="apiKeyFormError" class="mt-4 text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="apiKeyFormError"></div>
+        <div class="flex gap-3 mt-6">
+          <button type="button" @click="closeApiKeyModal()" class="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+          <button type="submit" :disabled="apiKeyFormLoading" class="flex-1 bg-blue-700 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-800 disabled:opacity-50 transition">
+            <span x-show="!apiKeyFormLoading">Save Key</span>
+            <span x-show="apiKeyFormLoading"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...</span>
           </button>
         </div>
       </form>

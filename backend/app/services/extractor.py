@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-from ..models import Invoice, ColumnConfig, CategoryConfig
+from ..models import Invoice, ColumnConfig, CategoryConfig, GeminiApiKey
 from .gemini import extract_invoice_from_file
 
 
@@ -68,7 +68,15 @@ async def process_invoice_file(
     try:
         columns = get_active_columns(db, user_id)
         cats = get_active_categories(db, user_id)
-        data = await extract_invoice_from_file(file_path, columns, cats)
+        # Load active DB keys in priority order; .env key is appended as fallback inside gemini.py
+        db_keys = [
+            k.key_value for k in
+            db.query(GeminiApiKey)
+              .filter(GeminiApiKey.is_active == True)
+              .order_by(GeminiApiKey.priority, GeminiApiKey.id)
+              .all()
+        ]
+        data = await extract_invoice_from_file(file_path, columns, cats, db_keys)
 
         # Populate indexed fields from extracted data
         invoice.invoice_number = _str(data.get("invoice_number"))

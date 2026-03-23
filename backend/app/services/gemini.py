@@ -1,10 +1,12 @@
 import google.generativeai as genai
 import json
+import logging
 import os
 from pathlib import Path
 from typing import List, Optional
 from ..models import ColumnConfig, CategoryConfig
 
+logger = logging.getLogger(__name__)
 
 SUPPORTED_MIME = {
     ".pdf": "application/pdf",
@@ -17,13 +19,36 @@ SUPPORTED_MIME = {
 }
 
 
-def get_gemini_model():
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if not api_key or api_key == "your_gemini_api_key_here":
-        raise ValueError("GEMINI_API_KEY is not configured. Please set it in your .env file.")
-    genai.configure(api_key=api_key)
-    model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
-    return genai.GenerativeModel(model_name)
+def _env_keys() -> list:
+    """
+    Return all valid Gemini API keys from the environment.
+    Reads GEMINI_API_KEYS (comma-separated) first, then falls back to GEMINI_API_KEY.
+    """
+    multi = os.getenv("GEMINI_API_KEYS", "")
+    if multi:
+        keys = [k.strip() for k in multi.split(",") if k.strip() and k.strip() != "your_gemini_api_key_here"]
+        if keys:
+            return keys
+    single = os.getenv("GEMINI_API_KEY", "").strip()
+    if single and single != "your_gemini_api_key_here":
+        return [single]
+    return []
+
+
+def _env_key() -> str:
+    """Return the first valid .env key (kept for backward compat with check_api_key)."""
+    keys = _env_keys()
+    return keys[0] if keys else ""
+
+
+def check_api_key(db=None) -> bool:
+    """Return True if at least one Gemini API key is available (DB or .env)."""
+    if _env_key():
+        return True
+    if db is not None:
+        from ..models import GeminiApiKey
+        return db.query(GeminiApiKey).filter(GeminiApiKey.is_active == True).count() > 0
+    return False
 
 
 def build_category_hint(categories: List[CategoryConfig]) -> dict:
@@ -159,40 +184,84 @@ Extraction rules:
 async def extract_invoice_from_file(
     file_path: str,
     columns: List[ColumnConfig],
-    categories: List[CategoryConfig] = None
+    categories: List[CategoryConfig] = None,
+    api_keys: List[str] = None,
 ) -> dict:
-    """Upload file to Gemini and extract invoice data. Returns extracted JSON dict."""
-    model = get_gemini_model()
+    """
+    Upload file to Gemini and extract invoice data.
+    Tries each key in api_keys (DB-managed, ordered by priority), then the .env
+    fallback key.  Raises ValueError only if every key fails.
+    """
     prompt = build_extraction_prompt(columns, categories or [])
-
     ext = Path(file_path).suffix.lower()
     mime_type = SUPPORTED_MIME.get(ext)
     if not mime_type:
         raise ValueError(f"Unsupported file type: {ext}")
 
-    uploaded_file = genai.upload_file(path=file_path, mime_type=mime_type)
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-    response = model.generate_content(
-        [uploaded_file, prompt],
-        generation_config=genai.GenerationConfig(
-            response_mime_type="application/json",
-            temperature=0.1,
+    # Build the list of keys to try: DB keys first, then .env keys as fallback
+    keys_to_try: List[str] = list(api_keys or [])
+    for env_k in _env_keys():
+        if env_k not in keys_to_try:
+            keys_to_try.append(env_k)
+
+    if not keys_to_try:
+        raise ValueError(
+            "No Gemini API keys configured. "
+            "Add at least one key in Admin → API Keys (or set GEMINI_API_KEY in .env)."
         )
-    )
 
-    try:
-        genai.delete_file(uploaded_file.name)
-    except Exception:
-        pass
+    import hashlib
 
-    raw_text = response.text.strip()
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("\n", 1)[-1]
-        raw_text = raw_text.rsplit("```", 1)[0]
+    def _key_tag(k: str, idx: int, total: int) -> str:
+        h = hashlib.sha256(k.encode()).hexdigest()[:8]
+        return f"key {idx}/{total} [sha256:{h}]"
 
-    return json.loads(raw_text)
+    def _classify_error(e: Exception) -> str:
+        """Return a short human-readable reason for the failure."""
+        msg = str(e).lower()
+        if "429" in msg or "quota" in msg or "resource_exhausted" in msg or "rate" in msg:
+            return "rate-limited / quota exceeded"
+        if "401" in msg or "403" in msg or "api_key" in msg or "invalid" in msg or "permission" in msg:
+            return "invalid or unauthorised key"
+        return str(e)
 
+    total = len(keys_to_try)
+    last_error: Exception = Exception("No keys available")
+    for idx, key in enumerate(keys_to_try, start=1):
+        tag = _key_tag(key, idx, total)
+        try:
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel(model_name)
 
-def check_api_key() -> bool:
-    key = os.getenv("GEMINI_API_KEY", "")
-    return bool(key and key != "your_gemini_api_key_here")
+            uploaded_file = genai.upload_file(path=file_path, mime_type=mime_type)
+            try:
+                response = model.generate_content(
+                    [uploaded_file, prompt],
+                    generation_config=genai.GenerationConfig(
+                        response_mime_type="application/json",
+                        temperature=0.1,
+                    ),
+                )
+            finally:
+                try:
+                    genai.delete_file(uploaded_file.name)
+                except Exception:
+                    pass
+
+            raw_text = response.text.strip()
+            if raw_text.startswith("```"):
+                raw_text = raw_text.split("\n", 1)[-1]
+                raw_text = raw_text.rsplit("```", 1)[0]
+
+            logger.info("Gemini %s succeeded.", tag)
+            return json.loads(raw_text)
+
+        except Exception as e:
+            last_error = e
+            reason = _classify_error(e)
+            logger.warning("Gemini %s failed (%s) — trying next key.", tag, reason)
+            continue  # try the next key
+
+    raise ValueError(f"All {total} Gemini API key(s) failed. Last error: {last_error}")

@@ -23,10 +23,10 @@ async def upload_invoices(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not check_api_key():
+    if not check_api_key(db):
         raise HTTPException(
             status_code=400,
-            detail="Gemini API key not configured. Please add GEMINI_API_KEY to your .env file."
+            detail="No Gemini API key configured. Add one in Admin → Settings → API Keys, or set GEMINI_API_KEY in .env."
         )
 
     results = []
@@ -40,14 +40,37 @@ async def upload_invoices(
             })
             continue
 
-        content = await upload.read()
-        if len(content) > 50 * 1024 * 1024:  # 50 MB limit
+        _MAX = 50 * 1024 * 1024  # 50 MB
+        # Reject early using Content-Length header when browser provides it
+        cl = upload.headers.get("content-length")
+        if cl and int(cl) > _MAX:
             results.append({
                 "filename": upload.filename,
                 "status": "rejected",
                 "reason": "File too large (max 50 MB)"
             })
             continue
+        # Read in chunks; abort if accumulated size exceeds limit
+        chunks = []
+        total = 0
+        oversized = False
+        while True:
+            chunk = await upload.read(65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > _MAX:
+                oversized = True
+                break
+            chunks.append(chunk)
+        if oversized:
+            results.append({
+                "filename": upload.filename,
+                "status": "rejected",
+                "reason": "File too large (max 50 MB)"
+            })
+            continue
+        content = b"".join(chunks)
 
         # Save file to disk
         saved_path = save_upload_file(content, upload.filename)
