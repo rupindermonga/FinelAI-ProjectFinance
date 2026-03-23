@@ -80,8 +80,8 @@ async def process_invoice_file(
 
         # Populate indexed fields from extracted data
         invoice.invoice_number = _str(data.get("invoice_number"))
-        invoice.invoice_date = _str(data.get("invoice_date"))
-        invoice.due_date = _str(data.get("due_date"))
+        invoice.invoice_date = _date(data.get("invoice_date"))
+        invoice.due_date = _date(data.get("due_date"))
         invoice.vendor_name = _str(data.get("vendor_name"))
         invoice.currency = _str(data.get("currency"))
         invoice.total_due = _num(data.get("total_due"))
@@ -118,6 +118,27 @@ def _str(val) -> str | None:
     if val is None:
         return None
     return str(val).strip() or None
+
+
+def _date(val) -> str | None:
+    """Return a YYYY-MM-DD string or None.  Rejects malformed dates."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    try:
+        from datetime import datetime as _dt
+        _dt.strptime(s, "%Y-%m-%d")
+        return s
+    except ValueError:
+        # Try common alternative formats and normalise
+        for fmt in ("%d/%m/%Y", "%m/%d/%Y", "%Y/%m/%d", "%d-%m-%Y"):
+            try:
+                return _dt.strptime(s, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        return s  # store raw; don't discard data, but date filters may not match
 
 
 def _num(val) -> float | None:

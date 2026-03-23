@@ -108,9 +108,11 @@ async def stream_processing(
     """SSE endpoint — streams live processing updates to client."""
     async def event_generator():
         seen = set()
-        timeout = 120  # seconds
-        elapsed = 0
-        while elapsed < timeout:
+        idle_timeout = 30   # close after 30s of no new events
+        max_timeout = 300   # hard cap at 5 minutes
+        idle = 0
+        total = 0
+        while idle < idle_timeout and total < max_timeout:
             updates = []
             for inv_id, info in list(processing_store.items()):
                 # Only stream events owned by the authenticated user
@@ -124,9 +126,12 @@ async def stream_processing(
 
             if updates:
                 yield f"data: {json.dumps(updates)}\n\n"
+                idle = 0  # reset idle timer on activity
+            else:
+                idle += 1
 
             await asyncio.sleep(1)
-            elapsed += 1
+            total += 1
 
         yield "data: {\"done\": true}\n\n"
 
@@ -209,13 +214,16 @@ def delete_invoice(
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Delete backing file from disk before removing the DB record
-    if inv.source_file and os.path.isfile(inv.source_file):
-        try:
-            os.remove(inv.source_file)
-        except OSError:
-            pass  # File already gone or no permission — proceed with DB delete
-
+    # Delete DB record first so a failed commit doesn't orphan the record
+    file_to_delete = inv.source_file
     db.delete(inv)
     db.commit()
+
+    # Now safe to remove the backing file
+    if file_to_delete and os.path.isfile(file_to_delete):
+        try:
+            os.remove(file_to_delete)
+        except OSError:
+            pass  # File already gone or no permission — DB record is already removed
+
     return {"message": "Invoice deleted"}

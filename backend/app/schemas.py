@@ -6,6 +6,7 @@ import re
 VALID_FIELD_TYPES = ("string", "number", "date", "boolean")
 
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9_\-]+$")
+_FIELD_KEY_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 
 
 # ─── Auth ────────────────────────────────────────────────────────────────────
@@ -46,8 +47,15 @@ class Token(BaseModel):
 # ─── Column Config ────────────────────────────────────────────────────────────
 
 class ColumnConfigCreate(BaseModel):
-    field_key: str
+    field_key: str = Field(..., min_length=1, max_length=64)
     field_label: str
+
+    @field_validator("field_key")
+    @classmethod
+    def field_key_safe(cls, v: str) -> str:
+        if not _FIELD_KEY_RE.match(v):
+            raise ValueError("field_key must start with a letter and contain only letters, digits, and underscores")
+        return v
     field_description: Optional[str] = None
     field_type: Literal["string", "number", "date", "boolean"] = "string"
     display_order: Optional[int] = 100

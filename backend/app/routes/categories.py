@@ -167,8 +167,10 @@ def update_category(
     if not item:
         raise HTTPException(status_code=404, detail="Not found")
 
+    _ALLOWED = {"name", "is_active", "display_order", "requires_sub_division"}
     for field, value in body.model_dump(exclude_unset=True).items():
-        setattr(item, field, value)
+        if field in _ALLOWED:
+            setattr(item, field, value)
 
     db.commit()
     db.refresh(item)
