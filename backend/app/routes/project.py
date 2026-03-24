@@ -124,8 +124,11 @@ def update_cost_category(cat_id: int, body: CostCategoryUpdate, db: Session = De
     cat = db.query(CostCategory).filter(CostCategory.id == cat_id, CostCategory.project_id == proj.id).first()
     if not cat:
         raise HTTPException(status_code=404, detail="Cost category not found")
+    updates = body.model_dump(exclude_unset=True)
+    if "budget" in updates and updates["budget"] is not None and updates["budget"] < 0:
+        raise HTTPException(status_code=400, detail="Budget must be non-negative")
     _ALLOWED = {"name", "budget"}
-    for field, value in body.model_dump(exclude_unset=True).items():
+    for field, value in updates.items():
         if field in _ALLOWED:
             setattr(cat, field, value)
     db.commit()
@@ -188,8 +191,13 @@ def set_subdivision_budgets(cat_id: int, budgets: List[SubDivisionBudgetSet], db
     cat = db.query(CostCategory).filter(CostCategory.id == cat_id, CostCategory.project_id == proj.id).first()
     if not cat:
         raise HTTPException(status_code=404)
-    # Upsert budgets
+    # Upsert budgets — verify each subdivision belongs to this project
     for b in budgets:
+        sd = db.query(SubDivision).filter(SubDivision.id == b.subdivision_id, SubDivision.project_id == proj.id).first()
+        if not sd:
+            raise HTTPException(status_code=404, detail=f"Sub-division {b.subdivision_id} not found in your project")
+        if b.budget < 0:
+            raise HTTPException(status_code=400, detail="Budget must be non-negative")
         existing = db.query(SubDivisionBudget).filter(
             SubDivisionBudget.category_id == cat_id,
             SubDivisionBudget.subdivision_id == b.subdivision_id
@@ -307,6 +315,11 @@ def create_payment(body: PaymentCreate, db: Session = Depends(get_db), current_u
         raise HTTPException(status_code=404, detail="Invoice not found")
     if body.amount <= 0:
         raise HTTPException(status_code=400, detail="Payment amount must be positive")
+    balance = (inv.total_due or 0.0) - (inv.amount_paid or 0.0)
+    if balance <= 0:
+        raise HTTPException(status_code=400, detail="Invoice is already fully paid")
+    if body.amount > balance + 0.01:
+        raise HTTPException(status_code=400, detail=f"Payment ${body.amount:.2f} exceeds outstanding balance ${balance:.2f}")
 
     pmt = Payment(
         invoice_id=body.invoice_id,

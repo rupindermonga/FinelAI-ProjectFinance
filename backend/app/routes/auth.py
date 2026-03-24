@@ -17,21 +17,31 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "10080"))
 
-# ── Simple in-memory rate limiter for login/register ────────────────────────
-_MAX_ATTEMPTS = 10          # max attempts per window
+# ── Simple in-memory rate limiter ────────────────────────────────────────────
+_LOGIN_MAX = 10             # max login attempts per window per IP
+_REGISTER_MAX = 5           # max register attempts per window per IP
 _WINDOW_SECONDS = 300       # 5-minute window
-_attempts: dict = defaultdict(list)
+_login_attempts: dict = defaultdict(list)
+_register_attempts: dict = defaultdict(list)
 
 
-def _check_rate_limit(request: Request):
-    """Raise 429 if the client IP has exceeded the login attempt limit."""
+def _check_rate_limit(request: Request, bucket: str = "login"):
+    """Raise 429 if the client IP has exceeded the attempt limit for this bucket."""
     ip = request.client.host if request.client else "unknown"
     now = time.time()
+
+    if bucket == "register":
+        store = _register_attempts
+        limit = _REGISTER_MAX
+    else:
+        store = _login_attempts
+        limit = _LOGIN_MAX
+
     # Prune old entries
-    _attempts[ip] = [t for t in _attempts[ip] if now - t < _WINDOW_SECONDS]
-    if len(_attempts[ip]) >= _MAX_ATTEMPTS:
+    store[ip] = [t for t in store[ip] if now - t < _WINDOW_SECONDS]
+    if len(store[ip]) >= limit:
         raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
-    _attempts[ip].append(now)
+    store[ip].append(now)
 
 
 def create_token(user_id: int) -> str:
@@ -41,7 +51,7 @@ def create_token(user_id: int) -> str:
 
 @router.post("/register", response_model=Token)
 def register(body: UserCreate, request: Request = None, db: Session = Depends(get_db)):
-    _check_rate_limit(request)
+    _check_rate_limit(request, bucket="register")
     if db.query(User).filter(User.username == body.username).first():
         raise HTTPException(status_code=400, detail="Username already taken")
     if db.query(User).filter(User.email == body.email).first():

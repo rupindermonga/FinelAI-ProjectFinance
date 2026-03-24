@@ -107,7 +107,8 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_spa(full_path: str = ""):
     # API routes take priority (handled above); everything else serves the SPA
-    if full_path.startswith("api/") or full_path.startswith("static/"):
+    _blocked = {"api/", "static/", "docs", "redoc", "openapi.json"}
+    if any(full_path.startswith(b) or full_path == b for b in _blocked):
         from fastapi import HTTPException
         raise HTTPException(status_code=404)
     index_path = os.path.join(static_dir, "index.html")
