@@ -30,12 +30,13 @@ def _check_rate_limit(request: Request, bucket: str = "login"):
     ip = request.client.host if request.client else "unknown"
     now = time.time()
 
+    # Only rate-limit login (brute-force protection). Registration is not rate-limited
+    # to avoid blocking legitimate users behind shared NATs.
     if bucket == "register":
-        store = _register_attempts
-        limit = _REGISTER_MAX
-    else:
-        store = _login_attempts
-        limit = _LOGIN_MAX
+        return
+
+    store = _login_attempts
+    limit = _LOGIN_MAX
 
     # Prune old entries
     store[ip] = [t for t in store[ip] if now - t < _WINDOW_SECONDS]

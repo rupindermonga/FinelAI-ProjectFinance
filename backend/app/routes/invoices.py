@@ -109,6 +109,9 @@ async def stream_processing(
     from ..models import User as UserModel
     try:
         payload = jwt.decode(token or "", SECRET_KEY, algorithms=[ALGORITHM])
+        # Enforce scope=sse — reject main session JWTs
+        if payload.get("scope") != "sse":
+            raise ValueError("SSE endpoint requires a short-lived SSE token, not the session JWT")
         user_id = int(payload.get("sub"))
         current_user = db.query(UserModel).filter(UserModel.id == user_id).first()
         if not current_user or not current_user.is_active:

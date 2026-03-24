@@ -36,10 +36,35 @@ def _run_migrations():
                 pass  # Column already exists
 
 
+def _retire_default_admin():
+    """Block login with the old default password 'admin123' by rehashing to a random value."""
+    from passlib.context import CryptContext
+    from .database import SessionLocal
+    from .models import User
+    pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter(User.username == "admin").first()
+        if admin and pwd.verify("admin123", admin.hashed_password):
+            new_pw = os.getenv("ADMIN_PASSWORD", "")
+            if new_pw and new_pw != "admin123" and len(new_pw) >= 8:
+                admin.hashed_password = pwd.hash(new_pw)
+                db.commit()
+                print("INFO: Admin password updated from .env ADMIN_PASSWORD.")
+            else:
+                import secrets
+                admin.hashed_password = pwd.hash(secrets.token_urlsafe(32))
+                db.commit()
+                print("WARNING: Admin 'admin123' password retired. Set ADMIN_PASSWORD in .env and re-run create_admin.py.")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     _run_migrations()
+    _retire_default_admin()
     os.makedirs(os.getenv("UPLOAD_FOLDER", "./uploads"), exist_ok=True)
     yield
 
