@@ -2,7 +2,8 @@
 import requests
 import time
 
-BASE = "http://localhost:8002"
+import os
+BASE = os.getenv("TEST_BASE_URL", "http://localhost:8000")
 RESULTS = []
 
 
@@ -16,7 +17,10 @@ def test(name, condition, detail=""):
     print(line)
 
 
-def login(username="admin", password="admin123"):
+def login(username="admin", password=None):
+    import os
+    if password is None:
+        password = os.getenv("ADMIN_PASSWORD", "Admin@2026!")
     r = requests.post(f"{BASE}/api/auth/login", json={"username": username, "password": password})
     return r.json().get("access_token") if r.status_code == 200 else None
 
@@ -31,6 +35,9 @@ print("=" * 70)
 
 # ── AUTH ─────────────────────────────────────────────────────────────────
 print("\n-- AUTH & INPUT VALIDATION --")
+r = requests.post(f"{BASE}/api/auth/login", json={"username": "admin", "password": "admin123"})
+test("Default admin123 rejected", r.status_code == 401)
+
 token = login()
 test("Admin login succeeds", token is not None)
 
