@@ -776,7 +776,17 @@
             </div>
           </div>
 
-          <!-- All extracted fields -->
+          <!-- All extracted fields (editable) -->
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-400" x-show="editingInvoice">Click a value to edit. Corrections teach the AI for future extractions.</span>
+            <button
+              @click="editingInvoice ? saveInvoiceEdits() : startEditingInvoice()"
+              class="text-xs px-3 py-1 rounded-lg border transition"
+              :class="editingInvoice ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'"
+              x-text="editingInvoice ? (editSaving ? 'Saving...' : 'Save Changes') : 'Edit Fields'"
+              :disabled="editSaving"
+            ></button>
+          </div>
           <div class="border rounded-xl overflow-hidden">
             <table class="w-full text-sm">
               <thead class="bg-gray-50 border-b">
@@ -789,7 +799,19 @@
                 <template x-for="col in allColumns.filter(c => c.is_active && c.field_key !== 'line_items')" :key="col.id">
                   <tr class="hover:bg-gray-50">
                     <td class="px-4 py-2.5 text-gray-500 font-medium w-44" x-text="col.field_label"></td>
-                    <td class="px-4 py-2.5 text-gray-800" x-text="getCellValue(selectedInvoice, col) || '—'"></td>
+                    <td class="px-4 py-2.5 text-gray-800">
+                      <template x-if="editingInvoice">
+                        <input
+                          type="text"
+                          class="w-full px-2 py-1 border rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          :value="editBuffer[col.field_key] ?? ''"
+                          @input="editBuffer[col.field_key] = $event.target.value"
+                        />
+                      </template>
+                      <template x-if="!editingInvoice">
+                        <span x-text="getCellValue(selectedInvoice, col) || '—'"></span>
+                      </template>
+                    </td>
                   </tr>
                 </template>
               </tbody>

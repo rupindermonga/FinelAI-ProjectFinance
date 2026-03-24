@@ -96,6 +96,21 @@ class CategoryConfig(Base):
     children = relationship("CategoryConfig", back_populates="parent", cascade="all, delete-orphan")
 
 
+class Correction(Base):
+    """Stores user corrections to extracted data — used as few-shot examples in future prompts."""
+    __tablename__ = "corrections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    field_key = Column(String, nullable=False)        # e.g. "category"
+    original_value = Column(String, nullable=True)     # what Gemini returned
+    corrected_value = Column(String, nullable=False)   # what the user chose
+    vendor_name = Column(String, nullable=True)        # context: which vendor
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
 class GeminiApiKey(Base):
     """Admin-managed pool of Gemini API keys — tried in priority order with fallback."""
     __tablename__ = "gemini_api_keys"

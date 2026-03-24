@@ -12,7 +12,7 @@ import aiofiles
 from dotenv import load_dotenv
 
 from ..database import get_db
-from ..models import Invoice, User
+from ..models import Invoice, User, Correction
 from ..schemas import InvoiceOut, InvoiceListResponse
 from ..dependencies import get_current_user
 
@@ -150,6 +150,62 @@ def get_invoice(
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
     return inv
+
+
+# Indexed fields that live as columns on the Invoice table (not just in extracted_data JSON)
+_INDEXED_FIELDS = {"invoice_number", "invoice_date", "due_date", "vendor_name", "currency", "total_due"}
+
+
+@router.patch("/{invoice_id}")
+def update_invoice_fields(
+    invoice_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Update extracted fields on a processed invoice.
+    Body: { "field_key": "new_value", ... }
+    Saves corrections to the corrections table so Gemini can learn from them.
+    """
+    inv = db.query(Invoice).filter(
+        Invoice.id == invoice_id, Invoice.user_id == current_user.id
+    ).first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    data = dict(inv.extracted_data or {})
+    for field_key, new_value in body.items():
+        old_value = data.get(field_key)
+
+        # Save correction if value actually changed
+        if str(old_value) != str(new_value):
+            correction = Correction(
+                user_id=current_user.id,
+                field_key=field_key,
+                original_value=str(old_value) if old_value is not None else None,
+                corrected_value=str(new_value) if new_value is not None else "",
+                vendor_name=inv.vendor_name,
+            )
+            db.add(correction)
+
+        # Update extracted_data JSON
+        data[field_key] = new_value
+
+        # Also update indexed column if applicable
+        if field_key in _INDEXED_FIELDS:
+            if field_key == "total_due":
+                try:
+                    setattr(inv, field_key, float(new_value) if new_value else None)
+                except (TypeError, ValueError):
+                    pass
+            else:
+                setattr(inv, field_key, str(new_value) if new_value else None)
+
+    inv.extracted_data = data
+    db.commit()
+    db.refresh(inv)
+    return {"message": "Updated", "id": inv.id}
 
 
 _FILE_MIME = {

@@ -34,6 +34,9 @@ function app() {
     previewUrl: null,
     previewType: null,           // 'pdf' | 'image'
     previewLoading: false,
+    editingInvoice: false,
+    editBuffer: {},
+    editSaving: false,
 
     // ── Columns ───────────────────────────────────────────────────
     allColumns: [],
@@ -163,6 +166,8 @@ function app() {
     openInvoice(inv) {
       this.selectedInvoice = inv;
       this.activeDetailTab = 'fields';
+      this.editingInvoice = false;
+      this.editBuffer = {};
       // Revoke any previous blob URL
       if (this.previewUrl) { URL.revokeObjectURL(this.previewUrl); this.previewUrl = null; }
       this.previewType = null;
@@ -171,7 +176,56 @@ function app() {
 
     closeInvoiceDetail() {
       if (this.previewUrl) { URL.revokeObjectURL(this.previewUrl); this.previewUrl = null; }
+      this.editingInvoice = false;
+      this.editBuffer = {};
       this.showInvoiceDetail = false;
+    },
+
+    startEditingInvoice() {
+      if (!this.selectedInvoice) return;
+      const data = this.selectedInvoice.extracted_data || {};
+      this.editBuffer = {};
+      for (const col of this.allColumns.filter(c => c.is_active && c.field_key !== 'line_items')) {
+        const val = data[col.field_key] ?? this.selectedInvoice[col.field_key] ?? '';
+        this.editBuffer[col.field_key] = val === null ? '' : String(val);
+      }
+      this.editingInvoice = true;
+    },
+
+    async saveInvoiceEdits() {
+      if (!this.selectedInvoice) return;
+      this.editSaving = true;
+      try {
+        // Build patch: only send changed fields
+        const data = this.selectedInvoice.extracted_data || {};
+        const patch = {};
+        for (const [key, newVal] of Object.entries(this.editBuffer)) {
+          const oldVal = String(data[key] ?? this.selectedInvoice[key] ?? '');
+          if (newVal !== oldVal) {
+            patch[key] = newVal === '' ? null : newVal;
+          }
+        }
+        if (Object.keys(patch).length === 0) {
+          this.editingInvoice = false;
+          return;
+        }
+        await fetch(`/api/invoices/${this.selectedInvoice.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...this._headers() },
+          body: JSON.stringify(patch),
+        });
+        // Refresh the invoice data
+        const updated = await this.get(`/api/invoices/${this.selectedInvoice.id}`);
+        const idx = this.invoices.findIndex(i => i.id === updated.id);
+        if (idx !== -1) this.invoices[idx] = updated;
+        this.selectedInvoice = updated;
+        this.editingInvoice = false;
+        this.editBuffer = {};
+      } catch (e) {
+        alert('Save failed: ' + e.message);
+      } finally {
+        this.editSaving = false;
+      }
     },
 
     async switchToPreview() {

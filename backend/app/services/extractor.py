@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-from ..models import Invoice, ColumnConfig, CategoryConfig, GeminiApiKey
+from ..models import Invoice, ColumnConfig, CategoryConfig, GeminiApiKey, Correction
 from .gemini import extract_invoice_from_file
 
 
@@ -76,7 +76,29 @@ async def process_invoice_file(
               .order_by(GeminiApiKey.priority, GeminiApiKey.id)
               .all()
         ]
-        data = await extract_invoice_from_file(file_path, columns, cats, db_keys)
+        # Load recent user corrections as few-shot examples (last 50, deduplicated)
+        raw_corrections = (
+            db.query(Correction)
+            .filter(Correction.user_id == user_id)
+            .order_by(Correction.created_at.desc())
+            .limit(50)
+            .all()
+        )
+        # Deduplicate: keep the latest correction per (field_key, vendor_name)
+        seen_corrections = set()
+        corrections = []
+        for c in raw_corrections:
+            key = (c.field_key, c.vendor_name or "")
+            if key not in seen_corrections:
+                seen_corrections.add(key)
+                corrections.append({
+                    "field_key": c.field_key,
+                    "original_value": c.original_value,
+                    "corrected_value": c.corrected_value,
+                    "vendor_name": c.vendor_name,
+                })
+
+        data = await extract_invoice_from_file(file_path, columns, cats, db_keys, corrections)
 
         # Populate indexed fields from extracted data
         invoice.invoice_number = _str(data.get("invoice_number"))

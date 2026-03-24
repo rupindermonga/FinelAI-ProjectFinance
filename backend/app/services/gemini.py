@@ -96,8 +96,8 @@ def build_category_hint(categories: List[CategoryConfig]) -> dict:
     }
 
 
-def build_extraction_prompt(columns: List[ColumnConfig], categories: List[CategoryConfig] = None) -> str:
-    """Build a dynamic extraction prompt from active column configs and configured categories."""
+def build_extraction_prompt(columns: List[ColumnConfig], categories: List[CategoryConfig] = None, corrections: list = None) -> str:
+    """Build a dynamic extraction prompt from active column configs, configured categories, and past corrections."""
     active_cols = [c for c in columns if c.is_active and c.field_key != "line_items"]
     line_item_col = next((c for c in columns if c.field_key == "line_items" and c.is_active), None)
     cat_hint = build_category_hint(categories or [])
@@ -113,17 +113,25 @@ def build_extraction_prompt(columns: List[ColumnConfig], categories: List[Catego
         }.get(col.field_type, "string or null")
         desc = col.field_description or col.field_label
 
-        # Inject allowed values for classification fields
-        if col.field_key == "category" and cat_hint.get("category_names"):
-            allowed = ", ".join(cat_hint["category_names"])
-            desc = f"Category of this invoice. Must be EXACTLY one of: [{allowed}]. Use null if none applies."
-        elif col.field_key == "sub_category" and cat_hint.get("sub_cat_map"):
-            parts = [f"If category is '{k}': [{', '.join(v)}]" for k, v in cat_hint["sub_cat_map"].items()]
-            desc = f"Sub-category within the category. Options — {'; '.join(parts)}. Use null if none applies."
+        # Inject allowed values for classification fields — or force null if none configured
+        if col.field_key == "category":
+            if cat_hint.get("category_names"):
+                allowed = ", ".join(cat_hint["category_names"])
+                desc = f"Category of this invoice. Must be EXACTLY one of: [{allowed}]. Use null if none applies."
+            else:
+                desc = "ALWAYS return null — no categories have been configured by the user."
+        elif col.field_key == "sub_category":
+            if cat_hint.get("sub_cat_map"):
+                parts = [f"If category is '{k}': [{', '.join(v)}]" for k, v in cat_hint["sub_cat_map"].items()]
+                desc = f"Sub-category within the category. Options — {'; '.join(parts)}. Use null if none applies."
+            else:
+                desc = "ALWAYS return null — no sub-categories have been configured by the user."
         elif col.field_key == "sub_division":
             sub_div_map = cat_hint.get("sub_div_map", {})
             requires_sub_div = cat_hint.get("requires_sub_div", set())
-            if sub_div_map or requires_sub_div:
+            if not sub_div_map and not requires_sub_div:
+                desc = "ALWAYS return null — no sub-divisions have been configured by the user."
+            elif sub_div_map or requires_sub_div:
                 parts = []
                 for cat_name, divs in sub_div_map.items():
                     req = cat_name in requires_sub_div
@@ -178,6 +186,15 @@ Extraction rules:
 - For the category/sub_category/sub_division fields: use EXACTLY the allowed values listed above; do not invent new values
 - confidence_score: 0.9+ = clear invoice, 0.5–0.9 = some ambiguity, <0.5 = poor quality scan
 """
+
+    # Append user corrections as few-shot learning examples
+    if corrections:
+        lines = []
+        for c in corrections:
+            vendor_ctx = f" (vendor: {c['vendor_name']})" if c.get("vendor_name") else ""
+            lines.append(f"- Field '{c['field_key']}'{vendor_ctx}: DO NOT use \"{c['original_value']}\", the correct value is \"{c['corrected_value']}\"")
+        prompt += "\nUser corrections — learn from these past mistakes:\n" + "\n".join(lines) + "\n"
+
     return prompt
 
 
@@ -186,13 +203,14 @@ async def extract_invoice_from_file(
     columns: List[ColumnConfig],
     categories: List[CategoryConfig] = None,
     api_keys: List[str] = None,
+    corrections: list = None,
 ) -> dict:
     """
     Upload file to Gemini and extract invoice data.
     Tries each key in api_keys (DB-managed, ordered by priority), then the .env
     fallback key.  Raises ValueError only if every key fails.
     """
-    prompt = build_extraction_prompt(columns, categories or [])
+    prompt = build_extraction_prompt(columns, categories or [], corrections or [])
     ext = Path(file_path).suffix.lower()
     mime_type = SUPPORTED_MIME.get(ext)
     if not mime_type:
