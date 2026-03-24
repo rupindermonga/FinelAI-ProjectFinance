@@ -17,9 +17,9 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "10080"))
 
-# ── Simple in-memory rate limiter ────────────────────────────────────────────
-_LOGIN_MAX = 10             # max login attempts per window per IP
-_REGISTER_MAX = 5           # max register attempts per window per IP
+# ── In-memory rate limiter (separate buckets per endpoint) ───────────────────
+_LOGIN_MAX = 10             # max failed login attempts per window per IP
+_REGISTER_MAX = 20          # max register attempts per window per IP (higher for QA)
 _WINDOW_SECONDS = 300       # 5-minute window
 _login_attempts: dict = defaultdict(list)
 _register_attempts: dict = defaultdict(list)
@@ -80,6 +80,9 @@ def login(body: UserLogin, request: Request = None, db: Session = Depends(get_db
     user = db.query(User).filter(User.username == body.username).first()
     if not user or not pwd_context.verify(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
+    # On successful login, clear this IP's failed attempts
+    ip = request.client.host if request and request.client else "unknown"
+    _login_attempts.pop(ip, None)
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
 

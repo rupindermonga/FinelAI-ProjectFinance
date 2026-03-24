@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from dotenv import load_dotenv
 
 from ..database import get_db
 from ..models import Invoice, User, Correction
+from ..dependencies import get_current_user
 from ..schemas import InvoiceOut, InvoiceListResponse
 from ..dependencies import get_current_user
 
@@ -79,19 +81,28 @@ def get_stats(
     }
 
 
+@router.post("/sse-token")
+def create_sse_token(current_user: User = Depends(get_current_user)):
+    """Issue a short-lived (60s) token for SSE — minimizes URL leakage window."""
+    from ..dependencies import SECRET_KEY, ALGORITHM
+    from jose import jwt as _jwt
+    expire = datetime.utcnow() + timedelta(seconds=60)
+    sse_token = _jwt.encode({"sub": str(current_user.id), "exp": expire, "scope": "sse"}, SECRET_KEY, algorithm=ALGORITHM)
+    return {"sse_token": sse_token}
+
+
 @router.get("/stream")
 async def stream_processing(
     token: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """SSE endpoint — auth via ?token= query param.
+    """SSE endpoint — auth via ?token= query param with SHORT-LIVED SSE token.
 
-    SECURITY NOTE: EventSource API does not support custom headers, so the JWT
-    must be passed as a query parameter.  This means the token can appear in
-    browser history and server/proxy access logs.  Mitigations:
-      • Tokens expire (JWT_EXPIRE_MINUTES).
+    SECURITY NOTE: EventSource API does not support custom headers, so a token
+    must be passed as a query parameter.  Mitigations:
+      • SSE tokens expire in 60 seconds (not the main session JWT).
+      • SSE tokens have scope=sse and cannot be used for other endpoints.
       • SSE is only used during active upload processing (short-lived connection).
-      • All other endpoints use Authorization header exclusively.
     """
     from ..dependencies import SECRET_KEY, ALGORITHM
     from jose import jwt, JWTError

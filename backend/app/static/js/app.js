@@ -443,9 +443,15 @@ function app() {
 
 
     // ── SSE processing updates ────────────────────────────────────
-    startSSE() {
+    async startSSE() {
       if (this.sseSource) this.sseSource.close();
-      const url = `/api/invoices/stream?token=${encodeURIComponent(this.token)}`;
+      // Get a short-lived (60s) SSE-only token instead of exposing the main JWT
+      let sseToken = this.token;
+      try {
+        const r = await this.post('/api/invoices/sse-token', {});
+        sseToken = r.sse_token;
+      } catch (e) { /* fallback to main token */ }
+      const url = `/api/invoices/stream?token=${encodeURIComponent(sseToken)}`;
       const source = new EventSource(url);
       this.sseSource = source;
 

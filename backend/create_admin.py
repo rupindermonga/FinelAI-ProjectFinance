@@ -14,11 +14,13 @@ from passlib.context import CryptContext
 Base.metadata.create_all(bind=engine)
 
 USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 EMAIL    = os.getenv("ADMIN_EMAIL", "admin@hm.local")
 
-if PASSWORD == "admin123":
-    print("WARNING: Using default admin password 'admin123'. Set ADMIN_PASSWORD in .env before going to production.")
+if not PASSWORD or len(PASSWORD) < 8:
+    print("ERROR: Set ADMIN_PASSWORD in .env (minimum 8 characters).")
+    print("  Example: ADMIN_PASSWORD=MySecureP@ss123")
+    sys.exit(1)
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 db  = SessionLocal()
@@ -47,5 +49,5 @@ else:
 
 db.close()
 print(f"\n  Username : {USERNAME}")
-print(f"  Password : {PASSWORD}")
+print(f"  Password : {'*' * len(PASSWORD)}")
 print(f"\n  Open: http://localhost:8000\n")
