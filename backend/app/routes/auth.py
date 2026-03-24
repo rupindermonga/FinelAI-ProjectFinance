@@ -76,6 +76,9 @@ def login(body: UserLogin, request: Request = None, db: Session = Depends(get_db
     from ..seed_columns import patch_existing_user_columns
     patch_existing_user_columns(db, user.id)
 
+    from ..seed_project import seed_project_finance
+    seed_project_finance(db, user.id)
+
     token = create_token(user.id)
     return Token(access_token=token, token_type="bearer", user=UserOut.model_validate(user))
 

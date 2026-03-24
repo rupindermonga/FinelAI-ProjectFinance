@@ -71,6 +71,18 @@ function app() {
     addCategoryLoading: false,
 
 
+    // ── Project Finance ──────────────────────────────────────────
+    projectDash: null,
+    costCategories: [],
+    subdivisions: [],
+    selectedAllocInvoice: null,
+    allocations: [],
+    allocForm: { category_id: '', sub_category_id: '', subdivision_id: '', percentage: 100 },
+    showAllocModal: false,
+    showPaymentModal: false,
+    paymentForm: { invoice_id: null, amount: '', payment_date: '', method: '', reference: '', notes: '' },
+    invoicePayments: [],
+
     // ── Init ──────────────────────────────────────────────────────
     async init() {
       const saved = localStorage.getItem('invoice_token');
@@ -79,7 +91,7 @@ function app() {
         this.token = saved;
         this.user = JSON.parse(savedUser);
         this.view = 'dashboard';
-        await Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories()]);
+        await Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions()]);
         if (this.user?.is_admin) await this.loadApiKeys();
       }
     },
@@ -118,7 +130,7 @@ function app() {
       localStorage.setItem('invoice_token', this.token);
       localStorage.setItem('invoice_user', JSON.stringify(this.user));
       this.view = 'dashboard';
-      Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories()])
+      Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions()])
         .then(() => { if (this.user?.is_admin) this.loadApiKeys(); });
     },
 
@@ -604,6 +616,141 @@ function app() {
       } catch (e) { alert('Error: ' + e.message); }
     },
 
+
+    // ── Project Finance ──────────────────────────────────────────
+    async loadProjectDashboard() {
+      try {
+        this.projectDash = await this.get('/api/project/dashboard');
+        this.costCategories = this.projectDash?.categories || [];
+      } catch (e) { console.error(e); }
+    },
+
+    async loadSubdivisions() {
+      try { this.subdivisions = await this.get('/api/project/subdivisions'); } catch (e) {}
+    },
+
+    async loadCostCategories() {
+      try { this.costCategories = await this.get('/api/project/categories'); } catch (e) {}
+    },
+
+    async updateProjectBudget(field, value) {
+      try { await this.put('/api/project', { [field]: value }); await this.loadProjectDashboard(); } catch (e) { alert(e.message); }
+    },
+
+    async updateCategoryBudget(catId, budget) {
+      try { await this.put(`/api/project/categories/${catId}`, { budget: parseFloat(budget) }); await this.loadProjectDashboard(); } catch (e) { alert(e.message); }
+    },
+
+    // Allocation modal
+    async openAllocModal(inv) {
+      this.selectedAllocInvoice = inv;
+      this.allocations = await this.get(`/api/project/allocations/${inv.id}`);
+      if (this.costCategories.length === 0) await this.loadCostCategories();
+      if (this.subdivisions.length === 0) await this.loadSubdivisions();
+      this.allocForm = { category_id: '', sub_category_id: '', subdivision_id: '', percentage: 100 };
+      this.showAllocModal = true;
+    },
+
+    allocFormSubCategories() {
+      const cat = this.costCategories.find(c => c.id == this.allocForm.category_id);
+      return cat?.sub_categories || [];
+    },
+
+    allocFormNeedsSubdivision() {
+      const cat = this.costCategories.find(c => c.id == this.allocForm.category_id);
+      return cat?.is_per_subdivision || false;
+    },
+
+    async addAllocation() {
+      if (!this.allocForm.category_id) return;
+      const remaining = 100 - this.allocations.reduce((s, a) => s + a.percentage, 0);
+      const pct = Math.min(parseFloat(this.allocForm.percentage) || 0, remaining);
+      if (pct <= 0) { alert('No remaining percentage to allocate'); return; }
+
+      this.allocations.push({
+        id: null,
+        invoice_id: this.selectedAllocInvoice.id,
+        category_id: parseInt(this.allocForm.category_id),
+        sub_category_id: this.allocForm.sub_category_id ? parseInt(this.allocForm.sub_category_id) : null,
+        subdivision_id: this.allocForm.subdivision_id ? parseInt(this.allocForm.subdivision_id) : null,
+        percentage: pct,
+        amount: ((this.selectedAllocInvoice.total_due || 0) * pct / 100),
+        category_name: this.costCategories.find(c => c.id == this.allocForm.category_id)?.name,
+        sub_category_name: null,
+        subdivision_name: this.subdivisions.find(s => s.id == this.allocForm.subdivision_id)?.name,
+      });
+      this.allocForm = { category_id: '', sub_category_id: '', subdivision_id: '', percentage: remaining - pct };
+    },
+
+    removeAllocation(idx) {
+      this.allocations.splice(idx, 1);
+    },
+
+    async saveAllocations() {
+      const total = this.allocations.reduce((s, a) => s + a.percentage, 0);
+      if (this.allocations.length > 0 && Math.abs(total - 100) > 0.01) {
+        alert(`Percentages must total 100% (currently ${total.toFixed(1)}%)`);
+        return;
+      }
+      try {
+        await this.put(`/api/project/allocations/${this.selectedAllocInvoice.id}`, this.allocations.map(a => ({
+          invoice_id: a.invoice_id,
+          category_id: a.category_id,
+          sub_category_id: a.sub_category_id,
+          subdivision_id: a.subdivision_id,
+          percentage: a.percentage,
+        })));
+        this.showAllocModal = false;
+        await this.loadProjectDashboard();
+      } catch (e) { alert(e.message); }
+    },
+
+    // Payment modal
+    async openPaymentModal(inv) {
+      this.paymentForm = { invoice_id: inv.id, amount: '', payment_date: new Date().toISOString().slice(0, 10), method: '', reference: '', notes: '' };
+      this.invoicePayments = await this.get(`/api/project/payments/${inv.id}`);
+      this.showPaymentModal = true;
+    },
+
+    async submitPayment() {
+      if (!this.paymentForm.amount || !this.paymentForm.payment_date) return;
+      try {
+        await this.post('/api/project/payments', {
+          ...this.paymentForm,
+          amount: parseFloat(this.paymentForm.amount),
+        });
+        this.invoicePayments = await this.get(`/api/project/payments/${this.paymentForm.invoice_id}`);
+        this.paymentForm.amount = '';
+        this.paymentForm.reference = '';
+        this.paymentForm.notes = '';
+        await Promise.all([this.loadInvoices(), this.loadProjectDashboard()]);
+      } catch (e) { alert(e.message); }
+    },
+
+    async deletePayment(pmtId, invoiceId) {
+      if (!confirm('Delete this payment?')) return;
+      try {
+        await this.del(`/api/project/payments/${pmtId}`);
+        this.invoicePayments = await this.get(`/api/project/payments/${invoiceId}`);
+        await Promise.all([this.loadInvoices(), this.loadProjectDashboard()]);
+      } catch (e) { alert(e.message); }
+    },
+
+    paymentBadge(status) {
+      return {
+        'paid':           'bg-green-100 text-green-700',
+        'partially_paid': 'bg-amber-100 text-amber-700',
+        'unpaid':         'bg-red-100 text-red-600',
+      }[status] || 'bg-gray-100 text-gray-600';
+    },
+
+    budgetHealth(remaining, budget) {
+      if (!budget || budget <= 0) return 'text-gray-400';
+      const pct = remaining / budget;
+      if (pct > 0.2) return 'text-green-600';
+      if (pct > 0) return 'text-amber-500';
+      return 'text-red-600';
+    },
 
     // ── Settings ──────────────────────────────────────────────────
     async saveSettings() {

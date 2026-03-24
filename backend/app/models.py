@@ -49,7 +49,13 @@ class Invoice(Base):
     # All extracted data as JSON (flexible, driven by column config)
     extracted_data = Column(JSON, nullable=True)
 
+    # Payment tracking
+    payment_status = Column(String, default="unpaid")  # unpaid | partially_paid | paid
+    amount_paid = Column(Float, default=0.0)
+
     user = relationship("User", back_populates="invoices")
+    allocations = relationship("InvoiceAllocation", back_populates="invoice", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="invoice", cascade="all, delete-orphan")
 
 
 class ColumnConfig(Base):
@@ -109,6 +115,117 @@ class Correction(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+
+# ─── Project Finance Models ──────────────────────────────────────────────────
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    code = Column(String, nullable=True)
+    client = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    start_date = Column(String, nullable=True)
+    end_date = Column(String, nullable=True)
+    total_budget = Column(Float, default=0.0)
+    currency = Column(String, default="CAD")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    sub_divisions = relationship("SubDivision", back_populates="project", cascade="all, delete-orphan")
+    cost_categories = relationship("CostCategory", back_populates="project", cascade="all, delete-orphan")
+
+
+class SubDivision(Base):
+    __tablename__ = "sub_divisions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String, nullable=False)           # "1", "2", "3", "4", "5"
+    description = Column(String, nullable=True)
+    display_order = Column(Integer, default=100)
+
+    project = relationship("Project", back_populates="sub_divisions")
+
+
+class CostCategory(Base):
+    """Top-level cost category: Payroll, Material, Electronics, Make Ready, Fiber Build, etc."""
+    __tablename__ = "cost_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String, nullable=False)
+    budget = Column(Float, default=0.0)              # total budget for this category
+    is_per_subdivision = Column(Boolean, default=False)  # True = Fiber Build (budget per sub-division)
+    display_order = Column(Integer, default=100)
+
+    project = relationship("Project", back_populates="cost_categories")
+    sub_categories = relationship("CostSubCategory", back_populates="category", cascade="all, delete-orphan")
+    subdivision_budgets = relationship("SubDivisionBudget", back_populates="category", cascade="all, delete-orphan")
+
+
+class CostSubCategory(Base):
+    """Sub-category within a cost category (e.g. OLT & Chassis under Electronics)."""
+    __tablename__ = "cost_sub_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("cost_categories.id"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)        # what's included
+    budget = Column(Float, nullable=True)             # optional per-sub-category budget
+    display_order = Column(Integer, default=100)
+
+    category = relationship("CostCategory", back_populates="sub_categories")
+
+
+class SubDivisionBudget(Base):
+    """Budget allocation per sub-division for categories that split by sub-division (Fiber Build)."""
+    __tablename__ = "subdivision_budgets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("cost_categories.id"), nullable=False)
+    subdivision_id = Column(Integer, ForeignKey("sub_divisions.id"), nullable=False)
+    budget = Column(Float, default=0.0)
+
+    category = relationship("CostCategory", back_populates="subdivision_budgets")
+    subdivision = relationship("SubDivision")
+
+
+class InvoiceAllocation(Base):
+    """Links an invoice to a cost category + optional sub-category + sub-division(s) with % split."""
+    __tablename__ = "invoice_allocations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("cost_categories.id"), nullable=False)
+    sub_category_id = Column(Integer, ForeignKey("cost_sub_categories.id"), nullable=True)
+    subdivision_id = Column(Integer, ForeignKey("sub_divisions.id"), nullable=True)
+    percentage = Column(Float, default=100.0)         # % of invoice allocated here
+    amount = Column(Float, default=0.0)               # computed: invoice.total_due * percentage / 100
+
+    invoice = relationship("Invoice", back_populates="allocations")
+    category = relationship("CostCategory")
+    sub_category = relationship("CostSubCategory")
+    subdivision = relationship("SubDivision")
+
+
+class Payment(Base):
+    """Payment record against an invoice."""
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    payment_date = Column(String, nullable=False)     # YYYY-MM-DD
+    method = Column(String, nullable=True)            # cheque | etransfer | wire | eft
+    reference = Column(String, nullable=True)         # cheque # or transaction ref
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    invoice = relationship("Invoice", back_populates="payments")
 
 
 class GeminiApiKey(Base):

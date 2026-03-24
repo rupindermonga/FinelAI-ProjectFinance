@@ -123,6 +123,8 @@ class InvoiceOut(BaseModel):
     currency: Optional[str]
     total_due: Optional[float]
     extracted_data: Optional[Any]
+    payment_status: Optional[str] = "unpaid"
+    amount_paid: Optional[float] = 0.0
 
     class Config:
         from_attributes = True
@@ -144,3 +146,129 @@ class ExportRequest(BaseModel):
     currency: Optional[str] = None
     status: Optional[str] = None
     format: str = "excel"  # excel | json
+
+
+# ─── Project Finance ─────────────────────────────────────────────────────────
+
+class ProjectCreate(BaseModel):
+    name: str
+    code: Optional[str] = None
+    client: Optional[str] = None
+    address: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    total_budget: float = 0.0
+    currency: str = "CAD"
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    client: Optional[str] = None
+    address: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    total_budget: Optional[float] = None
+    currency: Optional[str] = None
+
+class ProjectOut(BaseModel):
+    id: int
+    name: str
+    code: Optional[str]
+    client: Optional[str]
+    address: Optional[str]
+    start_date: Optional[str]
+    end_date: Optional[str]
+    total_budget: float
+    currency: str
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class SubDivisionOut(BaseModel):
+    id: int
+    project_id: int
+    name: str
+    description: Optional[str]
+    display_order: int
+    class Config:
+        from_attributes = True
+
+class CostSubCategoryOut(BaseModel):
+    id: int
+    category_id: int
+    name: str
+    description: Optional[str]
+    budget: Optional[float]
+    display_order: int
+    class Config:
+        from_attributes = True
+
+class CostCategoryOut(BaseModel):
+    id: int
+    project_id: int
+    name: str
+    budget: float
+    is_per_subdivision: bool
+    display_order: int
+    sub_categories: List[CostSubCategoryOut] = []
+    class Config:
+        from_attributes = True
+
+class CostCategoryCreate(BaseModel):
+    name: str
+    budget: float = 0.0
+    is_per_subdivision: bool = False
+
+class CostCategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    budget: Optional[float] = None
+
+class CostSubCategoryCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    budget: Optional[float] = None
+
+class SubDivisionBudgetSet(BaseModel):
+    subdivision_id: int
+    budget: float
+
+class AllocationCreate(BaseModel):
+    invoice_id: int
+    category_id: int
+    sub_category_id: Optional[int] = None
+    subdivision_id: Optional[int] = None
+    percentage: float = 100.0
+
+class AllocationOut(BaseModel):
+    id: int
+    invoice_id: int
+    category_id: int
+    sub_category_id: Optional[int]
+    subdivision_id: Optional[int]
+    percentage: float
+    amount: float
+    category_name: Optional[str] = None
+    sub_category_name: Optional[str] = None
+    subdivision_name: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class PaymentCreate(BaseModel):
+    invoice_id: int
+    amount: float
+    payment_date: str
+    method: Optional[str] = None
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+
+class PaymentOut(BaseModel):
+    id: int
+    invoice_id: int
+    amount: float
+    payment_date: str
+    method: Optional[str]
+    reference: Optional[str]
+    notes: Optional[str]
+    created_at: datetime
+    class Config:
+        from_attributes = True

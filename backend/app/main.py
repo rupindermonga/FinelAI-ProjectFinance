@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import engine, Base
-from .routes import auth, invoices, upload, columns, export, categories, admin
+from .routes import auth, invoices, upload, columns, export, categories, admin, project
 
 
 def _run_migrations():
@@ -21,6 +21,8 @@ def _run_migrations():
             "ALTER TABLE category_configs ADD COLUMN requires_sub_division BOOLEAN DEFAULT 0",
             "ALTER TABLE column_configs ADD COLUMN is_exportable BOOLEAN DEFAULT 1",
             "ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0",
+            "ALTER TABLE invoices ADD COLUMN payment_status VARCHAR DEFAULT 'unpaid'",
+            "ALTER TABLE invoices ADD COLUMN amount_paid FLOAT DEFAULT 0.0",
         ]:
             try:
                 conn.execute(text(stmt))
@@ -91,6 +93,7 @@ app.include_router(columns.router)
 app.include_router(categories.router)
 app.include_router(export.router)
 app.include_router(admin.router)
+app.include_router(project.router)
 
 # Serve static frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")

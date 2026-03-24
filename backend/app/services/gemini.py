@@ -96,8 +96,8 @@ def build_category_hint(categories: List[CategoryConfig]) -> dict:
     }
 
 
-def build_extraction_prompt(columns: List[ColumnConfig], categories: List[CategoryConfig] = None, corrections: list = None) -> str:
-    """Build a dynamic extraction prompt from active column configs, configured categories, and past corrections."""
+def build_extraction_prompt(columns: List[ColumnConfig], categories: List[CategoryConfig] = None, corrections: list = None, cost_categories: list = None) -> str:
+    """Build a dynamic extraction prompt from active column configs, configured categories, past corrections, and project cost categories."""
     active_cols = [c for c in columns if c.is_active and c.field_key != "line_items"]
     line_item_col = next((c for c in columns if c.field_key == "line_items" and c.is_active), None)
     cat_hint = build_category_hint(categories or [])
@@ -169,6 +169,37 @@ def build_extraction_prompt(columns: List[ColumnConfig], categories: List[Catego
 
     fields_desc["confidence_score"] = "Your confidence in the overall extraction accuracy, 0.0 to 1.0 (number)"
 
+    # Add cost category classification fields
+    if cost_categories:
+        cat_names = [c["name"] for c in cost_categories]
+        fields_desc["cost_category"] = (
+            f"Project cost category for this invoice. Must be EXACTLY one of: [{', '.join(cat_names)}]. "
+            "Use null if unsure. (string or null)"
+        )
+        # Build sub-category hints per cost category
+        sc_parts = []
+        for c in cost_categories:
+            subs = c.get("sub_categories", [])
+            if subs:
+                sub_names = [s["name"] for s in subs]
+                sc_parts.append(f"If cost_category='{c['name']}': [{', '.join(sub_names)}]")
+        if sc_parts:
+            fields_desc["cost_sub_category"] = (
+                "Sub-category within the cost category. Options — " + "; ".join(sc_parts) +
+                ". Use null if not applicable. (string or null)"
+            )
+
+        # Sub-division hint for per-subdivision categories
+        per_sd_cats = [c["name"] for c in cost_categories if c.get("is_per_subdivision")]
+        if per_sd_cats:
+            fields_desc["cost_subdivision"] = (
+                f"Sub-division number (1-5) for this invoice. Only applicable when cost_category is one of: "
+                f"[{', '.join(per_sd_cats)}]. Look for sub-division, zone, or area references in the invoice. "
+                "Can be a single number or comma-separated list (e.g. '1,3'). Use null if not found. (string or null)"
+            )
+    else:
+        fields_desc["cost_category"] = "ALWAYS return null — no project cost categories configured. (string or null)"
+
     prompt = f"""You are an expert invoice data extractor for a construction and procurement management system. Carefully read this invoice document and extract ALL the following fields accurately.
 
 Return ONLY a valid JSON object — no markdown, no explanation, no code fences.
@@ -204,13 +235,14 @@ async def extract_invoice_from_file(
     categories: List[CategoryConfig] = None,
     api_keys: List[str] = None,
     corrections: list = None,
+    cost_categories: list = None,
 ) -> dict:
     """
     Upload file to Gemini and extract invoice data.
     Tries each key in api_keys (DB-managed, ordered by priority), then the .env
     fallback key.  Raises ValueError only if every key fails.
     """
-    prompt = build_extraction_prompt(columns, categories or [], corrections or [])
+    prompt = build_extraction_prompt(columns, categories or [], corrections or [], cost_categories or [])
     ext = Path(file_path).suffix.lower()
     mime_type = SUPPORTED_MIME.get(ext)
     if not mime_type:

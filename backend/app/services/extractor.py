@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-from ..models import Invoice, ColumnConfig, CategoryConfig, GeminiApiKey, Correction
+from ..models import Invoice, ColumnConfig, CategoryConfig, GeminiApiKey, Correction, CostCategory, Project
 from .gemini import extract_invoice_from_file
 
 
@@ -98,7 +98,24 @@ async def process_invoice_file(
                     "vendor_name": c.vendor_name,
                 })
 
-        data = await extract_invoice_from_file(file_path, columns, cats, db_keys, corrections)
+        # Load project cost categories for classification
+        proj = db.query(Project).filter(Project.user_id == user_id).first()
+        cost_cats_data = []
+        if proj:
+            cost_cats = (
+                db.query(CostCategory)
+                .filter(CostCategory.project_id == proj.id)
+                .order_by(CostCategory.display_order)
+                .all()
+            )
+            for cc in cost_cats:
+                cost_cats_data.append({
+                    "name": cc.name,
+                    "is_per_subdivision": cc.is_per_subdivision,
+                    "sub_categories": [{"name": sc.name} for sc in cc.sub_categories],
+                })
+
+        data = await extract_invoice_from_file(file_path, columns, cats, db_keys, corrections, cost_cats_data)
 
         # Populate indexed fields from extracted data
         invoice.invoice_number = _str(data.get("invoice_number"))

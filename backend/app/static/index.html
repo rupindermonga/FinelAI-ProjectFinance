@@ -95,6 +95,9 @@
         <button @click="view='categories'; loadCategories()" :class="view==='categories' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-tags w-4"></i> Categories
         </button>
+        <button @click="view='finance'; loadProjectDashboard()" :class="view==='finance' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-chart-pie w-4"></i> Project Finance
+        </button>
         <button @click="view='settings'" :class="view==='settings' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-gear w-4"></i> Settings
         </button>
@@ -587,6 +590,279 @@
         </div><!-- /grid -->
       </div><!-- /categories -->
 
+
+      <!-- ── PROJECT FINANCE ──────────────────────────────────────────── -->
+      <div x-show="view==='finance'" class="p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4"><i class="fa-solid fa-chart-pie mr-2 text-blue-600"></i>Project Finance</h2>
+
+        <template x-if="projectDash?.project">
+          <div>
+            <!-- Project overview cards -->
+            <div class="grid grid-cols-5 gap-4 mb-6">
+              <div class="bg-white rounded-xl border p-4 text-center">
+                <div class="text-xs text-gray-400 mb-1">Total Budget</div>
+                <div class="text-lg font-bold text-gray-800" x-text="'$' + (projectDash.total_budget || 0).toLocaleString('en-CA', {minimumFractionDigits:2})"></div>
+              </div>
+              <div class="bg-white rounded-xl border p-4 text-center">
+                <div class="text-xs text-gray-400 mb-1">Invoiced</div>
+                <div class="text-lg font-bold text-blue-600" x-text="'$' + (projectDash.total_invoiced || 0).toLocaleString('en-CA', {minimumFractionDigits:2})"></div>
+              </div>
+              <div class="bg-white rounded-xl border p-4 text-center">
+                <div class="text-xs text-gray-400 mb-1">Paid</div>
+                <div class="text-lg font-bold text-green-600" x-text="'$' + (projectDash.total_paid || 0).toLocaleString('en-CA', {minimumFractionDigits:2})"></div>
+              </div>
+              <div class="bg-white rounded-xl border p-4 text-center">
+                <div class="text-xs text-gray-400 mb-1">Remaining</div>
+                <div class="text-lg font-bold" :class="projectDash.total_remaining < 0 ? 'text-red-600' : 'text-green-600'" x-text="'$' + (projectDash.total_remaining || 0).toLocaleString('en-CA', {minimumFractionDigits:2})"></div>
+              </div>
+              <div class="bg-white rounded-xl border p-4 text-center">
+                <div class="text-xs text-gray-400 mb-1">Unallocated Invoices</div>
+                <div class="text-lg font-bold" :class="projectDash.unallocated_invoices > 0 ? 'text-amber-500' : 'text-green-600'" x-text="projectDash.unallocated_invoices"></div>
+              </div>
+            </div>
+
+            <!-- Aging -->
+            <div class="bg-white rounded-xl border p-4 mb-6">
+              <h3 class="text-sm font-semibold text-gray-700 mb-3">Accounts Payable Aging</h3>
+              <div class="grid grid-cols-4 gap-4 text-center text-sm">
+                <div><div class="text-xs text-gray-400">Current</div><div class="font-bold text-green-600" x-text="'$' + (projectDash.aging?.current || 0).toLocaleString('en-CA', {minimumFractionDigits:2})"></div></div>
+                <div><div class="text-xs text-gray-400">30+ Days</div><div class="font-bold text-amber-500" x-text="'$' + (projectDash.aging?.over_30 || 0).toLocaleString('en-CA', {minimumFractionDigits:2})"></div></div>
+                <div><div class="text-xs text-gray-400">60+ Days</div><div class="font-bold text-orange-500" x-text="'$' + (projectDash.aging?.over_60 || 0).toLocaleString('en-CA', {minimumFractionDigits:2})"></div></div>
+                <div><div class="text-xs text-gray-400">90+ Days</div><div class="font-bold text-red-600" x-text="'$' + (projectDash.aging?.over_90 || 0).toLocaleString('en-CA', {minimumFractionDigits:2})"></div></div>
+              </div>
+            </div>
+
+            <!-- Cost categories table -->
+            <div class="bg-white rounded-xl border overflow-hidden mb-6">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b">
+                  <tr>
+                    <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">Category</th>
+                    <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">Budget</th>
+                    <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">Invoiced</th>
+                    <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">Paid</th>
+                    <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">Remaining</th>
+                    <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500">Health</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="cat in projectDash.categories" :key="cat.id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 font-medium text-gray-800">
+                        <span x-text="cat.name"></span>
+                        <span x-show="cat.is_per_subdivision" class="ml-1 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">per sub-div</span>
+                      </td>
+                      <td class="px-4 py-3 text-right text-gray-700" x-text="'$' + cat.budget.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
+                      <td class="px-4 py-3 text-right text-blue-600" x-text="'$' + cat.invoiced.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
+                      <td class="px-4 py-3 text-right text-green-600" x-text="'$' + cat.paid.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
+                      <td class="px-4 py-3 text-right font-semibold" :class="cat.remaining < 0 ? 'text-red-600' : 'text-green-600'" x-text="'$' + cat.remaining.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
+                      <td class="px-4 py-3 text-center">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                          <div class="h-2 rounded-full" :class="cat.budget > 0 && cat.invoiced / cat.budget > 1 ? 'bg-red-500' : cat.budget > 0 && cat.invoiced / cat.budget > 0.8 ? 'bg-amber-400' : 'bg-green-500'" :style="`width: ${Math.min(100, cat.budget > 0 ? (cat.invoiced / cat.budget * 100) : 0)}%`"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Fiber Build sub-division breakdown -->
+            <template x-for="cat in projectDash.categories.filter(c => c.is_per_subdivision && c.subdivisions)" :key="'sd-' + cat.id">
+              <div class="bg-white rounded-xl border overflow-hidden mb-6">
+                <div class="px-4 py-3 bg-blue-50 border-b">
+                  <h3 class="text-sm font-semibold text-blue-700" x-text="cat.name + ' — Sub-Division Breakdown'"></h3>
+                </div>
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 border-b">
+                    <tr>
+                      <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500">Sub-Division</th>
+                      <th class="text-right px-4 py-2 text-xs font-semibold text-gray-500">Budget</th>
+                      <th class="text-right px-4 py-2 text-xs font-semibold text-gray-500">Invoiced</th>
+                      <th class="text-right px-4 py-2 text-xs font-semibold text-gray-500">Remaining</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y">
+                    <template x-for="sd in cat.subdivisions" :key="sd.subdivision_id">
+                      <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 font-medium text-gray-700" x-text="'Sub-Division ' + sd.name"></td>
+                        <td class="px-4 py-2 text-right" x-text="'$' + sd.budget.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
+                        <td class="px-4 py-2 text-right text-blue-600" x-text="'$' + sd.invoiced.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
+                        <td class="px-4 py-2 text-right" :class="sd.remaining < 0 ? 'text-red-600 font-semibold' : 'text-green-600'" x-text="'$' + sd.remaining.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+
+            <!-- Invoices with allocation + payment actions -->
+            <div class="bg-white rounded-xl border overflow-hidden">
+              <div class="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-gray-700">Processed Invoices</h3>
+              </div>
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b">
+                  <tr>
+                    <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Invoice #</th>
+                    <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Vendor</th>
+                    <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Date</th>
+                    <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Amount</th>
+                    <th class="text-center px-3 py-2 text-xs font-semibold text-gray-500">Payment</th>
+                    <th class="text-center px-3 py-2 text-xs font-semibold text-gray-500">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="inv in invoices.filter(i => i.status === 'processed')" :key="'fi-' + inv.id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-3 py-2 text-gray-800 font-medium" x-text="inv.invoice_number || '—'"></td>
+                      <td class="px-3 py-2 text-gray-600" x-text="inv.vendor_name || '—'"></td>
+                      <td class="px-3 py-2 text-gray-500" x-text="inv.invoice_date || '—'"></td>
+                      <td class="px-3 py-2 text-right font-medium" x-text="inv.total_due ? '$' + inv.total_due.toLocaleString('en-CA', {minimumFractionDigits:2}) : '—'"></td>
+                      <td class="px-3 py-2 text-center">
+                        <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="paymentBadge(inv.payment_status)" x-text="(inv.payment_status || 'unpaid').replace('_', ' ')"></span>
+                      </td>
+                      <td class="px-3 py-2 text-center space-x-1">
+                        <button @click="openAllocModal(inv)" class="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100">Allocate</button>
+                        <button @click="openPaymentModal(inv)" class="text-xs px-2 py-1 rounded bg-green-50 text-green-600 hover:bg-green-100">Pay</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+
+        <template x-if="!projectDash?.project">
+          <div class="text-center py-20 text-gray-400">
+            <i class="fa-solid fa-folder-open text-4xl mb-3"></i>
+            <p>No project set up yet. Log out and log back in to initialize.</p>
+          </div>
+        </template>
+      </div>
+
+      <!-- Allocation Modal -->
+      <div x-show="showAllocModal" x-cloak class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showAllocModal=false">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6" @click.stop>
+          <h3 class="text-lg font-bold text-gray-800 mb-1">Allocate Invoice</h3>
+          <p class="text-sm text-gray-500 mb-4">
+            <span x-text="selectedAllocInvoice?.invoice_number || 'N/A'"></span> —
+            <span x-text="selectedAllocInvoice?.vendor_name || ''"></span> —
+            <strong x-text="selectedAllocInvoice?.total_due ? '$' + selectedAllocInvoice.total_due.toLocaleString('en-CA', {minimumFractionDigits:2}) : '$0'"></strong>
+          </p>
+
+          <!-- Existing allocations -->
+          <div class="space-y-2 mb-4" x-show="allocations.length > 0">
+            <template x-for="(a, idx) in allocations" :key="idx">
+              <div class="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                <span class="flex-1" x-text="a.category_name + (a.subdivision_name ? ' / Sub-Div ' + a.subdivision_name : '')"></span>
+                <span class="font-semibold" x-text="a.percentage + '%'"></span>
+                <span class="text-gray-400" x-text="'$' + a.amount.toLocaleString('en-CA', {minimumFractionDigits:2})"></span>
+                <button @click="removeAllocation(idx)" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            </template>
+            <div class="text-xs text-right" :class="Math.abs(allocations.reduce((s,a) => s + a.percentage, 0) - 100) < 0.01 ? 'text-green-600' : 'text-amber-500'" x-text="'Total: ' + allocations.reduce((s,a) => s + a.percentage, 0).toFixed(1) + '%'"></div>
+          </div>
+
+          <!-- Add allocation form -->
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label class="text-xs text-gray-500">Category</label>
+              <select x-model="allocForm.category_id" class="w-full border rounded px-2 py-1.5 text-sm">
+                <option value="">Select...</option>
+                <template x-for="cat in costCategories" :key="cat.id">
+                  <option :value="cat.id" x-text="cat.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Sub-Category</label>
+              <select x-model="allocForm.sub_category_id" class="w-full border rounded px-2 py-1.5 text-sm">
+                <option value="">None</option>
+                <template x-for="sc in allocFormSubCategories()" :key="sc.id">
+                  <option :value="sc.id" x-text="sc.name"></option>
+                </template>
+              </select>
+            </div>
+            <div x-show="allocFormNeedsSubdivision()">
+              <label class="text-xs text-gray-500">Sub-Division</label>
+              <select x-model="allocForm.subdivision_id" class="w-full border rounded px-2 py-1.5 text-sm">
+                <option value="">Select...</option>
+                <template x-for="sd in subdivisions" :key="sd.id">
+                  <option :value="sd.id" x-text="'Sub-Division ' + sd.name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Percentage %</label>
+              <input type="number" x-model="allocForm.percentage" min="0" max="100" step="0.1" class="w-full border rounded px-2 py-1.5 text-sm" />
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button @click="addAllocation()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Line</button>
+            <button @click="saveAllocations()" class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Save All</button>
+            <button @click="showAllocModal=false" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment Modal -->
+      <div x-show="showPaymentModal" x-cloak class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" @click.self="showPaymentModal=false">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" @click.stop>
+          <h3 class="text-lg font-bold text-gray-800 mb-4">Record Payment</h3>
+
+          <!-- Past payments -->
+          <div x-show="invoicePayments.length > 0" class="mb-4">
+            <h4 class="text-xs font-semibold text-gray-500 mb-2">Payment History</h4>
+            <template x-for="pmt in invoicePayments" :key="pmt.id">
+              <div class="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm mb-1">
+                <span x-text="pmt.payment_date"></span>
+                <span class="font-medium" x-text="'$' + pmt.amount.toLocaleString('en-CA', {minimumFractionDigits:2})"></span>
+                <span class="text-xs text-gray-400" x-text="pmt.method || ''"></span>
+                <button @click="deletePayment(pmt.id, paymentForm.invoice_id)" class="text-red-400 hover:text-red-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+              </div>
+            </template>
+          </div>
+
+          <!-- New payment form -->
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs text-gray-500">Amount</label>
+              <input type="number" x-model="paymentForm.amount" step="0.01" class="w-full border rounded px-3 py-2 text-sm" placeholder="0.00" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Payment Date</label>
+              <input type="date" x-model="paymentForm.payment_date" class="w-full border rounded px-3 py-2 text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-gray-500">Method</label>
+                <select x-model="paymentForm.method" class="w-full border rounded px-2 py-2 text-sm">
+                  <option value="">Select...</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="etransfer">E-Transfer</option>
+                  <option value="wire">Wire</option>
+                  <option value="eft">EFT</option>
+                  <option value="credit_card">Credit Card</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500">Reference #</label>
+                <input type="text" x-model="paymentForm.reference" class="w-full border rounded px-3 py-2 text-sm" placeholder="Cheque # or ref" />
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500">Notes</label>
+              <input type="text" x-model="paymentForm.notes" class="w-full border rounded px-3 py-2 text-sm" />
+            </div>
+          </div>
+          <div class="flex gap-2 mt-4">
+            <button @click="submitPayment()" class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Record Payment</button>
+            <button @click="showPaymentModal=false" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Close</button>
+          </div>
+        </div>
+      </div>
 
       <!-- ── SETTINGS ───────────────────────────────────────────────── -->
       <div x-show="view==='settings'" class="p-6 max-w-2xl">
