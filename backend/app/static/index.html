@@ -873,70 +873,15 @@
       <div x-show="view==='settings'" class="p-6 max-w-2xl">
         <h2 class="text-xl font-bold text-gray-800 mb-6">Settings</h2>
 
-        <!-- Gemini API Keys (admin only) -->
-        <div x-show="user?.is_admin" class="bg-white rounded-xl border p-6 mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h3 class="font-semibold text-gray-800">Gemini API Keys</h3>
-              <p class="text-xs text-gray-400 mt-0.5">Keys are tried in priority order (lowest number first). If one fails, the next is used automatically.</p>
-            </div>
-            <button @click="openApiKeyModal()" class="bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-800 transition flex items-center gap-1.5">
-              <i class="fa-solid fa-plus"></i> Add Key
-            </button>
+        <!-- Gemini Configuration (read-only reference) -->
+        <div class="bg-white rounded-xl border p-6 mb-6">
+          <h3 class="font-semibold text-gray-800 mb-3"><i class="fa-solid fa-key mr-2 text-blue-500"></i>Gemini API Keys</h3>
+          <p class="text-sm text-gray-600 mb-3">API keys are managed in the server's <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">backend/.env</code> file.</p>
+          <div class="bg-gray-50 rounded-lg px-4 py-3 text-xs font-mono text-gray-500 space-y-1">
+            <div>GEMINI_API_KEYS=key1,key2,key3</div>
+            <div>GEMINI_MODEL=gemini-2.5-flash</div>
           </div>
-
-          <!-- Keys table -->
-          <div x-show="adminApiKeys.length === 0" class="text-center py-8 text-gray-400 text-sm border rounded-xl">
-            <i class="fa-solid fa-key text-3xl mb-2 block text-gray-200"></i>
-            No API keys configured yet.<br>
-            <span class="text-xs">Add at least one key to enable invoice processing.</span>
-          </div>
-          <div x-show="adminApiKeys.length > 0" class="border rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
-              <thead class="bg-gray-50 border-b">
-                <tr>
-                  <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Priority</th>
-                  <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Label</th>
-                  <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Key (masked)</th>
-                  <th class="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Active</th>
-                  <th class="px-4 py-2.5"></th>
-                </tr>
-              </thead>
-              <tbody class="divide-y">
-                <template x-for="key in adminApiKeys" :key="key.id">
-                  <tr class="hover:bg-gray-50">
-                    <td class="px-4 py-2.5 text-gray-500 text-sm font-mono" x-text="key.priority"></td>
-                    <td class="px-4 py-2.5 text-gray-800 font-medium" x-text="key.label"></td>
-                    <td class="px-4 py-2.5 text-gray-500 font-mono text-xs" x-text="key.key_preview"></td>
-                    <td class="px-4 py-2.5 text-center">
-                      <button @click="toggleApiKey(key)" :class="key.is_active ? 'bg-green-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors">
-                        <span :class="key.is_active ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"></span>
-                      </button>
-                    </td>
-                    <td class="px-4 py-2.5 text-right">
-                      <button @click="deleteApiKey(key)" class="text-gray-300 hover:text-red-500 transition">
-                        <i class="fa-solid fa-trash-can text-xs"></i>
-                      </button>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-          <p class="text-xs text-gray-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i>API keys are stored securely on the server and never sent to the browser. The masked preview shows only first 8 + last 4 characters.</p>
-        </div>
-
-        <!-- Non-admin note -->
-        <div x-show="!user?.is_admin" class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-800">
-          <i class="fa-solid fa-lock mr-2"></i>API key management is restricted to admin users.
-        </div>
-
-        <!-- Gemini Model selector (all users can see which model is in use) -->
-        <div class="bg-white rounded-xl border p-6">
-          <h3 class="font-semibold text-gray-800 mb-4">Gemini Model</h3>
-          <p class="text-xs text-gray-400 mb-3">The model is set via <code class="bg-gray-100 px-1 rounded">GEMINI_MODEL</code> in the server's .env file. Current value shown below for reference.</p>
-          <div class="bg-gray-50 rounded-lg px-4 py-2 font-mono text-sm text-gray-700">gemini-1.5-pro (default)</div>
-          <div x-show="settingsSaved" class="text-green-600 text-sm mt-3"><i class="fa-solid fa-circle-check mr-1"></i>Saved.</div>
+          <p class="text-xs text-gray-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i>Keys are tried in order. If key 1 is rate-limited, key 2 is used automatically. Restart the server after editing .env.</p>
         </div>
       </div><!-- /settings -->
 
@@ -1261,39 +1206,6 @@
   <!-- ══════════════════════════════════════════════════════════════
        ADD API KEY MODAL (admin only)
   ══════════════════════════════════════════════════════════════ -->
-  <div x-show="showApiKeyModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="closeApiKeyModal()">
-    <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md">
-      <div class="flex items-center justify-between mb-5">
-        <h3 class="text-lg font-bold text-gray-800">Add Gemini API Key</h3>
-        <button @click="closeApiKeyModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
-      </div>
-      <form @submit.prevent="saveApiKey()">
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Label</label>
-            <input x-model="apiKeyForm.label" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="e.g. Primary Key, Backup Key 1" required />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-            <input x-model="apiKeyForm.key_value" type="password" class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="AIza..." required />
-            <p class="text-xs text-gray-400 mt-1">The key will be masked after saving. It is never sent back to the browser.</p>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Priority <span class="text-gray-400 text-xs">(lower = tried first)</span></label>
-            <input x-model.number="apiKeyForm.priority" type="number" min="1" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-          </div>
-        </div>
-        <div x-show="apiKeyFormError" class="mt-4 text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="apiKeyFormError"></div>
-        <div class="flex gap-3 mt-6">
-          <button type="button" @click="closeApiKeyModal()" class="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
-          <button type="submit" :disabled="apiKeyFormLoading" class="flex-1 bg-blue-700 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-800 disabled:opacity-50 transition">
-            <span x-show="!apiKeyFormLoading">Save Key</span>
-            <span x-show="apiKeyFormLoading"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...</span>
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <script src="/static/js/app.js"></script>
 </body>
