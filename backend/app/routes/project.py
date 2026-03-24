@@ -104,6 +104,11 @@ def create_cost_category(body: CostCategoryCreate, db: Session = Depends(get_db)
     proj = db.query(Project).filter(Project.user_id == current_user.id).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Create a project first")
+    if body.budget < 0:
+        raise HTTPException(status_code=400, detail="Budget must be non-negative")
+    existing = db.query(CostCategory).filter(CostCategory.project_id == proj.id, CostCategory.name == body.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Category name already exists in this project")
     cat = CostCategory(project_id=proj.id, **body.model_dump())
     db.add(cat)
     db.commit()
@@ -202,6 +207,10 @@ def get_subdivision_budgets(cat_id: int, db: Session = Depends(get_db), current_
     proj = db.query(Project).filter(Project.user_id == current_user.id).first()
     if not proj:
         return []
+    # Verify category belongs to user's project
+    cat = db.query(CostCategory).filter(CostCategory.id == cat_id, CostCategory.project_id == proj.id).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Cost category not found")
     rows = db.query(SubDivisionBudget).filter(SubDivisionBudget.category_id == cat_id).all()
     return [{"subdivision_id": r.subdivision_id, "budget": r.budget} for r in rows]
 
@@ -234,11 +243,33 @@ def set_allocations(invoice_id: int, allocations: List[AllocationCreate], db: Se
     inv = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.user_id == current_user.id).first()
     if not inv:
         raise HTTPException(status_code=404)
+    proj = db.query(Project).filter(Project.user_id == current_user.id).first()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Create a project first")
+
+    # Validate individual percentages
+    for a in allocations:
+        if a.percentage <= 0 or a.percentage > 100:
+            raise HTTPException(status_code=400, detail="Each allocation percentage must be between 0 and 100")
 
     # Validate total percentage
     total_pct = sum(a.percentage for a in allocations)
     if allocations and abs(total_pct - 100.0) > 0.01:
         raise HTTPException(status_code=400, detail=f"Allocation percentages must total 100% (got {total_pct}%)")
+
+    # Validate all referenced cost structures belong to user's project
+    for a in allocations:
+        cat = db.query(CostCategory).filter(CostCategory.id == a.category_id, CostCategory.project_id == proj.id).first()
+        if not cat:
+            raise HTTPException(status_code=404, detail=f"Cost category {a.category_id} not found in your project")
+        if a.sub_category_id:
+            sc = db.query(CostSubCategory).filter(CostSubCategory.id == a.sub_category_id, CostSubCategory.category_id == a.category_id).first()
+            if not sc:
+                raise HTTPException(status_code=404, detail="Sub-category not found in this category")
+        if a.subdivision_id:
+            sd = db.query(SubDivision).filter(SubDivision.id == a.subdivision_id, SubDivision.project_id == proj.id).first()
+            if not sd:
+                raise HTTPException(status_code=404, detail="Sub-division not found in your project")
 
     # Clear old allocations
     db.query(InvoiceAllocation).filter(InvoiceAllocation.invoice_id == invoice_id).delete()
@@ -274,6 +305,8 @@ def create_payment(body: PaymentCreate, db: Session = Depends(get_db), current_u
     inv = db.query(Invoice).filter(Invoice.id == body.invoice_id, Invoice.user_id == current_user.id).first()
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    if body.amount <= 0:
+        raise HTTPException(status_code=400, detail="Payment amount must be positive")
 
     pmt = Payment(
         invoice_id=body.invoice_id,
@@ -300,10 +333,14 @@ def create_payment(body: PaymentCreate, db: Session = Depends(get_db), current_u
 
 @router.delete("/payments/{payment_id}")
 def delete_payment(payment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    pmt = db.query(Payment).filter(Payment.id == payment_id).first()
+    # Join through Invoice to verify ownership in a single query
+    pmt = db.query(Payment).join(Invoice).filter(
+        Payment.id == payment_id,
+        Invoice.user_id == current_user.id,
+    ).first()
     if not pmt:
-        raise HTTPException(status_code=404)
-    inv = db.query(Invoice).filter(Invoice.id == pmt.invoice_id, Invoice.user_id == current_user.id).first()
+        raise HTTPException(status_code=404, detail="Payment not found")
+    inv = db.query(Invoice).filter(Invoice.id == pmt.invoice_id).first()
     if not inv:
         raise HTTPException(status_code=404)
 

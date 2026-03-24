@@ -204,8 +204,8 @@ class InvoiceAllocation(Base):
     __tablename__ = "invoice_allocations"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
-    category_id = Column(Integer, ForeignKey("cost_categories.id"), nullable=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False, index=True)
+    category_id = Column(Integer, ForeignKey("cost_categories.id"), nullable=False, index=True)
     sub_category_id = Column(Integer, ForeignKey("cost_sub_categories.id"), nullable=True)
     subdivision_id = Column(Integer, ForeignKey("sub_divisions.id"), nullable=True)
     percentage = Column(Float, default=100.0)         # % of invoice allocated here
@@ -222,7 +222,7 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False, index=True)
     amount = Column(Float, nullable=False)
     payment_date = Column(String, nullable=False)     # YYYY-MM-DD
     method = Column(String, nullable=True)            # cheque | etransfer | wire | eft

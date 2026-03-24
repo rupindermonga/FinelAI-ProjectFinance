@@ -203,6 +203,13 @@ def update_invoice_fields(
                 setattr(inv, field_key, str(new_value) if new_value else None)
 
     inv.extracted_data = data
+
+    # Recalculate allocation amounts if total_due changed
+    if "total_due" in body and inv.allocations:
+        new_total = inv.total_due or 0.0
+        for alloc in inv.allocations:
+            alloc.amount = round(new_total * alloc.percentage / 100.0, 2)
+
     db.commit()
     db.refresh(inv)
     return {"message": "Updated", "id": inv.id}
@@ -236,7 +243,9 @@ async def get_invoice_file(
 
     # Path traversal guard: ensure file is inside the upload directory
     safe_path = os.path.abspath(inv.source_file)
-    if not safe_path.startswith(_UPLOAD_DIR + os.sep) and safe_path != _UPLOAD_DIR:
+    try:
+        Path(safe_path).relative_to(Path(_UPLOAD_DIR))
+    except ValueError:
         raise HTTPException(status_code=403, detail="Access denied")
 
     ext = Path(safe_path).suffix.lower()

@@ -154,10 +154,10 @@ class ExportRequest(BaseModel):
 # ─── Project Finance ─────────────────────────────────────────────────────────
 
 class ProjectCreate(BaseModel):
-    name: str
-    code: Optional[str] = None
-    client: Optional[str] = None
-    address: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=200)
+    code: Optional[str] = Field(None, max_length=50)
+    client: Optional[str] = Field(None, max_length=200)
+    address: Optional[str] = Field(None, max_length=500)
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     total_budget: float = 0.0
