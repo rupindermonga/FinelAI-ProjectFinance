@@ -83,6 +83,18 @@ function app() {
     paymentForm: { invoice_id: null, amount: '', payment_date: '', method: '', reference: '', notes: '' },
     invoicePayments: [],
 
+    // ── Payroll ───────────────────────────────────────────────────
+    payrollEntries: [],
+    showPayrollModal: false,
+    payrollForm: { employee_name: '', company_name: '', pay_period_start: '', pay_period_end: '', gross_pay: 0, cpp: 0, ei: 0, income_tax: 0, insurance: 0, holiday_pay: 0, other_deductions: 0, working_days: 22, statutory_holidays: 0, province: 'ON' },
+    payrollFormError: '',
+    editingPayrollId: null,
+
+    // ── Upload draw/claim selection (persisted) ─────────────────
+    uploadDrawId: localStorage.getItem('lastDrawId') || '',
+    uploadProvClaimId: localStorage.getItem('lastProvClaimId') || '',
+    uploadFedClaimId: localStorage.getItem('lastFedClaimId') || '',
+
     // ── Draws & Claims ──────────────────────────────────────────
     financeView: 'draws',    // 'draws' | 'provincial' | 'federal'
     draws: [],
@@ -109,7 +121,7 @@ function app() {
         this.token = saved;
         this.user = JSON.parse(savedUser);
         this.view = 'dashboard';
-        await Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions()]);
+        await Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions(), this.loadPayroll()]);
         if (this.user?.is_admin) await this.loadApiKeys();
       }
     },
@@ -148,7 +160,7 @@ function app() {
       localStorage.setItem('invoice_token', this.token);
       localStorage.setItem('invoice_user', JSON.stringify(this.user));
       this.view = 'dashboard';
-      Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions()])
+      Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions(), this.loadPayroll()])
         .then(() => { if (this.user?.is_admin) this.loadApiKeys(); });
     },
 
@@ -424,6 +436,33 @@ function app() {
         this.showUploadModal = false;
         this.uploadFiles = [];
 
+        // Persist last-used draw/claim selections
+        if (this.uploadDrawId) localStorage.setItem('lastDrawId', this.uploadDrawId);
+        if (this.uploadProvClaimId) localStorage.setItem('lastProvClaimId', this.uploadProvClaimId);
+        if (this.uploadFedClaimId) localStorage.setItem('lastFedClaimId', this.uploadFedClaimId);
+
+        // Assign uploaded invoices to selected draw/claim
+        const invoiceIds = data.results.filter(r => r.invoice_id).map(r => r.invoice_id);
+        if (invoiceIds.length > 0) {
+          if (this.uploadDrawId) {
+            try { await this.put(`/api/project/draws/${this.uploadDrawId}/invoices`, invoiceIds); } catch(e) { console.warn('Draw assign:', e); }
+          }
+          if (this.uploadProvClaimId) {
+            try {
+              const existing = await this.get(`/api/project/claims/${this.uploadProvClaimId}/invoices`);
+              const existingIds = existing.map(i => i.id);
+              await this.put(`/api/project/claims/${this.uploadProvClaimId}/invoices`, [...existingIds, ...invoiceIds]);
+            } catch(e) { console.warn('Prov claim assign:', e); }
+          }
+          if (this.uploadFedClaimId) {
+            try {
+              const existing = await this.get(`/api/project/claims/${this.uploadFedClaimId}/invoices`);
+              const existingIds = existing.map(i => i.id);
+              await this.put(`/api/project/claims/${this.uploadFedClaimId}/invoices`, [...existingIds, ...invoiceIds]);
+            } catch(e) { console.warn('Fed claim assign:', e); }
+          }
+        }
+
         // Add to processing queue
         data.results.filter(r => r.status === 'queued').forEach(r => {
           this.processingQueue.push({ id: r.invoice_id, filename: r.filename, status: 'processing' });
@@ -433,7 +472,7 @@ function app() {
         this.startSSE();
 
         // Refresh table after short delay
-        setTimeout(() => { this.loadInvoices(); this.loadStats(); }, 1500);
+        setTimeout(() => { this.loadInvoices(); this.loadStats(); this.loadProjectDashboard(); }, 1500);
       } catch (e) {
         this.uploadError = e.message;
       } finally {
@@ -919,6 +958,46 @@ function app() {
 
     statusColor(status) {
       return { draft: 'bg-gray-100 text-gray-700', submitted: 'bg-blue-100 text-blue-700', approved: 'bg-green-100 text-green-700', funded: 'bg-emerald-100 text-emerald-800', received: 'bg-emerald-100 text-emerald-800' }[status] || 'bg-gray-100 text-gray-600';
+    },
+
+    // ── Payroll ──────────────────────────────────────────────────
+    async loadPayroll() {
+      try { this.payrollEntries = await this.get('/api/project/payroll'); } catch(e) { this.payrollEntries = []; }
+    },
+    openPayrollModal(entry = null) {
+      if (entry) {
+        this.editingPayrollId = entry.id;
+        this.payrollForm = { ...entry };
+      } else {
+        this.editingPayrollId = null;
+        this.payrollForm = { employee_name: '', company_name: '', pay_period_start: '', pay_period_end: '', gross_pay: 0, cpp: 0, ei: 0, income_tax: 0, insurance: 0, holiday_pay: 0, other_deductions: 0, working_days: 22, statutory_holidays: 0, province: 'ON' };
+      }
+      this.payrollFormError = '';
+      this.showPayrollModal = true;
+    },
+    async savePayroll() {
+      try {
+        if (this.editingPayrollId) {
+          await this.put(`/api/project/payroll/${this.editingPayrollId}`, this.payrollForm);
+        } else {
+          await this.post('/api/project/payroll', this.payrollForm);
+        }
+        this.showPayrollModal = false;
+        await Promise.all([this.loadPayroll(), this.loadProjectDashboard()]);
+      } catch(e) { this.payrollFormError = e.message; }
+    },
+    async deletePayroll(id) {
+      if (!confirm('Delete this payroll entry?')) return;
+      await this.del(`/api/project/payroll/${id}`);
+      await Promise.all([this.loadPayroll(), this.loadProjectDashboard()]);
+    },
+
+    // ── Invoice Cost Update ─────────────────────────────────────
+    async updateInvoiceCost(invId, field, value) {
+      try {
+        await this.put(`/api/project/invoices/${invId}/cost`, { [field]: value });
+        await this.loadInvoices();
+      } catch(e) { alert(e.message); }
     },
 
     // ── Settings ──────────────────────────────────────────────────

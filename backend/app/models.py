@@ -54,17 +54,49 @@ class Invoice(Base):
     billing_type = Column(String, nullable=True)                 # direct | pass_through
     vendor_on_record = Column(String, nullable=True)             # subsidiary acting as intermediary
 
+    # Tax breakdown (extracted by Gemini)
+    subtotal = Column(Float, nullable=True)              # before tax
+    tax_gst = Column(Float, nullable=True)               # 5% federal GST
+    tax_hst = Column(Float, nullable=True)               # 13% Ontario HST (includes GST)
+    tax_qst = Column(Float, nullable=True)               # 9.975% Quebec QST
+    tax_pst = Column(Float, nullable=True)               # provincial sales tax (BC, SK, MB)
+    tax_total = Column(Float, nullable=True)             # total tax on invoice
+    vendor_province = Column(String, nullable=True)      # province/state of vendor
+
+    # Cost tracking — what we received vs what we bill
+    received_total = Column(Float, nullable=True)        # = total_due (what vendor billed us)
+
+    # Lender billing
+    lender_margin_pct = Column(Float, default=0.0)       # margin % for lender (0 going forward)
+    lender_margin_amt = Column(Float, default=0.0)       # computed: subtotal * margin_pct / 100
+    lender_submitted_amt = Column(Float, nullable=True)  # subtotal + margin + recalculated tax
+    lender_approved_amt = Column(Float, nullable=True)   # what lender approved (may differ)
+    lender_status = Column(String, default="pending")    # pending | approved | partial | rejected
+    lender_tax_amt = Column(Float, nullable=True)        # recalculated tax (HST or QST+GST based on VoR)
+
+    # Govt billing (same amounts for both provincial and federal)
+    govt_margin_pct = Column(Float, default=0.0)         # margin % for govt (0 going forward)
+    govt_margin_amt = Column(Float, default=0.0)         # computed: subtotal * margin_pct / 100
+    govt_submitted_amt = Column(Float, nullable=True)    # subtotal + margin (no tax claimable)
+    govt_approved_amt = Column(Float, nullable=True)     # what govt approved
+    govt_status = Column(String, default="pending")      # pending | approved | partial | rejected
+
     # Payment tracking
     payment_status = Column(String, default="unpaid")  # unpaid | partially_paid | paid
     amount_paid = Column(Float, default=0.0)
 
     # Draw / Claim linking
     draw_id = Column(Integer, ForeignKey("draws.id"), nullable=True)
-    claim_id = Column(Integer, ForeignKey("claims.id"), nullable=True)        # provincial or federal
+    provincial_claim_id = Column(Integer, ForeignKey("claims.id"), nullable=True)
+    federal_claim_id = Column(Integer, ForeignKey("claims.id"), nullable=True)
+
+    # Payroll flag
+    is_payroll = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="invoices")
     draw = relationship("Draw", foreign_keys=[draw_id], back_populates="invoices")
-    claim = relationship("Claim", foreign_keys=[claim_id], back_populates="invoices")
+    provincial_claim = relationship("Claim", foreign_keys=[provincial_claim_id], back_populates="provincial_invoices")
+    federal_claim = relationship("Claim", foreign_keys=[federal_claim_id], back_populates="federal_invoices")
     allocations = relationship("InvoiceAllocation", back_populates="invoice", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="invoice", cascade="all, delete-orphan")
 
@@ -271,7 +303,65 @@ class Claim(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project")
-    invoices = relationship("Invoice", foreign_keys="Invoice.claim_id", back_populates="claim")
+    provincial_invoices = relationship("Invoice", foreign_keys="Invoice.provincial_claim_id", back_populates="provincial_claim")
+    federal_invoices = relationship("Invoice", foreign_keys="Invoice.federal_claim_id", back_populates="federal_claim")
+
+
+class PayrollEntry(Base):
+    """A payroll record — extracted from paystubs or entered manually."""
+    __tablename__ = "payroll_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+
+    # Employee / period info
+    employee_name = Column(String, nullable=True)
+    company_name = Column(String, nullable=True)          # which subsidiary ran the payroll
+    pay_period_start = Column(String, nullable=True)      # YYYY-MM-DD
+    pay_period_end = Column(String, nullable=True)        # YYYY-MM-DD
+
+    # Amounts
+    gross_pay = Column(Float, default=0.0)
+    net_pay = Column(Float, nullable=True)
+    cpp = Column(Float, default=0.0)                     # Canada Pension Plan
+    ei = Column(Float, default=0.0)                      # Employment Insurance
+    income_tax = Column(Float, default=0.0)
+    insurance = Column(Float, default=0.0)
+    holiday_pay = Column(Float, default=0.0)
+    other_deductions = Column(Float, default=0.0)
+
+    # Working days calculation
+    total_calendar_days = Column(Integer, nullable=True)
+    working_days = Column(Integer, nullable=True)         # total working days in period
+    statutory_holidays = Column(Integer, default=0)       # holidays to deduct (Ontario/Quebec)
+    eligible_days = Column(Integer, nullable=True)        # working_days - statutory_holidays
+    daily_rate = Column(Float, nullable=True)             # gross_pay / eligible_days
+    province = Column(String, default="ON")               # ON | QC — affects holiday rules
+
+    # Billing
+    lender_billable = Column(Float, nullable=True)        # full gross (lender approves all)
+    govt_billable = Column(Float, nullable=True)          # gross - (CPP + EI + Insurance + Holiday pay)
+    lender_submitted_amt = Column(Float, nullable=True)
+    lender_approved_amt = Column(Float, nullable=True)
+    lender_status = Column(String, default="pending")
+    govt_submitted_amt = Column(Float, nullable=True)
+    govt_approved_amt = Column(Float, nullable=True)
+    govt_status = Column(String, default="pending")
+
+    # Linking
+    draw_id = Column(Integer, ForeignKey("draws.id"), nullable=True)
+    provincial_claim_id = Column(Integer, ForeignKey("claims.id"), nullable=True)
+    federal_claim_id = Column(Integer, ForeignKey("claims.id"), nullable=True)
+
+    # Source
+    source_file = Column(String, nullable=True)
+    original_filename = Column(String, nullable=True)
+    status = Column(String, default="pending")           # pending | processing | processed | error
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    project = relationship("Project")
 
 
 class GeminiApiKey(Base):

@@ -126,10 +126,35 @@ class InvoiceOut(BaseModel):
     billed_to: Optional[str] = None
     billing_type: Optional[str] = None
     vendor_on_record: Optional[str] = None
+    # Tax breakdown
+    subtotal: Optional[float] = None
+    tax_gst: Optional[float] = None
+    tax_hst: Optional[float] = None
+    tax_qst: Optional[float] = None
+    tax_pst: Optional[float] = None
+    tax_total: Optional[float] = None
+    vendor_province: Optional[str] = None
+
+    # Cost tracking
+    received_total: Optional[float] = None
+    lender_margin_pct: Optional[float] = 0.0
+    lender_margin_amt: Optional[float] = 0.0
+    lender_submitted_amt: Optional[float] = None
+    lender_approved_amt: Optional[float] = None
+    lender_status: Optional[str] = "pending"
+    lender_tax_amt: Optional[float] = None
+    govt_margin_pct: Optional[float] = 0.0
+    govt_margin_amt: Optional[float] = 0.0
+    govt_submitted_amt: Optional[float] = None
+    govt_approved_amt: Optional[float] = None
+    govt_status: Optional[str] = "pending"
+
     payment_status: Optional[str] = "unpaid"
     amount_paid: Optional[float] = 0.0
     draw_id: Optional[int] = None
-    claim_id: Optional[int] = None
+    provincial_claim_id: Optional[int] = None
+    federal_claim_id: Optional[int] = None
+    is_payroll: bool = False
 
     class Config:
         from_attributes = True
@@ -334,5 +359,100 @@ class ClaimOut(BaseModel):
     invoice_count: int = 0
     total_original: float = 0.0
     total_cad: float = 0.0
+    class Config:
+        from_attributes = True
+
+
+# ─── Invoice Cost Update ────────────────────────────────────────────────────
+
+class InvoiceCostUpdate(BaseModel):
+    """Update billing/cost fields on an invoice."""
+    lender_margin_pct: Optional[float] = None
+    govt_margin_pct: Optional[float] = None
+    lender_submitted_amt: Optional[float] = None
+    lender_approved_amt: Optional[float] = None
+    lender_status: Optional[str] = None
+    govt_submitted_amt: Optional[float] = None
+    govt_approved_amt: Optional[float] = None
+    govt_status: Optional[str] = None
+
+
+# ─── Payroll ────────────────────────────────────────────────────────────────
+
+class PayrollEntryCreate(BaseModel):
+    employee_name: Optional[str] = None
+    company_name: Optional[str] = None
+    pay_period_start: Optional[str] = None
+    pay_period_end: Optional[str] = None
+    gross_pay: float = 0.0
+    net_pay: Optional[float] = None
+    cpp: float = 0.0
+    ei: float = 0.0
+    income_tax: float = 0.0
+    insurance: float = 0.0
+    holiday_pay: float = 0.0
+    other_deductions: float = 0.0
+    working_days: Optional[int] = None
+    statutory_holidays: int = 0
+    province: str = "ON"
+    draw_id: Optional[int] = None
+    provincial_claim_id: Optional[int] = None
+    federal_claim_id: Optional[int] = None
+
+class PayrollEntryUpdate(BaseModel):
+    employee_name: Optional[str] = None
+    company_name: Optional[str] = None
+    gross_pay: Optional[float] = None
+    cpp: Optional[float] = None
+    ei: Optional[float] = None
+    income_tax: Optional[float] = None
+    insurance: Optional[float] = None
+    holiday_pay: Optional[float] = None
+    working_days: Optional[int] = None
+    statutory_holidays: Optional[int] = None
+    province: Optional[str] = None
+    lender_submitted_amt: Optional[float] = None
+    lender_approved_amt: Optional[float] = None
+    lender_status: Optional[str] = None
+    govt_submitted_amt: Optional[float] = None
+    govt_approved_amt: Optional[float] = None
+    govt_status: Optional[str] = None
+    draw_id: Optional[int] = None
+    provincial_claim_id: Optional[int] = None
+    federal_claim_id: Optional[int] = None
+
+class PayrollEntryOut(BaseModel):
+    id: int
+    employee_name: Optional[str]
+    company_name: Optional[str]
+    pay_period_start: Optional[str]
+    pay_period_end: Optional[str]
+    gross_pay: float
+    net_pay: Optional[float]
+    cpp: float
+    ei: float
+    income_tax: float
+    insurance: float
+    holiday_pay: float
+    other_deductions: float
+    working_days: Optional[int]
+    statutory_holidays: int
+    eligible_days: Optional[int]
+    daily_rate: Optional[float]
+    province: str
+    lender_billable: Optional[float]
+    govt_billable: Optional[float]
+    lender_submitted_amt: Optional[float]
+    lender_approved_amt: Optional[float]
+    lender_status: str
+    govt_submitted_amt: Optional[float]
+    govt_approved_amt: Optional[float]
+    govt_status: str
+    draw_id: Optional[int]
+    provincial_claim_id: Optional[int]
+    federal_claim_id: Optional[int]
+    original_filename: Optional[str]
+    status: str
+    created_at: datetime
     class Config:
         from_attributes = True

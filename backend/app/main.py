@@ -28,6 +28,31 @@ def _run_migrations():
             "ALTER TABLE invoices ADD COLUMN vendor_on_record VARCHAR",
             "ALTER TABLE invoices ADD COLUMN draw_id INTEGER REFERENCES draws(id)",
             "ALTER TABLE invoices ADD COLUMN claim_id INTEGER REFERENCES claims(id)",
+            # Dual claim FKs
+            "ALTER TABLE invoices ADD COLUMN provincial_claim_id INTEGER REFERENCES claims(id)",
+            "ALTER TABLE invoices ADD COLUMN federal_claim_id INTEGER REFERENCES claims(id)",
+            # Tax breakdown
+            "ALTER TABLE invoices ADD COLUMN subtotal FLOAT",
+            "ALTER TABLE invoices ADD COLUMN tax_gst FLOAT",
+            "ALTER TABLE invoices ADD COLUMN tax_hst FLOAT",
+            "ALTER TABLE invoices ADD COLUMN tax_qst FLOAT",
+            "ALTER TABLE invoices ADD COLUMN tax_pst FLOAT",
+            "ALTER TABLE invoices ADD COLUMN tax_total FLOAT",
+            "ALTER TABLE invoices ADD COLUMN vendor_province VARCHAR",
+            # Cost tracking
+            "ALTER TABLE invoices ADD COLUMN received_total FLOAT",
+            "ALTER TABLE invoices ADD COLUMN lender_margin_pct FLOAT DEFAULT 0.0",
+            "ALTER TABLE invoices ADD COLUMN lender_margin_amt FLOAT DEFAULT 0.0",
+            "ALTER TABLE invoices ADD COLUMN lender_submitted_amt FLOAT",
+            "ALTER TABLE invoices ADD COLUMN lender_approved_amt FLOAT",
+            "ALTER TABLE invoices ADD COLUMN lender_status VARCHAR DEFAULT 'pending'",
+            "ALTER TABLE invoices ADD COLUMN lender_tax_amt FLOAT",
+            "ALTER TABLE invoices ADD COLUMN govt_margin_pct FLOAT DEFAULT 0.0",
+            "ALTER TABLE invoices ADD COLUMN govt_margin_amt FLOAT DEFAULT 0.0",
+            "ALTER TABLE invoices ADD COLUMN govt_submitted_amt FLOAT",
+            "ALTER TABLE invoices ADD COLUMN govt_approved_amt FLOAT",
+            "ALTER TABLE invoices ADD COLUMN govt_status VARCHAR DEFAULT 'pending'",
+            "ALTER TABLE invoices ADD COLUMN is_payroll BOOLEAN DEFAULT 0",
         ]:
             try:
                 conn.execute(text(stmt))

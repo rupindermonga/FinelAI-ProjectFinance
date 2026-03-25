@@ -128,6 +128,15 @@ async def process_invoice_file(
         invoice.billed_to = _str(data.get("billed_to"))
         invoice.billing_type = _str(data.get("billing_type"))
         invoice.vendor_on_record = _str(data.get("vendor_on_record"))
+        # Tax breakdown
+        invoice.subtotal = _num(data.get("subtotal"))
+        invoice.tax_gst = _num(data.get("tax_gst"))
+        invoice.tax_hst = _num(data.get("tax_hst"))
+        invoice.tax_qst = _num(data.get("tax_qst"))
+        invoice.tax_pst = _num(data.get("tax_pst"))
+        invoice.tax_total = _num(data.get("tax_total"))
+        invoice.vendor_province = _str(data.get("vendor_province"))
+        invoice.received_total = invoice.total_due
         invoice.extracted_data = data
         invoice.status = "processed"
         invoice.processed_at = datetime.utcnow()

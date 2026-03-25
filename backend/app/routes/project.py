@@ -14,7 +14,7 @@ from ..database import get_db
 from ..models import (
     User, Project, SubDivision, CostCategory, CostSubCategory,
     SubDivisionBudget, Invoice, InvoiceAllocation, Payment,
-    Draw, Claim,
+    Draw, Claim, PayrollEntry,
 )
 from ..schemas import (
     ProjectCreate, ProjectUpdate, ProjectOut,
@@ -24,6 +24,7 @@ from ..schemas import (
     PaymentCreate, PaymentOut,
     DrawCreate, DrawUpdate, DrawOut,
     ClaimCreate, ClaimUpdate, ClaimOut,
+    InvoiceCostUpdate, PayrollEntryCreate, PayrollEntryUpdate, PayrollEntryOut,
 )
 from ..dependencies import get_current_user
 
@@ -474,8 +475,16 @@ def get_draw_invoices(draw_id: int, db: Session = Depends(get_db), current_user:
 
 # ─── Claims ──────────────────────────────────────────────────────────────────
 
+def _claim_fk(claim):
+    """Return the Invoice FK column for this claim's type."""
+    return Invoice.provincial_claim_id if claim.claim_type == "provincial" else Invoice.federal_claim_id
+
+def _claim_fk_name(claim):
+    """Return the Invoice FK column name string for this claim's type."""
+    return "provincial_claim_id" if claim.claim_type == "provincial" else "federal_claim_id"
+
 def _claim_out(claim, db):
-    invs = db.query(Invoice).filter(Invoice.claim_id == claim.id).all()
+    invs = db.query(Invoice).filter(_claim_fk(claim) == claim.id).all()
     total_orig = sum(i.total_due or 0 for i in invs)
     return ClaimOut(
         id=claim.id, claim_number=claim.claim_number, claim_type=claim.claim_type,
@@ -534,7 +543,8 @@ def delete_claim(claim_id: int, db: Session = Depends(get_db), current_user: Use
     claim = db.query(Claim).filter(Claim.id == claim_id, Claim.project_id == proj.id).first()
     if not claim:
         raise HTTPException(status_code=404)
-    db.query(Invoice).filter(Invoice.claim_id == claim_id).update({"claim_id": None})
+    fk_name = _claim_fk_name(claim)
+    db.query(Invoice).filter(_claim_fk(claim) == claim_id).update({fk_name: None})
     db.delete(claim)
     db.commit()
     return {"message": "Claim deleted"}
@@ -547,11 +557,12 @@ def assign_invoices_to_claim(claim_id: int, invoice_ids: List[int], db: Session 
     claim = db.query(Claim).filter(Claim.id == claim_id, Claim.project_id == proj.id).first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
-    db.query(Invoice).filter(Invoice.claim_id == claim_id).update({"claim_id": None})
+    fk_name = _claim_fk_name(claim)
+    db.query(Invoice).filter(_claim_fk(claim) == claim_id).update({fk_name: None})
     for iid in invoice_ids:
         inv = db.query(Invoice).filter(Invoice.id == iid, Invoice.user_id == current_user.id).first()
         if inv:
-            inv.claim_id = claim_id
+            setattr(inv, fk_name, claim_id)
     db.commit()
     return _claim_out(claim, db)
 
@@ -565,9 +576,10 @@ def copy_draw_to_claim(claim_id: int, draw_id: int, db: Session = Depends(get_db
     claim = db.query(Claim).filter(Claim.id == claim_id, Claim.project_id == proj.id).first()
     if not draw or not claim:
         raise HTTPException(status_code=404)
+    fk_name = _claim_fk_name(claim)
     draw_invs = db.query(Invoice).filter(Invoice.draw_id == draw_id, Invoice.user_id == current_user.id).all()
     for inv in draw_invs:
-        inv.claim_id = claim_id
+        setattr(inv, fk_name, claim_id)
     db.commit()
     return _claim_out(claim, db)
 
@@ -579,7 +591,7 @@ def get_claim_invoices(claim_id: int, db: Session = Depends(get_db), current_use
     claim = db.query(Claim).filter(Claim.id == claim_id, Claim.project_id == proj.id).first()
     if not claim:
         raise HTTPException(status_code=404)
-    invs = db.query(Invoice).filter(Invoice.claim_id == claim_id, Invoice.user_id == current_user.id).all()
+    invs = db.query(Invoice).filter(_claim_fk(claim) == claim_id, Invoice.user_id == current_user.id).all()
     return [{
         "id": i.id, "invoice_number": i.invoice_number, "vendor_name": i.vendor_name,
         "currency": i.currency or "CAD", "total_due": i.total_due or 0,
@@ -748,7 +760,24 @@ def project_dashboard(db: Session = Depends(get_db), current_user: User = Depend
 
     # Unassigned to draws/claims
     no_draw = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.draw_id.is_(None)).count()
-    no_claim = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.claim_id.is_(None)).count()
+    no_prov = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.provincial_claim_id.is_(None)).count()
+    no_fed = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.federal_claim_id.is_(None)).count()
+
+    # Cost tracking summary (4 views)
+    all_processed = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed").all()
+    committed_total = sum(i.received_total or i.total_due or 0 for i in all_processed)
+    lender_approved = sum(i.lender_approved_amt or 0 for i in all_processed)
+    lender_pending = sum(i.lender_submitted_amt or 0 for i in all_processed if i.lender_status == "pending")
+    lender_rejected = sum(i.lender_submitted_amt or 0 for i in all_processed if i.lender_status == "rejected")
+    govt_approved = sum(i.govt_approved_amt or 0 for i in all_processed)
+    govt_pending = sum(i.govt_submitted_amt or 0 for i in all_processed if i.govt_status == "pending")
+    govt_rejected = sum(i.govt_submitted_amt or 0 for i in all_processed if i.govt_status == "rejected")
+
+    # Payroll summary
+    payroll_entries = db.query(PayrollEntry).filter(PayrollEntry.user_id == current_user.id, PayrollEntry.status == "processed").all()
+    payroll_committed = sum(p.gross_pay or 0 for p in payroll_entries)
+    payroll_lender_approved = sum(p.lender_approved_amt or 0 for p in payroll_entries)
+    payroll_govt_approved = sum(p.govt_approved_amt or 0 for p in payroll_entries)
 
     return {
         "project": ProjectOut.model_validate(proj).model_dump(),
@@ -763,8 +792,143 @@ def project_dashboard(db: Session = Depends(get_db), current_user: User = Depend
         "provincial_claims": [_claim_out(c, db).model_dump() for c in prov_claims],
         "federal_claims": [_claim_out(c, db).model_dump() for c in fed_claims],
         "invoices_without_draw": no_draw,
-        "invoices_without_claim": no_claim,
+        "invoices_without_claim": no_prov + no_fed,
+        # Cost tracking 4-view
+        "cost_tracking": {
+            "committed": round(committed_total + payroll_committed, 2),
+            "lender": {
+                "approved": round(lender_approved + payroll_lender_approved, 2),
+                "pending": round(lender_pending, 2),
+                "rejected": round(lender_rejected, 2),
+            },
+            "govt": {
+                "approved": round(govt_approved + payroll_govt_approved, 2),
+                "pending": round(govt_pending, 2),
+                "rejected": round(govt_rejected, 2),
+            },
+            "net_position": {
+                "committed": round(committed_total + payroll_committed, 2),
+                "recovered_lender": round(lender_approved + payroll_lender_approved, 2),
+                "recovered_govt": round(govt_approved + payroll_govt_approved, 2),
+                "out_of_pocket": round((committed_total + payroll_committed) - (lender_approved + payroll_lender_approved) - (govt_approved + payroll_govt_approved), 2),
+            },
+            "payroll_committed": round(payroll_committed, 2),
+            "payroll_entries_count": len(payroll_entries),
+        },
     }
+
+
+# ─── Invoice Cost Update ─────────────────────────────────────────────────────
+
+# VoR → tax jurisdiction mapping
+_QUEBEC_VORS = {"digicom", "digicom inc", "digicom inc."}
+
+def _calc_lender_tax(invoice):
+    """Recalculate lender tax based on VoR province."""
+    st = invoice.subtotal or invoice.total_due or 0
+    margin = invoice.lender_margin_amt or 0
+    base = st + margin
+    vor = (invoice.vendor_on_record or "").strip().lower()
+    if invoice.billing_type == "direct":
+        return invoice.tax_total or 0  # pass through
+    if vor in _QUEBEC_VORS:
+        return round(base * 0.14975, 2)  # GST 5% + QST 9.975%
+    return round(base * 0.13, 2)  # HST 13% (Ontario)
+
+
+@router.put("/invoices/{invoice_id}/cost")
+def update_invoice_cost(invoice_id: int, body: InvoiceCostUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Update billing/cost fields on an invoice."""
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.user_id == current_user.id).first()
+    if not inv:
+        raise HTTPException(status_code=404)
+    allowed = {"lender_margin_pct", "govt_margin_pct", "lender_submitted_amt", "lender_approved_amt",
+               "lender_status", "govt_submitted_amt", "govt_approved_amt", "govt_status"}
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if field in allowed:
+            setattr(inv, field, value)
+
+    # Recalculate margins and tax
+    st = inv.subtotal or inv.total_due or 0
+    if inv.lender_margin_pct is not None:
+        inv.lender_margin_amt = round(st * (inv.lender_margin_pct or 0) / 100, 2)
+    if inv.govt_margin_pct is not None:
+        inv.govt_margin_amt = round(st * (inv.govt_margin_pct or 0) / 100, 2)
+    inv.received_total = inv.total_due
+    inv.lender_tax_amt = _calc_lender_tax(inv)
+    # Auto-calc submitted amounts if not manually set
+    if inv.lender_submitted_amt is None:
+        inv.lender_submitted_amt = round(st + (inv.lender_margin_amt or 0) + (inv.lender_tax_amt or 0), 2)
+    if inv.govt_submitted_amt is None:
+        inv.govt_submitted_amt = round(st + (inv.govt_margin_amt or 0), 2)
+    db.commit()
+    db.refresh(inv)
+    return {"message": "Cost updated", "id": inv.id}
+
+
+# ─── Payroll CRUD ────────────────────────────────────────────────────────────
+
+def _calc_payroll(entry: PayrollEntry):
+    """Calculate derived payroll fields."""
+    entry.eligible_days = (entry.working_days or 0) - (entry.statutory_holidays or 0)
+    if entry.eligible_days and entry.eligible_days > 0:
+        entry.daily_rate = round((entry.gross_pay or 0) / entry.eligible_days, 2)
+    else:
+        entry.daily_rate = 0
+    entry.lender_billable = entry.gross_pay  # lender approves full gross
+    non_claimable = (entry.cpp or 0) + (entry.ei or 0) + (entry.insurance or 0) + (entry.holiday_pay or 0)
+    entry.govt_billable = round((entry.gross_pay or 0) - non_claimable, 2)
+
+
+@router.get("/payroll")
+def list_payroll(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    entries = db.query(PayrollEntry).filter(PayrollEntry.user_id == current_user.id).order_by(PayrollEntry.pay_period_start.desc()).all()
+    return [PayrollEntryOut.model_validate(e) for e in entries]
+
+
+@router.post("/payroll")
+def create_payroll(body: PayrollEntryCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    proj = db.query(Project).filter(Project.user_id == current_user.id).first()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Create a project first")
+    entry = PayrollEntry(user_id=current_user.id, project_id=proj.id, status="processed")
+    for field, value in body.model_dump().items():
+        if hasattr(entry, field):
+            setattr(entry, field, value)
+    _calc_payroll(entry)
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return PayrollEntryOut.model_validate(entry)
+
+
+@router.put("/payroll/{entry_id}")
+def update_payroll(entry_id: int, body: PayrollEntryUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    entry = db.query(PayrollEntry).filter(PayrollEntry.id == entry_id, PayrollEntry.user_id == current_user.id).first()
+    if not entry:
+        raise HTTPException(status_code=404)
+    allowed = {"employee_name", "company_name", "gross_pay", "cpp", "ei", "income_tax", "insurance",
+               "holiday_pay", "working_days", "statutory_holidays", "province",
+               "lender_submitted_amt", "lender_approved_amt", "lender_status",
+               "govt_submitted_amt", "govt_approved_amt", "govt_status",
+               "draw_id", "provincial_claim_id", "federal_claim_id"}
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if field in allowed:
+            setattr(entry, field, value)
+    _calc_payroll(entry)
+    db.commit()
+    db.refresh(entry)
+    return PayrollEntryOut.model_validate(entry)
+
+
+@router.delete("/payroll/{entry_id}")
+def delete_payroll(entry_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    entry = db.query(PayrollEntry).filter(PayrollEntry.id == entry_id, PayrollEntry.user_id == current_user.id).first()
+    if not entry:
+        raise HTTPException(status_code=404)
+    db.delete(entry)
+    db.commit()
+    return {"message": "Payroll entry deleted"}
 
 
 # ─── Bookkeeping Export ──────────────────────────────────────────────────────

@@ -229,7 +229,16 @@ Extraction rules:
 - Dates must be YYYY-MM-DD format only (e.g. 2024-01-15)
 - Numbers must be pure numeric values — no currency symbols or commas (e.g. 1234.56 not $1,234.56)
 - Currency: use ISO 4217 code (CAD, USD, EUR, GBP, etc.)
-- tax_total: combine ALL tax types (GST + HST + PST + VAT) into one number
+- tax_total: combine ALL tax types (GST + HST + PST + QST + VAT) into one number
+- subtotal: the amount BEFORE any tax
+- tax_gst: federal Goods & Services Tax amount (5% in Canada), null if not applicable
+- tax_hst: Harmonized Sales Tax amount (13% Ontario, 15% NS/NB/NL), null if not applicable. If HST is present, tax_gst should be null (HST includes GST).
+- tax_qst: Quebec Sales Tax amount (9.975%), null if not applicable
+- tax_pst: Provincial Sales Tax (BC 7%, SK 6%, MB 7%), null if not applicable
+- vendor_province: the province/state where the vendor is located (e.g. "ON", "QC", "AB", "NY"), null if unclear
+- billed_to: the company/entity name the invoice is addressed TO (the buyer)
+- vendor_on_record: if the invoice mentions a "Vendor on Record" or intermediary company, extract it; otherwise null
+- billing_type: "direct" if vendor bills the buyer directly, "pass_through" if there's an intermediary/VoR mentioned
 - line_items: extract EVERY line item row, do not skip any
 - For the category/sub_category/sub_division fields: use EXACTLY the allowed values listed above; do not invent new values
 - confidence_score: 0.9+ = clear invoice, 0.5–0.9 = some ambiguity, <0.5 = poor quality scan
