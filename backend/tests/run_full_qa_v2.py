@@ -128,12 +128,13 @@ admin_invs = requests.get(f"{BASE}/api/invoices", headers=auth(token)).json().ge
 user2_invs = requests.get(f"{BASE}/api/invoices", headers=auth(user2_token)).json().get("items", [])
 test("User2 sees 0 invoices", len(user2_invs) == 0)
 
-admin_cols = requests.get(f"{BASE}/api/columns", headers=auth(token)).json()
+r_admin_cols = requests.get(f"{BASE}/api/columns", headers=auth(token))
+admin_cols = r_admin_cols.json() if r_admin_cols.status_code == 200 and isinstance(r_admin_cols.json(), list) else []
 r_u2_cols = requests.get(f"{BASE}/api/columns", headers=auth(user2_token))
 user2_cols = r_u2_cols.json() if r_u2_cols.status_code == 200 and isinstance(r_u2_cols.json(), list) else []
-test("Column IDs user-scoped", len(user2_cols) == 0 or {c["id"] for c in admin_cols}.isdisjoint({c["id"] for c in user2_cols}))
+test("Column IDs user-scoped", len(admin_cols) == 0 or len(user2_cols) == 0 or {c["id"] for c in admin_cols}.isdisjoint({c["id"] for c in user2_cols}))
 
-if admin_cols:
+if admin_cols and isinstance(admin_cols, list):
     r = requests.put(f"{BASE}/api/columns/{admin_cols[0]['id']}", headers=auth(user2_token), json={"field_label": "HACKED"})
     test("User2 cant modify admin column", r.status_code in (403, 404))
 

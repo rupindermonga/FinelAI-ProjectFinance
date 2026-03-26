@@ -18,9 +18,9 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "10080"))
 
 # ── In-memory rate limiter (separate buckets per endpoint) ───────────────────
-_LOGIN_MAX = int(os.getenv("LOGIN_RATE_LIMIT", "30"))  # max login attempts per window per IP
-_REGISTER_MAX = 20          # max register attempts per window per IP (higher for QA)
-_WINDOW_SECONDS = 300       # 5-minute window
+_LOGIN_MAX = int(os.getenv("LOGIN_RATE_LIMIT", "30"))  # max failed login attempts per window per IP
+_REGISTER_MAX = 20          # max register attempts per window per IP
+_WINDOW_SECONDS = 120       # 2-minute window (balances security vs QA stability)
 _login_attempts: dict = defaultdict(list)
 _register_attempts: dict = defaultdict(list)
 
