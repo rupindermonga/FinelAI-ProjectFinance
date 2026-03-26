@@ -111,7 +111,8 @@ class ColumnConfig(Base):
     field_label = Column(String, nullable=False)      # e.g. "Vendor Name"
     field_description = Column(String, nullable=True) # used in Gemini prompt
     field_type = Column(String, default="string")     # string | number | date | array | boolean
-    is_active = Column(Boolean, default=True)         # shown in table + extracted
+    is_active = Column(Boolean, default=True)         # extracted by Gemini
+    is_viewable = Column(Boolean, default=True)       # shown in dashboard table
     is_system = Column(Boolean, default=False)        # cannot be deleted, only toggled
     is_exportable = Column(Boolean, default=True)     # included in Excel/JSON export
     display_order = Column(Integer, default=100)

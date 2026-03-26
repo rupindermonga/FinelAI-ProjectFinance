@@ -133,3 +133,22 @@ def toggle_export(
     db.commit()
     db.refresh(col)
     return {"id": col.id, "is_exportable": col.is_exportable}
+
+
+@router.put("/{col_id}/toggle-view")
+def toggle_view(
+    col_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    col = db.query(ColumnConfig).filter(
+        ColumnConfig.id == col_id,
+        ColumnConfig.user_id == current_user.id
+    ).first()
+    if not col:
+        raise HTTPException(status_code=404, detail="Column not found")
+
+    col.is_viewable = not col.is_viewable
+    db.commit()
+    db.refresh(col)
+    return {"id": col.id, "is_viewable": col.is_viewable}

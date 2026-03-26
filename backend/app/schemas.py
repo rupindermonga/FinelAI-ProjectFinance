@@ -65,6 +65,7 @@ class ColumnConfigUpdate(BaseModel):
     field_description: Optional[str] = None
     field_type: Optional[Literal["string", "number", "date", "boolean"]] = None
     is_active: Optional[bool] = None
+    is_viewable: Optional[bool] = None
     is_exportable: Optional[bool] = None
     display_order: Optional[int] = None
 
@@ -75,6 +76,7 @@ class ColumnConfigOut(BaseModel):
     field_description: Optional[str]
     field_type: str
     is_active: bool
+    is_viewable: bool = True
     is_system: bool
     is_exportable: bool = True
     display_order: int

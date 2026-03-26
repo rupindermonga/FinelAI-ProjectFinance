@@ -41,6 +41,7 @@ function app() {
     // ── Columns ───────────────────────────────────────────────────
     allColumns: [],
     activeColumns: [],
+    get viewableColumns() { return this.activeColumns.filter(c => c.is_viewable !== false); },
     showAddColumnModal: false,
     editingColumn: null,
     columnForm: { field_key: '', field_label: '', field_description: '', field_type: 'string', display_order: 100 },
@@ -348,6 +349,12 @@ function app() {
         const res = await this.put(`/api/columns/${col.id}/toggle-export`, {});
         col.is_exportable = res.is_exportable;
       } catch (e) { alert('Could not toggle export flag: ' + e.message); }
+    },
+    async toggleColumnView(col) {
+      try {
+        const res = await this.put(`/api/columns/${col.id}/toggle-view`, {});
+        col.is_viewable = res.is_viewable;
+      } catch (e) { alert('Could not toggle view flag: ' + e.message); }
     },
 
     openEditColumn(col) {
@@ -992,6 +999,29 @@ function app() {
       if (!confirm('Delete this payroll entry?')) return;
       await this.del(`/api/project/payroll/${id}`);
       await Promise.all([this.loadPayroll(), this.loadProjectDashboard()]);
+    },
+
+    // ── Quick Create Draw/Claim from Upload Modal ──────────────
+    async quickCreateDraw() {
+      const num = prompt('Enter draw number:');
+      if (!num) return;
+      const rate = prompt('USD→CAD FX rate (default 1.0):', '1.0');
+      try {
+        const res = await this.post('/api/project/draws', { draw_number: parseInt(num), fx_rate: parseFloat(rate) || 1.0 });
+        await this.loadDraws();
+        this.uploadDrawId = res.id;
+      } catch(e) { alert(e.message); }
+    },
+    async quickCreateClaim(type) {
+      const num = prompt(`Enter ${type} claim number:`);
+      if (!num) return;
+      const rate = prompt('USD→CAD FX rate (default 1.0):', '1.0');
+      try {
+        const res = await this.post('/api/project/claims', { claim_number: parseInt(num), claim_type: type, fx_rate: parseFloat(rate) || 1.0 });
+        await this.loadClaims();
+        if (type === 'provincial') this.uploadProvClaimId = res.id;
+        else this.uploadFedClaimId = res.id;
+      } catch(e) { alert(e.message); }
     },
 
     // ── Bulk Approve ────────────────────────────────────────────

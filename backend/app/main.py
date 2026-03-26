@@ -20,6 +20,7 @@ def _run_migrations():
         for stmt in [
             "ALTER TABLE category_configs ADD COLUMN requires_sub_division BOOLEAN DEFAULT 0",
             "ALTER TABLE column_configs ADD COLUMN is_exportable BOOLEAN DEFAULT 1",
+            "ALTER TABLE column_configs ADD COLUMN is_viewable BOOLEAN DEFAULT 1",
             "ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0",
             "ALTER TABLE invoices ADD COLUMN payment_status VARCHAR DEFAULT 'unpaid'",
             "ALTER TABLE invoices ADD COLUMN amount_paid FLOAT DEFAULT 0.0",

@@ -284,7 +284,7 @@
                 <tr>
                   <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
                   <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">File</th>
-                  <template x-for="col in activeColumns" :key="col.id">
+                  <template x-for="col in viewableColumns" :key="col.id">
                     <th x-show="col.field_key !== 'line_items'" class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap" x-text="col.field_label"></th>
                   </template>
                   <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Draw</th>
@@ -296,7 +296,7 @@
               <tbody class="divide-y divide-gray-100">
                 <template x-if="invoices.length === 0">
                   <tr>
-                    <td :colspan="activeColumns.length + 4" class="text-center py-16 text-gray-400">
+                    <td :colspan="viewableColumns.length + 6" class="text-center py-16 text-gray-400">
                       <i class="fa-solid fa-inbox text-4xl mb-3 block text-gray-300"></i>
                       No invoices found. Upload some PDFs to get started.
                     </td>
@@ -311,7 +311,7 @@
                         <span class="text-gray-700 max-w-40 truncate text-xs" x-text="inv.original_filename"></span>
                       </div>
                     </td>
-                    <template x-for="col in activeColumns" :key="col.id">
+                    <template x-for="col in viewableColumns" :key="col.id">
                       <td x-show="col.field_key !== 'line_items'" class="px-4 py-3 text-gray-700 whitespace-nowrap">
                         <span x-text="getCellValue(inv, col)"></span>
                       </td>
@@ -439,6 +439,7 @@
                 <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Type</th>
                 <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Description (for AI)</th>
                 <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Active</th>
+                <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase" title="Show in dashboard table">View</th>
                 <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase" title="Include in Excel/JSON exports">Export</th>
                 <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase">System</th>
                 <th class="px-5 py-3"></th>
@@ -458,6 +459,12 @@
                   <td class="px-5 py-3 text-center">
                     <button @click="toggleColumn(col)" :class="col.is_active ? 'bg-green-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors" title="Show in table & extract">
                       <span :class="col.is_active ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"></span>
+                    </button>
+                  </td>
+                  <!-- View toggle -->
+                  <td class="px-5 py-3 text-center">
+                    <button @click="toggleColumnView(col)" :class="col.is_viewable !== false ? 'bg-purple-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors" title="Show in dashboard table">
+                      <span :class="col.is_viewable !== false ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"></span>
                     </button>
                   </td>
                   <!-- Export toggle -->
@@ -483,7 +490,7 @@
             </tbody>
           </table>
         </div>
-        <p class="text-xs text-gray-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i><strong>Active</strong> = field is extracted by Gemini and shown in the invoice table. <strong>Export</strong> = field is included in Excel / JSON downloads. Both can be toggled independently.</p>
+        <p class="text-xs text-gray-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i><strong>Active</strong> = extracted by Gemini. <strong>View</strong> = shown in dashboard table. <strong>Export</strong> = included in Excel / JSON downloads. All three are independent.</p>
       </div><!-- /columns -->
 
 
@@ -1335,30 +1342,39 @@
       <div class="mt-4 grid grid-cols-3 gap-3">
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1"><i class="fa-solid fa-building-columns mr-1 text-blue-500"></i>Draw</label>
-          <select x-model="uploadDrawId" class="w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-            <option value="">None</option>
-            <template x-for="d in draws" :key="d.id">
-              <option :value="d.id" x-text="'Draw ' + d.draw_number"></option>
-            </template>
-          </select>
+          <div class="flex gap-1">
+            <select x-model="uploadDrawId" class="flex-1 border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="">None</option>
+              <template x-for="d in draws" :key="d.id">
+                <option :value="d.id" x-text="'Draw ' + d.draw_number"></option>
+              </template>
+            </select>
+            <button @click="quickCreateDraw()" class="px-2 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700" title="New Draw"><i class="fa-solid fa-plus"></i></button>
+          </div>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1"><i class="fa-solid fa-landmark mr-1 text-purple-500"></i>Prov. Claim</label>
-          <select x-model="uploadProvClaimId" class="w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
-            <option value="">None</option>
-            <template x-for="c in claims.filter(cl => cl.claim_type === 'provincial')" :key="c.id">
-              <option :value="c.id" x-text="'Claim ' + c.claim_number"></option>
-            </template>
-          </select>
+          <div class="flex gap-1">
+            <select x-model="uploadProvClaimId" class="flex-1 border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400">
+              <option value="">None</option>
+              <template x-for="c in claims.filter(cl => cl.claim_type === 'provincial')" :key="c.id">
+                <option :value="c.id" x-text="'Claim ' + c.claim_number"></option>
+              </template>
+            </select>
+            <button @click="quickCreateClaim('provincial')" class="px-2 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700" title="New Provincial Claim"><i class="fa-solid fa-plus"></i></button>
+          </div>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1"><i class="fa-solid fa-flag mr-1 text-indigo-500"></i>Fed. Claim</label>
-          <select x-model="uploadFedClaimId" class="w-full border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
-            <option value="">None</option>
-            <template x-for="c in claims.filter(cl => cl.claim_type === 'federal')" :key="c.id">
-              <option :value="c.id" x-text="'Claim ' + c.claim_number"></option>
-            </template>
-          </select>
+          <div class="flex gap-1">
+            <select x-model="uploadFedClaimId" class="flex-1 border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <option value="">None</option>
+              <template x-for="c in claims.filter(cl => cl.claim_type === 'federal')" :key="c.id">
+                <option :value="c.id" x-text="'Claim ' + c.claim_number"></option>
+              </template>
+            </select>
+            <button @click="quickCreateClaim('federal')" class="px-2 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700" title="New Federal Claim"><i class="fa-solid fa-plus"></i></button>
+          </div>
         </div>
       </div>
       <p class="text-xs text-gray-400 mt-1">Auto-selects your last used values. Create draws/claims in Project Finance first.</p>
