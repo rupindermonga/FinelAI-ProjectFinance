@@ -367,20 +367,14 @@
                   <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Vendor</th>
                   <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Curr</th>
                   <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Total</th>
-                  <th class="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Line #</th>
-                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">SKU</th>
-                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Description</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Qty</th>
-                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Unit</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Unit Price</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Tax%</th>
-                  <th class="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Line Total</th>
-                  <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Sub-Division</th>
+                  <template x-for="lc in visibleLineItemCols" :key="lc.key">
+                    <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap" x-text="lc.label"></th>
+                  </template>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
                 <template x-if="lineItemsFlat.length === 0">
-                  <tr><td colspan="14" class="text-center py-16 text-gray-400">No invoices found.</td></tr>
+                  <tr><td :colspan="5 + visibleLineItemCols.length" class="text-center py-16 text-gray-400">No invoices found.</td></tr>
                 </template>
                 <template x-for="(row, i) in lineItemsFlat" :key="i">
                   <tr class="hover:bg-blue-50 cursor-pointer transition" @click="openInvoice(row.inv)">
@@ -389,16 +383,9 @@
                     <td class="px-3 py-2 text-gray-700 max-w-[140px] truncate" x-text="row.inv.vendor_name || '—'"></td>
                     <td class="px-3 py-2 text-gray-500" x-text="row.inv.currency || '—'"></td>
                     <td class="px-3 py-2 text-right font-medium text-gray-800" x-text="fmtNum(row.inv.total_due)"></td>
-                    <!-- Line item columns — blank if invoice has no items -->
-                    <td class="px-3 py-2 text-center text-gray-400" x-text="row.item ? (row.item.line_no ?? '—') : '—'"></td>
-                    <td class="px-3 py-2 text-gray-500 font-mono" x-text="row.item?.sku || '—'"></td>
-                    <td class="px-3 py-2 text-gray-700 max-w-xs truncate" x-text="row.item?.description || (row.item ? '—' : '(no line items)')"></td>
-                    <td class="px-3 py-2 text-right text-gray-700" x-text="row.item?.qty ?? '—'"></td>
-                    <td class="px-3 py-2 text-gray-500" x-text="row.item?.unit || '—'"></td>
-                    <td class="px-3 py-2 text-right text-gray-700" x-text="row.item ? fmtNum(row.item.unit_price) : '—'"></td>
-                    <td class="px-3 py-2 text-right text-gray-500" x-text="row.item?.tax_rate != null ? row.item.tax_rate + '%' : '—'"></td>
-                    <td class="px-3 py-2 text-right font-medium text-gray-800" x-text="row.item ? fmtNum(row.item.line_total) : '—'"></td>
-                    <td class="px-3 py-2 text-gray-500" x-text="row.item?.sub_division || '—'"></td>
+                    <template x-for="lc in visibleLineItemCols" :key="lc.key + '-' + i">
+                      <td class="px-3 py-2 text-gray-700 whitespace-nowrap" x-text="row.item ? (row.item[lc.key] ?? '—') : '—'"></td>
+                    </template>
                   </tr>
                 </template>
               </tbody>
@@ -500,6 +487,42 @@
           </table>
         </div>
         <p class="text-xs text-gray-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i><strong>Active</strong> = extracted by Gemini. <strong>View</strong> = shown in dashboard table. <strong>Export</strong> = included in Excel / JSON downloads. All three are independent.</p>
+
+        <!-- Line Item Columns -->
+        <div class="bg-white rounded-xl border overflow-hidden mt-6">
+          <div class="px-5 py-3 bg-amber-50 border-b flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-amber-700"><i class="fa-solid fa-table-list mr-1"></i> Line Item Columns</h3>
+            <span class="text-xs text-gray-400">Controls the "Line Items" view and export</span>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Field</th>
+                <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Label</th>
+                <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase" title="Show in Line Items table">View</th>
+                <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase" title="Include in Line Items export">Export</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="lc in lineItemColumns" :key="lc.key">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-5 py-3 font-mono text-xs text-blue-700" x-text="lc.key"></td>
+                  <td class="px-5 py-3 text-gray-800 font-medium" x-text="lc.label"></td>
+                  <td class="px-5 py-3 text-center">
+                    <button @click="toggleLineItemCol(lc, 'visible')" :class="lc.visible ? 'bg-purple-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors">
+                      <span :class="lc.visible ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"></span>
+                    </button>
+                  </td>
+                  <td class="px-5 py-3 text-center">
+                    <button @click="toggleLineItemCol(lc, 'exportable')" :class="lc.exportable ? 'bg-blue-500' : 'bg-gray-300'" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors">
+                      <span :class="lc.exportable ? 'translate-x-4' : 'translate-x-1'" class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"></span>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
       </div><!-- /columns -->
 
 

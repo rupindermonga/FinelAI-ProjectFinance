@@ -313,6 +313,26 @@ function app() {
     },
 
     // Line-items flat view: each line item becomes its own row
+    // ── Line Item Column Config ──────────────────────────────────
+    lineItemColumns: JSON.parse(localStorage.getItem('lineItemColumns') || 'null') || [
+      { key: 'line_no', label: 'Line #', visible: true, exportable: true },
+      { key: 'sku', label: 'SKU', visible: true, exportable: true },
+      { key: 'description', label: 'Description', visible: true, exportable: true },
+      { key: 'qty', label: 'Qty', visible: true, exportable: true },
+      { key: 'unit', label: 'Unit', visible: true, exportable: true },
+      { key: 'unit_price', label: 'Unit Price', visible: true, exportable: true },
+      { key: 'discount_amount', label: 'Discount', visible: false, exportable: true },
+      { key: 'tax_rate', label: 'Tax %', visible: true, exportable: true },
+      { key: 'line_total', label: 'Line Total', visible: true, exportable: true },
+      { key: 'manufacturer', label: 'Manufacturer', visible: false, exportable: true },
+      { key: 'sub_division', label: 'Sub-Division', visible: true, exportable: true },
+    ],
+    get visibleLineItemCols() { return this.lineItemColumns.filter(c => c.visible); },
+    toggleLineItemCol(col, field) {
+      col[field] = !col[field];
+      localStorage.setItem('lineItemColumns', JSON.stringify(this.lineItemColumns));
+    },
+
     get lineItemsFlat() {
       const rows = [];
       for (const inv of this.invoices) {
