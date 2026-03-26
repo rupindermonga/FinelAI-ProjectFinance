@@ -893,7 +893,22 @@ def update_invoice_cost(invoice_id: int, body: InvoiceCostUpdate, db: Session = 
         raise HTTPException(status_code=404)
     allowed = {"lender_margin_pct", "govt_margin_pct", "lender_submitted_amt", "lender_approved_amt",
                "lender_status", "govt_submitted_amt", "govt_approved_amt", "govt_status"}
-    for field, value in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    # Validate margin percentages
+    for pct_field in ("lender_margin_pct", "govt_margin_pct"):
+        if pct_field in data and data[pct_field] is not None:
+            if data[pct_field] < 0 or data[pct_field] > 200:
+                raise HTTPException(status_code=400, detail=f"{pct_field} must be between 0 and 200")
+    # Validate amounts are non-negative
+    for amt_field in ("lender_submitted_amt", "lender_approved_amt", "govt_submitted_amt", "govt_approved_amt"):
+        if amt_field in data and data[amt_field] is not None and data[amt_field] < 0:
+            raise HTTPException(status_code=400, detail=f"{amt_field} cannot be negative")
+    # Validate status values
+    valid_statuses = {"pending", "approved", "partial", "rejected"}
+    for status_field in ("lender_status", "govt_status"):
+        if status_field in data and data[status_field] is not None and data[status_field] not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"{status_field} must be one of: {', '.join(valid_statuses)}")
+    for field, value in data.items():
         if field in allowed:
             setattr(inv, field, value)
 
