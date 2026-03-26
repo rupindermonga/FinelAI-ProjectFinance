@@ -87,6 +87,10 @@ def login(body: UserLogin, request: Request = None, db: Session = Depends(get_db
     if not user or not pwd_context.verify(body.password, user.hashed_password):
         _record_failed_attempt(request)
         raise HTTPException(status_code=401, detail="Invalid username or password")
+    # Successful login — clear failed attempts for this IP
+    ip = request.client.host if request and request.client else "unknown"
+    _login_attempts.pop(ip, None)
+
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
