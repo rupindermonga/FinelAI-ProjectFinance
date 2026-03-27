@@ -64,30 +64,69 @@ r = requests.get(f"{BASE}/api/invoices", headers={"Authorization": "Bearer garba
 test("Garbage JWT = 401", r.status_code == 401)
 
 ts = str(int(time.time()))
+
+# Public registration should be disabled
 r = requests.post(f"{BASE}/api/auth/register", json={"username": f"qa_{ts}", "email": f"qa_{ts}@example.com", "password": "StrongP@ss1"})
-test("Register valid user", r.status_code == 200)
+test("Public registration disabled (403)", r.status_code == 403)
+
+# ── ADMIN USER MANAGEMENT ───────────────────────────────────────────────
+print("\n-- ADMIN USER MANAGEMENT --")
+# Admin creates user2
+r = requests.post(f"{BASE}/api/admin/users", headers=auth(token), json={"username": f"qa_{ts}", "email": f"qa_{ts}@example.com", "password": "StrongP@ss1"})
+test("Admin creates user", r.status_code == 200)
+
 user2_token = login(f"qa_{ts}", "StrongP@ss1")
 test("User2 login", user2_token is not None)
 if not user2_token:
-    print("  WARNING: User2 auth failed (likely rate limiter). Cross-user tests will use a dummy token.")
+    print("  WARNING: User2 auth failed. Cross-user tests will use a dummy token.")
     user2_token = "dummy_invalid_token"
 
-r = requests.post(f"{BASE}/api/auth/register", json={"username": "ab", "email": f"s_{ts}@example.com", "password": "StrongP@ss1"})
-test("Short username rejected", r.status_code == 422)
+# Admin can list users
+r = requests.get(f"{BASE}/api/admin/users", headers=auth(token))
+test("Admin lists users", r.status_code == 200 and len(r.json()) > 0)
 
-r = requests.post(f"{BASE}/api/auth/register", json={"username": f"b_{ts}", "email": f"b_{ts}@qa.local", "password": "StrongP@ss1"})
-test("Invalid email rejected", r.status_code == 422)
+# Non-admin cant list users
+r = requests.get(f"{BASE}/api/admin/users", headers=auth(user2_token))
+test("Non-admin cant list users", r.status_code == 403)
 
-r = requests.post(f"{BASE}/api/auth/register", json={"username": f"c_{ts}", "email": f"c_{ts}@example.com", "password": "abc"})
-test("Short password rejected", r.status_code == 422)
+# Admin create validation
+r = requests.post(f"{BASE}/api/admin/users", headers=auth(token), json={"username": "ab", "email": "x@x.com", "password": "Test1234!"})
+test("Short username rejected", r.status_code == 400)
+r = requests.post(f"{BASE}/api/admin/users", headers=auth(token), json={"username": f"v_{ts}", "email": f"v_{ts}@x.com", "password": "abc"})
+test("Short password rejected", r.status_code == 400)
+r = requests.post(f"{BASE}/api/admin/users", headers=auth(token), json={"username": f"qa_{ts}", "email": f"dup_{ts}@x.com", "password": "Test1234!"})
+test("Duplicate username rejected", r.status_code == 400)
 
-# ── REGISTRATION RATE LIMIT ─────────────────────────────────────────────
-print("\n-- REGISTRATION RATE LIMIT --")
-reg_statuses = []
-for i in range(25):
-    r = requests.post(f"{BASE}/api/auth/register", json={"username": f"rl_{ts}_{i}", "email": f"rl_{ts}_{i}@example.com", "password": "StrongP@ss1"})
-    reg_statuses.append(r.status_code)
-test("Registration rate limited after 20", 429 in reg_statuses, f"first 429 at index {reg_statuses.index(429) if 429 in reg_statuses else 'never'}")
+# Change password
+r = requests.put(f"{BASE}/api/auth/change-password", headers=auth(user2_token), json={"current_password": "StrongP@ss1", "new_password": "NewPass99!"})
+test("User changes own password", r.status_code == 200)
+r = requests.post(f"{BASE}/api/auth/login", json={"username": f"qa_{ts}", "password": "NewPass99!"})
+test("Login with new password", r.status_code == 200)
+user2_token = r.json()["access_token"]
+
+# Wrong current password
+r = requests.put(f"{BASE}/api/auth/change-password", headers=auth(user2_token), json={"current_password": "wrong", "new_password": "X1234567!"})
+test("Wrong current password rejected", r.status_code == 401)
+
+# Admin reset password
+users_list = requests.get(f"{BASE}/api/admin/users", headers=auth(token)).json()
+u2_entry = next((u for u in users_list if u["username"] == f"qa_{ts}"), None)
+if u2_entry:
+    r = requests.put(f"{BASE}/api/admin/users/{u2_entry['id']}/reset-password", headers=auth(token), json={"password": "ResetPw99!"})
+    test("Admin resets user password", r.status_code == 200)
+    r = requests.post(f"{BASE}/api/auth/login", json={"username": f"qa_{ts}", "password": "ResetPw99!"})
+    test("Login with reset password", r.status_code == 200)
+    user2_token = r.json()["access_token"]
+
+# Toggle active
+if u2_entry:
+    r = requests.put(f"{BASE}/api/admin/users/{u2_entry['id']}/toggle-active", headers=auth(token))
+    test("Toggle user inactive", r.status_code == 200 and r.json()["is_active"] == False)
+    r = requests.post(f"{BASE}/api/auth/login", json={"username": f"qa_{ts}", "password": "ResetPw99!"})
+    test("Inactive user cant login", r.status_code == 403)
+    # Reactivate
+    requests.put(f"{BASE}/api/admin/users/{u2_entry['id']}/toggle-active", headers=auth(token))
+    user2_token = login(f"qa_{ts}", "ResetPw99!")
 
 # ── SECURITY HEADERS ────────────────────────────────────────────────────
 print("\n-- SECURITY HEADERS --")
