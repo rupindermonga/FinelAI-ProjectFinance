@@ -507,8 +507,39 @@
         <div class="mb-6">
           <h2 class="text-xl font-bold text-gray-800">Categories</h2>
           <p class="text-sm text-gray-500 mt-1">
-            Define categories, sub-categories, and sub-divisions. Gemini will use these to classify each invoice automatically.
+            View your cost structure, manage categories, and map vendors to categories for automatic classification.
           </p>
+        </div>
+
+        <!-- ═══ CURRENT STRUCTURE OVERVIEW ═══ -->
+        <div class="bg-white rounded-xl border overflow-hidden mb-6">
+          <div class="px-4 py-3 bg-blue-50 border-b">
+            <h3 class="font-semibold text-blue-800"><i class="fa-solid fa-sitemap mr-1"></i> Current Cost Structure</h3>
+            <p class="text-xs text-gray-500 mt-1">Your project categories and sub-categories. Manage these in Project Finance → Cost Categories.</p>
+          </div>
+          <div class="p-4">
+            <div x-show="costCategories.length === 0" class="text-center text-gray-400 py-4 text-sm">No cost categories configured. Go to Project Finance to set up.</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" x-show="costCategories.length > 0">
+              <template x-for="cat in costCategories" :key="'cs-' + cat.id">
+                <div class="border rounded-lg overflow-hidden">
+                  <div class="px-3 py-2 font-semibold text-sm flex items-center justify-between"
+                    :class="cat.is_per_subdivision ? 'bg-purple-50 text-purple-800' : 'bg-gray-50 text-gray-800'">
+                    <span><i class="fa-solid fa-folder mr-1"></i> <span x-text="cat.name"></span></span>
+                    <span x-show="cat.is_per_subdivision" class="text-[10px] bg-purple-200 text-purple-700 px-1.5 py-0.5 rounded">Per Sub-Division</span>
+                  </div>
+                  <div class="divide-y" x-show="cat.sub_categories?.length > 0">
+                    <template x-for="sc in cat.sub_categories || []" :key="'scs-' + sc.id">
+                      <div class="px-3 py-1.5 text-xs text-gray-600 flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0"></span>
+                        <span x-text="sc.name"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <div x-show="!cat.sub_categories?.length" class="px-3 py-2 text-xs text-gray-400 italic">No sub-categories</div>
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
 
         <!-- How-to note -->
