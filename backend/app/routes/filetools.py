@@ -39,44 +39,55 @@ def _extract_text_from_pdf(filepath: str) -> str:
         return ""
 
 
-def _search_folder_for_invoice(folder: str, invoice_number: str) -> Optional[str]:
-    """Search a folder for a file matching the invoice number.
-    First tries filename match, then falls back to reading PDF text."""
+def _search_folder_filename_only(folder: str, invoice_number: str) -> Optional[str]:
+    """Fast search: filename match only, no PDF reading."""
     if not os.path.isdir(folder):
         return None
-
     inv_num_lower = invoice_number.lower().strip()
 
-    # Pass 1: filename match
+    # Direct files
     for entry in os.scandir(folder):
         if entry.is_file() and Path(entry.name).suffix.lower() in ALLOWED_EXTENSIONS:
             if inv_num_lower in entry.name.lower():
                 return entry.path
 
-    # Pass 2: recurse into subfolders for filename match
+    # Subfolders
     for entry in os.scandir(folder):
         if entry.is_dir():
             for sub_entry in os.scandir(entry.path):
                 if sub_entry.is_file() and Path(sub_entry.name).suffix.lower() in ALLOWED_EXTENSIONS:
                     if inv_num_lower in sub_entry.name.lower():
                         return sub_entry.path
+    return None
 
-    # Pass 3: read PDF text (only for .pdf files in the folder)
+
+# Cache for PDF text extraction (avoids re-reading same file)
+_pdf_text_cache: dict = {}
+
+
+def _search_folder_deep(folder: str, invoice_number: str) -> Optional[str]:
+    """Deep search: reads PDF text content. Uses cache to avoid re-reading."""
+    if not os.path.isdir(folder):
+        return None
+    inv_num_lower = invoice_number.lower().strip()
+
+    # Direct PDF files
     for entry in os.scandir(folder):
         if entry.is_file() and entry.name.lower().endswith(".pdf"):
-            text = _extract_text_from_pdf(entry.path)
-            if inv_num_lower in text.lower():
+            if entry.path not in _pdf_text_cache:
+                _pdf_text_cache[entry.path] = _extract_text_from_pdf(entry.path)
+            if inv_num_lower in _pdf_text_cache[entry.path].lower():
                 return entry.path
 
-    # Pass 4: read PDFs in subfolders
+    # Subfolder PDFs
     for entry in os.scandir(folder):
         if entry.is_dir():
             for sub_entry in os.scandir(entry.path):
                 if sub_entry.is_file() and sub_entry.name.lower().endswith(".pdf"):
-                    text = _extract_text_from_pdf(sub_entry.path)
-                    if inv_num_lower in text.lower():
+                    if sub_entry.path not in _pdf_text_cache:
+                        _pdf_text_cache[sub_entry.path] = _extract_text_from_pdf(sub_entry.path)
+                    if inv_num_lower in _pdf_text_cache[sub_entry.path].lower():
                         return sub_entry.path
-
     return None
 
 
@@ -119,6 +130,18 @@ class InvoiceFinderRequest(BaseModel):
     source_folder: str
     output_folder: Optional[str] = None
     invoices: List[dict]  # [{"vendor": "Nokia", "invoice_number": "123"}, ...]
+    mode: str = "fast"  # "fast" = filename only, "deep" = also read PDF content
+
+
+# Global cancel flag for long-running searches
+_cancel_search: dict = {}  # user_id -> bool
+
+
+@router.post("/find-invoices/cancel")
+def cancel_search(current_user: User = Depends(get_current_user)):
+    """Cancel an in-progress invoice search."""
+    _cancel_search[current_user.id] = True
+    return {"message": "Cancel requested"}
 
 
 @router.post("/find-invoices")
@@ -126,7 +149,8 @@ def find_invoices(
     body: InvoiceFinderRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Search source folder for invoices by vendor/number, copy to organized output folder."""
+    """Search source folder for invoices. mode=fast (filename only) or mode=deep (reads PDFs too)."""
+    _cancel_search[current_user.id] = False
     source = body.source_folder.strip()
     if not os.path.isdir(source):
         raise HTTPException(status_code=400, detail=f"Source folder not found: {source}")
@@ -136,10 +160,17 @@ def find_invoices(
         output = os.path.join(source, "_organized")
     os.makedirs(output, exist_ok=True)
 
+    deep = body.mode == "deep"
     found = []
     missing = []
+    cancelled = False
 
     for item in body.invoices:
+        # Check cancel flag
+        if _cancel_search.get(current_user.id):
+            cancelled = True
+            break
+
         vendor = (item.get("vendor") or "Unknown").strip()
         inv_num = (item.get("invoice_number") or "").strip()
         if not inv_num:
@@ -149,21 +180,33 @@ def find_invoices(
         # Find best matching vendor folder (fuzzy)
         vendor_folder = _find_vendor_folder(source, vendor)
         match = None
+
+        # Fast pass: filename search
         if vendor_folder:
-            match = _search_folder_for_invoice(vendor_folder, inv_num)
+            match = _search_folder_filename_only(vendor_folder, inv_num)
         if not match:
-            # Try root folder and all subfolders
-            match = _search_folder_for_invoice(source, inv_num)
+            match = _search_folder_filename_only(source, inv_num)
         if not match:
-            # Last resort: scan every subfolder
             for entry in os.scandir(source):
                 if entry.is_dir() and entry.path != vendor_folder:
-                    match = _search_folder_for_invoice(entry.path, inv_num)
+                    match = _search_folder_filename_only(entry.path, inv_num)
                     if match:
                         break
 
+        # Deep pass: read PDF text (only if mode=deep and still not found)
+        if not match and deep:
+            if vendor_folder:
+                match = _search_folder_deep(vendor_folder, inv_num)
+            if not match:
+                match = _search_folder_deep(source, inv_num)
+            if not match:
+                for entry in os.scandir(source):
+                    if entry.is_dir() and entry.path != vendor_folder:
+                        match = _search_folder_deep(entry.path, inv_num)
+                        if match:
+                            break
+
         if match:
-            # Copy to output/VendorName/
             dest_dir = os.path.join(output, vendor)
             os.makedirs(dest_dir, exist_ok=True)
             dest_file = os.path.join(dest_dir, os.path.basename(match))
@@ -182,7 +225,10 @@ def find_invoices(
                 "reason": "Not found in source folder",
             })
 
+    _cancel_search.pop(current_user.id, None)
+
     return {
+        "cancelled": cancelled,
         "found": len(found),
         "missing": len(missing),
         "found_list": found,

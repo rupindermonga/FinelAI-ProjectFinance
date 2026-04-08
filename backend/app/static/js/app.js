@@ -1234,18 +1234,37 @@ function app() {
       } catch (e) { alert('Failed to parse file'); console.error(e); }
     },
 
-    async runInvoiceFinder() {
+    async runInvoiceFinder(mode = 'fast') {
       this.finderSearching = true;
-      this.finderResults = null;
+      if (mode === 'fast') this.finderResults = null;
       localStorage.setItem('finderSourceFolder', this.finderSourceFolder);
+      // For deep search, only send the missing invoices
+      const invoicesToSearch = mode === 'deep' && this.finderResults?.missing_list
+        ? this.finderResults.missing_list.map(m => ({ vendor: m.vendor, invoice_number: m.invoice_number }))
+        : this.finderInvoices;
       try {
-        this.finderResults = await this.post('/api/filetools/find-invoices', {
+        const result = await this.post('/api/filetools/find-invoices', {
           source_folder: this.finderSourceFolder,
           output_folder: this.finderOutputFolder || null,
-          invoices: this.finderInvoices,
+          invoices: invoicesToSearch,
+          mode: mode,
         });
+        if (mode === 'deep' && this.finderResults) {
+          // Merge deep results into existing
+          this.finderResults.found += result.found;
+          this.finderResults.found_list = [...this.finderResults.found_list, ...result.found_list];
+          this.finderResults.missing = result.missing;
+          this.finderResults.missing_list = result.missing_list;
+          this.finderResults.cancelled = result.cancelled;
+        } else {
+          this.finderResults = result;
+        }
       } catch (e) { alert('Search failed: ' + (e.message || e)); console.error(e); }
       this.finderSearching = false;
+    },
+
+    async cancelSearch() {
+      try { await this.post('/api/filetools/find-invoices/cancel', {}); } catch (e) {}
     },
 
     async runBulkUpload() {
