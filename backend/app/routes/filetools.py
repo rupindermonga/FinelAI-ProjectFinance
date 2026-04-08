@@ -203,29 +203,43 @@ async def upload_invoice_csv(
     rows = []
     if name.endswith(".csv"):
         text = content.decode("utf-8-sig")
-        reader = csv.DictReader(io.StringIO(text))
-        for row in reader:
-            vendor = row.get("Vendor") or row.get("vendor") or row.get("VENDOR") or ""
-            inv_num = row.get("Invoice Number") or row.get("invoice_number") or row.get("INVOICE NUMBER") or row.get("InvoiceNumber") or row.get("Invoice_Number") or row.get("Invoice #") or ""
-            if vendor.strip() or inv_num.strip():
-                rows.append({"vendor": vendor.strip(), "invoice_number": inv_num.strip()})
+        reader = csv.reader(io.StringIO(text))
+        all_rows = list(reader)
+        if not all_rows:
+            raise HTTPException(status_code=400, detail="Empty CSV")
+        # Find first two non-empty columns from header row
+        header = all_rows[0]
+        data_cols = [i for i, v in enumerate(header) if v and v.strip()]
+        if len(data_cols) < 2:
+            # Fallback to first two columns
+            data_cols = [0, 1]
+        vc, ic = data_cols[0], data_cols[1]
+        for row in all_rows[1:]:  # skip header
+            if len(row) <= max(vc, ic):
+                continue
+            vendor = str(row[vc]).strip()
+            inv_num = str(row[ic]).strip()
+            if vendor or inv_num:
+                rows.append({"vendor": vendor, "invoice_number": inv_num})
     elif name.endswith((".xlsx", ".xls")):
         import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
         ws = wb.active
-        headers = [str(c.value or "").strip().lower() for c in next(ws.iter_rows(min_row=1, max_row=1))]
-        vendor_col = None
-        inv_col = None
-        for i, h in enumerate(headers):
-            if h in ("vendor", "vendor name"):
-                vendor_col = i
-            elif h in ("invoice number", "invoice_number", "invoice #", "invoicenumber", "inv #", "inv number"):
-                inv_col = i
-        if vendor_col is None or inv_col is None:
-            raise HTTPException(status_code=400, detail=f"Could not find 'Vendor' and 'Invoice Number' columns. Found headers: {headers}")
+        # Find first two non-empty columns from header row
+        header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
+        if not header_row:
+            raise HTTPException(status_code=400, detail="Empty spreadsheet")
+        # Find column indices that have data (skip empty columns)
+        data_cols = [i for i, v in enumerate(header_row) if v is not None and str(v).strip()]
+        if len(data_cols) < 2:
+            raise HTTPException(status_code=400, detail="Need at least 2 columns with data")
+        vendor_col = data_cols[0]
+        inv_col = data_cols[1]
         for row in ws.iter_rows(min_row=2, values_only=True):
-            vendor = str(row[vendor_col] or "").strip()
-            inv_num = str(row[inv_col] or "").strip()
+            if row is None:
+                continue
+            vendor = str(row[vendor_col] if vendor_col < len(row) else "" or "").strip()
+            inv_num = str(row[inv_col] if inv_col < len(row) else "" or "").strip()
             if vendor or inv_num:
                 rows.append({"vendor": vendor, "invoice_number": inv_num})
     else:
