@@ -332,7 +332,15 @@ async def bulk_upload_folder(
                 Invoice.original_filename == fname,
             ).first()
             if existing:
-                results.append({"filename": fname, "status": "skipped", "reason": "Already uploaded"})
+                results.append({
+                    "filename": fname,
+                    "status": "skipped",
+                    "reason": "Already uploaded",
+                    "invoice_id": existing.id,
+                    "vendor_name": existing.vendor_name,
+                    "invoice_number": existing.invoice_number,
+                    "invoice_status": existing.status,
+                })
                 continue
 
             # Read and save
@@ -363,6 +371,9 @@ async def bulk_upload_folder(
                 db,
                 processing_store,
             )
-            results.append({"invoice_id": invoice.id, "filename": fname, "status": "queued"})
+            # Use subfolder name as vendor hint
+            rel_path = os.path.relpath(root, folder)
+            subfolder = rel_path if rel_path != "." else ""
+            results.append({"invoice_id": invoice.id, "filename": fname, "status": "queued", "subfolder": subfolder})
 
     return {"total": len(results), "results": results}

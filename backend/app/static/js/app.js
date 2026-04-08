@@ -1277,11 +1277,14 @@ function app() {
                 if (mode === 'deep' && prevResults) {
                   this.finderResults = {
                     ...this.finderResults,
-                    searched: (prevResults.searched || 0) + event.searched,
-                    total: (prevResults.total || 0),
+                    searched: event.searched,
+                    total: event.total,
                     found: (prevResults.found || 0) + event.found,
                     duplicates: (prevResults.duplicates || 0) + event.duplicates,
                     missing: event.missing,
+                    vendor: event.vendor,
+                    invoice_number: event.invoice_number,
+                    deepMode: true,
                   };
                 } else {
                   this.finderResults = { ...this.finderResults, ...event };
@@ -1312,6 +1315,22 @@ function app() {
 
     async cancelSearch() {
       try { await this.post('/api/filetools/find-invoices/cancel', {}); } catch (e) {}
+    },
+
+    exportMissingCsv() {
+      const missing = this.finderResults?.missing_list || [];
+      if (!missing.length) return;
+      let csv = 'Vendor,Invoice Number,Reason\n';
+      for (const m of missing) {
+        csv += `"${(m.vendor||'').replace(/"/g,'""')}","${(m.invoice_number||'').replace(/"/g,'""')}","${(m.reason||'').replace(/"/g,'""')}"\n`;
+      }
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `missing_invoices_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
     },
 
     async runBulkUpload() {
