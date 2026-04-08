@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import engine, Base
-from .routes import auth, invoices, upload, columns, export, categories, admin, project
+from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools
 
 
 def _run_migrations():
@@ -150,6 +150,7 @@ app.include_router(categories.router)
 app.include_router(export.router)
 app.include_router(admin.router)
 app.include_router(project.router)
+app.include_router(filetools.router)
 
 # Serve static frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")

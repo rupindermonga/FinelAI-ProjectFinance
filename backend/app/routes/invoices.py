@@ -53,6 +53,7 @@ def list_invoices(
     status: Optional[str] = None,
     draw_id: Optional[str] = None,
     claim_id: Optional[str] = None,
+    unallocated: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -73,6 +74,11 @@ def list_invoices(
             from sqlalchemy import or_
             query = query.filter(or_(Invoice.provincial_claim_id == cid, Invoice.federal_claim_id == cid))
         except ValueError: pass
+    # Unallocated filter: no cost category allocation
+    if unallocated == "true":
+        from ..models import InvoiceAllocation
+        allocated_ids = db.query(InvoiceAllocation.invoice_id).distinct().subquery()
+        query = query.filter(~Invoice.id.in_(db.query(allocated_ids)))
     total = query.count()
     items = query.order_by(Invoice.processed_at.desc()).offset((page - 1) * limit).limit(limit).all()
     return InvoiceListResponse(

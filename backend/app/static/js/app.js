@@ -75,6 +75,8 @@ function app() {
 
     // ── Project Finance ──────────────────────────────────────────
     projectDash: null,
+    financeInvoices: [],
+    financeInvoiceFilter: 'all',
     costCategories: [],
     subdivisions: [],
     selectedAllocInvoice: null,
@@ -96,6 +98,16 @@ function app() {
     uploadDrawId: localStorage.getItem('lastDrawId') || '',
     uploadProvClaimId: localStorage.getItem('lastProvClaimId') || '',
     uploadFedClaimId: localStorage.getItem('lastFedClaimId') || '',
+
+    // ── File Tools ─────────────────────────────────────────────
+    finderInvoices: [],
+    finderSourceFolder: localStorage.getItem('finderSourceFolder') || '',
+    finderOutputFolder: '',
+    finderSearching: false,
+    finderResults: null,
+    bulkFolderPath: localStorage.getItem('bulkFolderPath') || '',
+    bulkUploading: false,
+    bulkResults: null,
 
     // ── Draws & Claims ──────────────────────────────────────────
     financeView: 'draws',    // 'draws' | 'provincial' | 'federal'
@@ -733,6 +745,23 @@ function app() {
         this.costCategories = this.projectDash?.categories || [];
         this.draws = this.projectDash?.draws || [];
         this.claims = [...(this.projectDash?.provincial_claims || []), ...(this.projectDash?.federal_claims || [])];
+        this.loadFinanceInvoices();
+      } catch (e) { console.error(e); }
+    },
+
+    async loadFinanceInvoices() {
+      try {
+        let params = 'page=1&limit=500';
+        if (this.financeInvoiceFilter === 'unallocated') params += '&unallocated=true';
+        else if (this.financeInvoiceFilter === 'no_draw') params += '&draw_id=none';
+        else if (this.financeInvoiceFilter === 'no_claim') params += '&claim_id=none';
+        const data = await this.get(`/api/invoices?${params}&status=processed`);
+        const invs = data.items || [];
+        // Enrich with allocation info
+        for (const inv of invs) {
+          try { inv.allocations = await this.get(`/api/project/allocations/${inv.id}`); } catch (e) { inv.allocations = []; }
+        }
+        this.financeInvoices = invs;
       } catch (e) { console.error(e); }
     },
 
@@ -1186,6 +1215,50 @@ function app() {
       }[status] || 'bg-gray-100 text-gray-600';
     },
 
+
+    // ── File Tools ──────────────────────────────────────────────
+    async handleFinderCsv(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const r = await fetch('/api/filetools/upload-csv', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${this.token}` },
+          body: formData,
+        });
+        if (!r.ok) { const e = await r.json(); alert(e.detail || 'Parse error'); return; }
+        const data = await r.json();
+        this.finderInvoices = data.invoices || [];
+      } catch (e) { alert('Failed to parse file'); console.error(e); }
+    },
+
+    async runInvoiceFinder() {
+      this.finderSearching = true;
+      this.finderResults = null;
+      localStorage.setItem('finderSourceFolder', this.finderSourceFolder);
+      try {
+        this.finderResults = await this.post('/api/filetools/find-invoices', {
+          source_folder: this.finderSourceFolder,
+          output_folder: this.finderOutputFolder || null,
+          invoices: this.finderInvoices,
+        });
+      } catch (e) { alert('Search failed: ' + (e.message || e)); console.error(e); }
+      this.finderSearching = false;
+    },
+
+    async runBulkUpload() {
+      this.bulkUploading = true;
+      this.bulkResults = null;
+      localStorage.setItem('bulkFolderPath', this.bulkFolderPath);
+      try {
+        this.bulkResults = await this.post(`/api/filetools/bulk-upload-folder?folder_path=${encodeURIComponent(this.bulkFolderPath)}`, {});
+        // Refresh dashboard after upload
+        setTimeout(() => { this.loadInvoices(); this.loadStats(); this.loadProjectDashboard(); }, 2000);
+      } catch (e) { alert('Upload failed: ' + (e.message || e)); console.error(e); }
+      this.bulkUploading = false;
+    },
 
     // ── HTTP helpers ─────────────────────────────────────────────
     async get(path) {
