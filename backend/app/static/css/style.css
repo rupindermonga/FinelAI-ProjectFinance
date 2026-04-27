@@ -7,8 +7,15 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Tighten heading scales for the institutional feel finel.ai uses */
-h1, h2, h3, h4 { letter-spacing: -0.015em; font-variant-numeric: lining-nums; }
+/* Tighten heading scales for the institutional feel finel.ai uses
+   (matches finel-hub/brand/typography.css h1/h2/h3-h4 graduated tracking).
+   Note: full typography polish — 93.75% root + body density — is intentionally
+   deferred for Project Finance per the same precedent as Mortgage and Books
+   (see brand/README.md). The dense invoice tables here would carry visual-
+   regression risk; revisit when bandwidth allows a focused review pass. */
+h1 { letter-spacing: -0.02em;  font-variant-numeric: lining-nums; }
+h2 { letter-spacing: -0.015em; font-variant-numeric: lining-nums; }
+h3, h4 { letter-spacing: -0.01em; font-variant-numeric: lining-nums; }
 
 /* Scrollbar — brand-tinted */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
