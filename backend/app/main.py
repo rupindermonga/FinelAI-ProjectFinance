@@ -54,6 +54,7 @@ def _run_migrations():
             "ALTER TABLE invoices ADD COLUMN govt_approved_amt FLOAT",
             "ALTER TABLE invoices ADD COLUMN govt_status VARCHAR DEFAULT 'pending'",
             "ALTER TABLE invoices ADD COLUMN is_payroll BOOLEAN DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN is_demo BOOLEAN DEFAULT 0",
         ]:
             try:
                 conn.execute(text(stmt))

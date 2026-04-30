@@ -11,6 +11,8 @@ function app() {
     regForm: { username: '', email: '', password: '' },
     user: null,
     token: null,
+    demoLoading: false,
+    demoError: '',
 
     // ── Invoices ──────────────────────────────────────────────────
     invoices: [],
@@ -190,6 +192,24 @@ function app() {
       localStorage.removeItem('invoice_user');
       if (this.sseSource) this.sseSource.close();
       this.view = 'landing';
+    },
+
+    async tryDemo() {
+      this.demoLoading = true;
+      this.demoError = '';
+      try {
+        const res = await fetch('/api/auth/demo', { method: 'POST' });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || 'Demo unavailable — please try again later.');
+        }
+        const data = await res.json();
+        this.setAuth(data);
+      } catch (e) {
+        this.demoError = e.message;
+      } finally {
+        this.demoLoading = false;
+      }
     },
 
 

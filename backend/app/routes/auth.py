@@ -85,6 +85,21 @@ def login(body: UserLogin, request: Request = None, db: Session = Depends(get_db
     return Token(access_token=token, token_type="bearer", user=UserOut.model_validate(user))
 
 
+@router.post("/demo", response_model=Token)
+def demo_login(db: Session = Depends(get_db)):
+    """One-click demo login — returns a token for the pre-seeded demo account.
+    Requires DEMO_ENABLED=true in env. Run create_demo.py first to seed the account."""
+    if os.getenv("DEMO_ENABLED", "false").strip().lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=403, detail="Demo mode is not enabled on this instance.")
+    user = db.query(User).filter(User.username == "demo").first()
+    if not user:
+        raise HTTPException(status_code=503, detail="Demo account not initialized. Contact the administrator.")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Demo account is disabled.")
+    token = create_token(user.id)
+    return Token(access_token=token, token_type="bearer", user=UserOut.model_validate(user))
+
+
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
     return current_user

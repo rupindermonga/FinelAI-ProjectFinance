@@ -216,9 +216,9 @@
               Sign In to Your Account
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
             </button>
-            <a href="https://finel.ai/contact"
+            <a href="#demo"
                class="inline-flex items-center gap-2 border border-slate-500 hover:border-slate-300 text-slate-300 hover:text-white px-8 py-3.5 rounded-md text-base font-semibold transition-colors">
-              Book a Demo
+              Try Live Demo
             </a>
           </div>
         </div>
@@ -300,6 +300,44 @@
             <p class="text-slate-500 text-sm leading-relaxed">Export filtered invoices to CSV in one click. Configure which columns appear in exports. Share clean, accountant-ready reports without manual spreadsheet work.</p>
           </div>
 
+        </div>
+      </div>
+    </section>
+
+    <!-- Try the Demo -->
+    <section id="demo" class="py-20 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 text-white">
+      <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div class="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-xs text-slate-200 mb-6">
+          <svg class="w-3.5 h-3.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+          </svg>
+          Live sample data · No account needed
+        </div>
+        <h2 class="font-serif text-4xl text-white mb-4">Explore a live project</h2>
+        <p class="text-slate-300 text-base leading-relaxed mb-8">
+          Click below to open a pre-loaded demo with 20 real-world construction invoices, 3 draws, provincial &amp; federal claims, and a full cost breakdown — so you can see exactly what the dashboard looks like before getting access.
+        </p>
+        <button @click="tryDemo()"
+                :disabled="demoLoading"
+                class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-400 disabled:opacity-60 text-white px-10 py-4 rounded-md text-base font-semibold transition-colors shadow-lg shadow-blue-500/25">
+          <span x-show="!demoLoading">
+            <svg class="w-4 h-4 inline -mt-0.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"/></svg>
+            Try the Live Demo
+          </span>
+          <span x-show="demoLoading" class="flex items-center gap-2">
+            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+            Loading demo…
+          </span>
+        </button>
+        <p x-show="demoError" class="mt-4 text-red-400 text-sm" x-text="demoError"></p>
+        <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6 mt-8 text-xs text-slate-400">
+          <span>20 invoices · $762k in costs</span>
+          <span>·</span>
+          <span>3 draws (approved + submitted)</span>
+          <span>·</span>
+          <span>Provincial &amp; federal claims</span>
+          <span>·</span>
+          <span>Sample data — read &amp; explore freely</span>
         </div>
       </div>
     </section>
@@ -470,6 +508,12 @@
           <span class="font-serif text-lg leading-tight">Finel AI<br><span class="text-xs text-blue-300 font-sans tracking-wide uppercase">Project Finance</span></span>
         </div>
       </div>
+      <!-- Demo mode banner -->
+      <div x-show="user?.is_demo" class="mx-3 mt-3 mb-1 bg-amber-400/10 border border-amber-400/30 rounded-lg px-3 py-2 text-xs text-amber-300 flex items-start gap-2">
+        <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        <span><strong>Demo mode</strong> — sample project data. Sign in for your own account.</span>
+      </div>
+
       <nav class="flex-1 py-4 space-y-1 px-3">
         <button @click="view='dashboard'" :class="view==='dashboard' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-table-columns w-4"></i> Dashboard

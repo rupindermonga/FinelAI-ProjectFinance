@@ -33,6 +33,7 @@ class UserOut(BaseModel):
     email: str
     is_active: bool
     is_admin: bool = False
+    is_demo: bool = False
     created_at: datetime
 
     class Config:
