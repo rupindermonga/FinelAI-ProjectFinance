@@ -947,12 +947,13 @@ def portfolio_rollup(db: Session = Depends(get_db), current_user: User = Depends
                     total_paid += (inv.amount_paid or 0) * (a.percentage / 100)
         # Draw status
         draws = db.query(Draw).filter(Draw.project_id == proj.id).all()
-        # Invoice counts
-        invoice_count = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed",
-                                                  Invoice.draw_id.in_(d.id for d in draws) if draws else Invoice.draw_id.is_(None)).count() if draws else 0
-        all_invs = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed").count()
-        # Pending approvals
-        pending_approvals = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.approval_status == "pending", Invoice.status == "processed").count()
+        # Pending approvals — scoped to this project
+        pending_approvals = db.query(Invoice).filter(
+            Invoice.user_id == current_user.id,
+            Invoice.project_id == proj.id,
+            Invoice.approval_status == "pending",
+            Invoice.status == "processed",
+        ).count()
         pct_burn = round((total_invoiced / total_budget * 100) if total_budget else 0, 1)
         result.append({
             "id": proj.id, "name": proj.name, "code": proj.code, "client": proj.client,
@@ -1285,10 +1286,24 @@ def aged_payables(
     from collections import defaultdict
     today = _dt.utcnow().strftime("%Y-%m-%d")
 
+    # Build project-scoped filter for aged payables
+    _ap_draws = db.query(Draw).filter(Draw.project_id == proj.id).all() if proj else []
+    _ap_claims = db.query(Claim).filter(Claim.project_id == proj.id).all() if proj else []
+    _ap_draw_ids = [d.id for d in _ap_draws]
+    _ap_claim_ids = [c.id for c in _ap_claims]
+    from sqlalchemy import or_ as _ap_or
+    _ap_conds = [Invoice.project_id == proj.id] if proj else [Invoice.user_id == current_user.id]
+    if proj and _ap_draw_ids:
+        _ap_conds.append(Invoice.draw_id.in_(_ap_draw_ids))
+    if proj and _ap_claim_ids:
+        _ap_conds.append(Invoice.provincial_claim_id.in_(_ap_claim_ids))
+        _ap_conds.append(Invoice.federal_claim_id.in_(_ap_claim_ids))
+
     unpaid = db.query(Invoice).filter(
         Invoice.user_id == current_user.id,
         Invoice.status == "processed",
         Invoice.payment_status != "paid",
+        _ap_or(*_ap_conds),
     ).all()
 
     # Group by vendor, bucket by days past due (using due_date or invoice_date)
@@ -1354,10 +1369,15 @@ def export_accounting_csv(
     import csv, io as _io
     from datetime import datetime as _dt
 
-    invoices = db.query(Invoice).filter(
+    # Project-scoped: only export invoices for this project
+    _export_proj_id = proj.id if proj else None
+    _inv_q = db.query(Invoice).filter(
         Invoice.user_id == current_user.id,
         Invoice.status == "processed",
-    ).order_by(Invoice.invoice_date.desc()).all()
+    )
+    if _export_proj_id:
+        _inv_q = _inv_q.filter(Invoice.project_id == _export_proj_id)
+    invoices = _inv_q.order_by(Invoice.invoice_date.desc()).all()
 
     buf = _io.StringIO()
     today = _dt.utcnow().strftime("%Y-%m-%d")
@@ -1436,15 +1456,35 @@ def cash_flow(
     receipts: dict = defaultdict(float)  # draw lender_approved by submission_date month
     projected: dict = defaultdict(float) # committed costs by expected_completion month
 
-    # Actual spend — invoices by invoice_date
-    for inv in db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed").all():
+    # Actual spend — project-scoped invoices by invoice_date
+    proj_draws_cf = db.query(Draw).filter(Draw.project_id == proj.id).all()
+    proj_draw_ids_cf = [d.id for d in proj_draws_cf]
+    proj_claims_cf = db.query(Claim).filter(Claim.project_id == proj.id).all()
+    proj_claim_ids_cf = [c.id for c in proj_claims_cf]
+    _cf_conds = [Invoice.project_id == proj.id]
+    if proj_draw_ids_cf:
+        _cf_conds.append(Invoice.draw_id.in_(proj_draw_ids_cf))
+    if proj_claim_ids_cf:
+        _cf_conds.append(Invoice.provincial_claim_id.in_(proj_claim_ids_cf))
+        _cf_conds.append(Invoice.federal_claim_id.in_(proj_claim_ids_cf))
+    from sqlalchemy import or_ as _or2_
+    _cf_inv = db.query(Invoice).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.status == "processed",
+        _or2_(*_cf_conds),
+    ).all()
+    for inv in _cf_inv:
         date_str = inv.invoice_date or (str(inv.processed_at)[:10] if inv.processed_at else None)
         if date_str and len(date_str) >= 7:
-            m = date_str[:7]  # YYYY-MM
+            m = date_str[:7]
             spend[m] += inv.total_due or 0
 
-    # Actual payments by payment date
-    for payment in db.query(Payment).join(Invoice, Invoice.id == Payment.invoice_id).filter(Invoice.user_id == current_user.id).all():
+    # Actual payments by payment date (project-scoped)
+    _cf_inv_ids = {i.id for i in _cf_inv}
+    for payment in db.query(Payment).join(Invoice, Invoice.id == Payment.invoice_id).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.id.in_(_cf_inv_ids) if _cf_inv_ids else Invoice.id == -1,
+    ).all():
         if payment.payment_date and len(payment.payment_date) >= 7:
             m = payment.payment_date[:7]
             paid[m] += payment.amount or 0
@@ -1650,22 +1690,42 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
     total_invoiced = sum(c["invoiced"] for c in cat_summary)
     total_paid = sum(c["paid"] for c in cat_summary)
 
-    # Invoice counts
-    all_invoices = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed").all()
+    # Draws + claims (needed before scoped invoice filter)
+    draws = db.query(Draw).filter(Draw.project_id == proj.id).order_by(Draw.draw_number).all()
+    draws_summary = [_draw_out(d, db).model_dump() for d in draws]
+    prov_claims = db.query(Claim).filter(Claim.project_id == proj.id, Claim.claim_type == "provincial").order_by(Claim.claim_number).all()
+    fed_claims  = db.query(Claim).filter(Claim.project_id == proj.id, Claim.claim_type == "federal").order_by(Claim.claim_number).all()
+
+    # Project-scoped invoice filter: invoices tagged to this project OR assigned to its draws/claims.
+    # This prevents multi-project contamination in all aggregate queries below.
+    _draw_ids  = [d.id for d in draws]
+    _claim_ids = [c.id for c in prov_claims + fed_claims]
+    _proj_inv_conditions = [Invoice.project_id == proj.id]
+    if _draw_ids:
+        _proj_inv_conditions.append(Invoice.draw_id.in_(_draw_ids))
+    if _claim_ids:
+        _proj_inv_conditions.append(Invoice.provincial_claim_id.in_(_claim_ids))
+        _proj_inv_conditions.append(Invoice.federal_claim_id.in_(_claim_ids))
+    from sqlalchemy import or_ as _or_
+    def _proj_inv_base():
+        return db.query(Invoice).filter(
+            Invoice.user_id == current_user.id,
+            Invoice.status == "processed",
+            _or_(*_proj_inv_conditions),
+        )
+
+    # Invoice counts (project-scoped)
+    all_invoices = _proj_inv_base().all()
     unallocated = 0
     for inv in all_invoices:
         has_alloc = db.query(InvoiceAllocation).filter(InvoiceAllocation.invoice_id == inv.id).count()
         if not has_alloc:
             unallocated += 1
 
-    # Aging buckets
+    # Aging buckets (project-scoped)
     from datetime import datetime, timedelta
     today = datetime.utcnow().strftime("%Y-%m-%d")
-    unpaid = db.query(Invoice).filter(
-        Invoice.user_id == current_user.id,
-        Invoice.status == "processed",
-        Invoice.payment_status != "paid",
-    ).all()
+    unpaid = _proj_inv_base().filter(Invoice.payment_status != "paid").all()
     aging = {"current": 0, "over_30": 0, "over_60": 0, "over_90": 0}
     for inv in unpaid:
         due = inv.due_date or inv.invoice_date
@@ -1686,52 +1746,44 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
         else:
             aging["current"] += amt
 
-    # Draws summary
-    draws = db.query(Draw).filter(Draw.project_id == proj.id).order_by(Draw.draw_number).all()
-    draws_summary = [_draw_out(d, db).model_dump() for d in draws]
+    # Unassigned to draws/claims (project-scoped)
+    no_draw = _proj_inv_base().filter(Invoice.draw_id.is_(None)).count()
+    no_prov = _proj_inv_base().filter(Invoice.provincial_claim_id.is_(None)).count()
+    no_fed  = _proj_inv_base().filter(Invoice.federal_claim_id.is_(None)).count()
 
-    # Claims summary
-    prov_claims = db.query(Claim).filter(Claim.project_id == proj.id, Claim.claim_type == "provincial").order_by(Claim.claim_number).all()
-    fed_claims = db.query(Claim).filter(Claim.project_id == proj.id, Claim.claim_type == "federal").order_by(Claim.claim_number).all()
-
-    # Unassigned to draws/claims
-    no_draw = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.draw_id.is_(None)).count()
-    no_prov = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.provincial_claim_id.is_(None)).count()
-    no_fed = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.federal_claim_id.is_(None)).count()
-
-    # Cost tracking summary (4 views)
-    all_processed = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed").all()
+    # Cost tracking summary (project-scoped)
+    all_processed = _proj_inv_base().all()
     committed_total = sum(i.received_total or i.total_due or 0 for i in all_processed)
     lender_approved = sum(i.lender_approved_amt or 0 for i in all_processed)
-    lender_pending = sum(i.lender_submitted_amt or 0 for i in all_processed if i.lender_status == "pending")
+    lender_pending  = sum(i.lender_submitted_amt or 0 for i in all_processed if i.lender_status == "pending")
     lender_rejected = sum(i.lender_submitted_amt or 0 for i in all_processed if i.lender_status == "rejected")
-    govt_approved = sum(i.govt_approved_amt or 0 for i in all_processed)
-    govt_pending = sum(i.govt_submitted_amt or 0 for i in all_processed if i.govt_status == "pending")
-    govt_rejected = sum(i.govt_submitted_amt or 0 for i in all_processed if i.govt_status == "rejected")
+    govt_approved   = sum(i.govt_approved_amt or 0 for i in all_processed)
+    govt_pending    = sum(i.govt_submitted_amt or 0 for i in all_processed if i.govt_status == "pending")
+    govt_rejected   = sum(i.govt_submitted_amt or 0 for i in all_processed if i.govt_status == "rejected")
 
-    # Payroll summary
-    payroll_entries = db.query(PayrollEntry).filter(PayrollEntry.user_id == current_user.id, PayrollEntry.status == "processed").all()
-    payroll_committed = sum(p.gross_pay or 0 for p in payroll_entries)
-    payroll_lender_approved = sum(p.lender_approved_amt or 0 for p in payroll_entries)
-    payroll_govt_approved = sum(p.govt_approved_amt or 0 for p in payroll_entries)
-
-    # Holdback aggregates
-    holdback_invoices = db.query(Invoice).filter(
-        Invoice.user_id == current_user.id,
-        Invoice.status == "processed",
-        Invoice.holdback_pct > 0,
+    # Payroll summary (project-scoped via project_id)
+    payroll_entries = db.query(PayrollEntry).filter(
+        PayrollEntry.user_id == current_user.id,
+        PayrollEntry.project_id == proj.id,
+        PayrollEntry.status == "processed",
     ).all()
+    payroll_committed      = sum(p.gross_pay or 0 for p in payroll_entries)
+    payroll_lender_approved = sum(p.lender_approved_amt or 0 for p in payroll_entries)
+    payroll_govt_approved   = sum(p.govt_approved_amt or 0 for p in payroll_entries)
+
+    # Holdback aggregates (project-scoped)
+    holdback_invoices = _proj_inv_base().filter(Invoice.holdback_pct > 0).all()
     holdback_held = sum(round((inv.subtotal or inv.total_due or 0) * (inv.holdback_pct or 0) / 100, 2)
                         for inv in holdback_invoices if not inv.holdback_released)
     holdback_released_total = sum(round((inv.subtotal or inv.total_due or 0) * (inv.holdback_pct or 0) / 100, 2)
                                    for inv in holdback_invoices if inv.holdback_released)
     holdback_total = holdback_held + holdback_released_total
 
-    # Approval summary
+    # Approval summary (project-scoped)
     approval_counts = {
-        "pending": db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.approval_status == "pending").count(),
-        "approved": db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.approval_status == "approved").count(),
-        "rejected": db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.approval_status == "rejected").count(),
+        "pending":  _proj_inv_base().filter(Invoice.approval_status == "pending").count(),
+        "approved": _proj_inv_base().filter(Invoice.approval_status == "approved").count(),
+        "rejected": _proj_inv_base().filter(Invoice.approval_status == "rejected").count(),
     }
 
     # All change orders (all statuses) for the CO log

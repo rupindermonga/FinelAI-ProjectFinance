@@ -1215,7 +1215,7 @@ function app() {
     },
 
     async loadCostCategories() {
-      try { this.costCategories = await this.get(\); } catch (e) {}
+      try { this.costCategories = await this.get(`/api/project/categories${this._pid}`); } catch (e) {}
     },
 
     async updateProjectBudget(field, value) {
@@ -1358,7 +1358,7 @@ function app() {
 
     // ── Draws ──────────────────────────────────────────────────────
     async loadDraws() {
-      try { this.draws = await this.get(\); } catch (e) {}
+      try { this.draws = await this.get(`/api/project/draws${this._pid}`); } catch (e) {}
     },
 
     openDrawModal(draw = null) {
@@ -1390,7 +1390,7 @@ function app() {
         if (this.editingDrawId) {
           await this.put(`/api/project/draws/${this.editingDrawId}`, { fx_rate: this.drawForm.fx_rate, submission_date: this.drawForm.submission_date || null, status: this.drawForm.status, notes: this.drawForm.notes || null });
         } else {
-          await this.post(\, this.drawForm);
+          await this.post(`/api/project/draws${this._pid}`, this.drawForm);
         }
         this.showDrawModal = false;
         await Promise.all([this.loadDraws(), this.loadProjectDashboard()]);
@@ -1407,7 +1407,7 @@ function app() {
 
     // ── Claims ─────────────────────────────────────────────────────
     async loadClaims() {
-      try { this.claims = await this.get(\); } catch (e) {}
+      try { this.claims = await this.get(`/api/project/claims${this._pid}`); } catch (e) {}
     },
 
     openClaimModal(claim = null, claimType = 'provincial') {
@@ -1429,7 +1429,7 @@ function app() {
         if (this.editingClaimId) {
           await this.put(`/api/project/claims/${this.editingClaimId}`, { fx_rate: this.claimForm.fx_rate, submission_date: this.claimForm.submission_date || null, status: this.claimForm.status, notes: this.claimForm.notes || null });
         } else {
-          await this.post(\, this.claimForm);
+          await this.post(`/api/project/claims${this._pid}`, this.claimForm);
         }
         this.showClaimModal = false;
         await Promise.all([this.loadClaims(), this.loadProjectDashboard()]);
@@ -1505,7 +1505,7 @@ function app() {
         if (this.editingPayrollId) {
           await this.put(`/api/project/payroll/${this.editingPayrollId}`, this.payrollForm);
         } else {
-          await this.post(\, this.payrollForm);
+          await this.post(`/api/project/payroll${this._pid}`, this.payrollForm);
         }
         this.showPayrollModal = false;
         await Promise.all([this.loadPayroll(), this.loadProjectDashboard()]);
