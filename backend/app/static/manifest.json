@@ -1,0 +1,27 @@
+{
+  "name": "Finel AI Project Finance",
+  "short_name": "Finel Finance",
+  "description": "Canadian construction project finance — draws, invoices, compliance, AI insights",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["finance", "business", "productivity"],
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/",
+      "description": "Project finance dashboard"
+    }
+  ]
+}

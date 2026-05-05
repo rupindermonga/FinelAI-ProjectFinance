@@ -35,3 +35,49 @@ thead th { position: sticky; top: 0; z-index: 1; }
   50% { border-color: #99dfff; }
 }
 .drag-active { animation: pulse-border 1s ease-in-out infinite; }
+
+/* ── Mobile / PWA ──────────────────────────────────────────────────────────── */
+
+/* Safe area insets for iPhone notch / home indicator */
+.pb-safe  { padding-bottom: env(safe-area-inset-bottom, 0); }
+.pt-safe  { padding-top:    env(safe-area-inset-top, 0); }
+
+/* Sidebar slide transition */
+.sidebar-transition { transition: transform 0.22s cubic-bezier(0.4,0,0.2,1); }
+
+/* All tables get horizontal scroll on mobile */
+@media (max-width: 1023px) {
+  .mobile-scroll         { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Reserve space for bottom nav */
+  main                   { padding-bottom: 4.5rem; }
+  /* All tables inside main page sections scroll horizontally.
+     The .p-6 / .p-4 view containers become the scroll viewport. */
+  main > div > div.p-6,
+  main > div.p-6         { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Give wide tables room to breathe */
+  main table             { min-width: 560px; }
+  /* But let small stat-card grids stay natural */
+  main .grid table       { min-width: unset; }
+}
+
+/* Large touch targets — 44px min per Apple HIG */
+@media (max-width: 1023px) {
+  button, a[role="button"] { min-height: 44px; }
+  /* Exception: icon-only buttons in tables can be smaller */
+  .btn-icon-xs { min-height: unset; }
+}
+
+/* Card-stack: invoices on mobile become cards instead of rows */
+@media (max-width: 767px) {
+  .invoice-card-row {
+    display: block;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.75rem 1rem;
+  }
+  .invoice-card-row td { display: block; border: none; padding: 0.15rem 0; }
+  .invoice-card-row td:first-child { font-weight: 600; font-size: 0.875rem; color: #1e293b; }
+  .invoice-card-row .col-hide-mobile { display: none; }
+}
+
+/* Mobile bottom nav elevation */
+.bottom-nav-shadow { box-shadow: 0 -1px 0 0 #e5e7eb, 0 -4px 12px 0 rgba(0,0,0,0.06); }

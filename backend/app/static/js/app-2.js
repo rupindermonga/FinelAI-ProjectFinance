@@ -14,6 +14,9 @@ function app() {
     demoLoading: false,
     demoError: '',
 
+    // ── Mobile sidebar ────────────────────────────────────────────
+    sidebarOpen: false,
+
     // ── Multi-project ──────────────────────────────────────────────
     projects: [],
     currentProject: null,

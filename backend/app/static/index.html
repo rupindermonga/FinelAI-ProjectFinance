@@ -52,7 +52,20 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <link rel="stylesheet" href="/static/css/style.css?v=20260505" />
+  <link rel="stylesheet" href="/static/css/style.css?v=20260601" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Finel Finance" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+    }
+  </script>
 </head>
 <body class="bg-gray-50 font-sans" x-data="app()" x-init="init()">
 
@@ -415,8 +428,27 @@
   ══════════════════════════════════════════════════════════════ -->
   <div x-show="view !== 'login' && view !== 'landing'" class="flex flex-col h-screen overflow-hidden">
 
-    <!-- FinelAppNav: canonical source finel-hub/brand/nav-example.tsx -->
-    <nav class="bg-white border-b border-gray-100 flex-shrink-0 z-40"
+    <!-- ── MOBILE TOP BAR (hidden on lg+) ──────────────────────────── -->
+    <div class="lg:hidden flex items-center h-14 px-3 bg-slate-900 text-white flex-shrink-0 z-40 gap-2 pt-safe">
+      <button @click="sidebarOpen=!sidebarOpen" class="btn-icon-xs p-2.5 rounded-lg hover:bg-slate-700 transition text-white">
+        <i class="fa-solid fa-bars text-lg"></i>
+      </button>
+      <img src="/static/favicon.svg" class="w-7 h-7 rounded-lg flex-shrink-0" />
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold truncate leading-tight" x-text="currentProject?.name || 'Finel Finance'"></div>
+        <div class="text-xs text-slate-400 capitalize truncate leading-tight" x-text="view === 'ai' ? 'AI Insights' : view"></div>
+      </div>
+      <button @click="view='approvals'; loadProjectDashboard(); sidebarOpen=false" class="btn-icon-xs relative p-2.5 rounded-lg hover:bg-slate-700 transition">
+        <i class="fa-solid fa-clipboard-check text-base"></i>
+        <span x-show="(projectDash?.approval?.pending||0)>0" class="absolute top-1 right-1 w-3.5 h-3.5 bg-amber-400 text-amber-900 text-xs rounded-full flex items-center justify-center font-bold leading-none" x-text="projectDash.approval.pending"></span>
+      </button>
+      <button @click="showUploadModal=true" class="btn-icon-xs p-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 transition">
+        <i class="fa-solid fa-cloud-arrow-up text-base"></i>
+      </button>
+    </div>
+
+    <!-- FinelAppNav: canonical source finel-hub/brand/nav-example.tsx (desktop only) -->
+    <nav class="hidden lg:block bg-white border-b border-gray-100 flex-shrink-0 z-40"
          x-data="{ fnMobileOpen: false, fnServicesOpen: false }">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-20 items-center">
@@ -498,15 +530,29 @@
       </div>
     </nav>
 
-    <div class="flex flex-1 overflow-hidden">
+    <div class="flex flex-1 overflow-hidden relative">
 
-    <!-- Sidebar -->
-    <aside class="w-56 bg-slate-900 text-white flex flex-col flex-shrink-0">
-      <div class="px-5 py-5 border-b border-slate-700">
+    <!-- Mobile sidebar overlay backdrop -->
+    <div x-show="sidebarOpen"
+         x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         @click="sidebarOpen=false"
+         class="lg:hidden fixed inset-0 bg-black/50 z-20"></div>
+
+    <!-- Sidebar — fixed overlay on mobile, normal flow on desktop -->
+    <aside class="w-56 bg-slate-900 text-white flex flex-col flex-shrink-0
+                  fixed lg:relative inset-y-0 left-0 z-30 h-full lg:h-auto
+                  sidebar-transition
+                  lg:translate-x-0"
+           :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
+      <div class="px-5 py-5 border-b border-slate-700 flex items-center justify-between">
         <div class="flex items-center gap-2.5">
           <img src="/static/favicon.svg" alt="Finel AI" class="w-9 h-9 rounded-lg" />
           <span class="font-serif text-lg leading-tight">Finel AI<br><span class="text-xs text-blue-300 font-sans tracking-wide uppercase">Project Finance</span></span>
         </div>
+        <button @click="sidebarOpen=false" class="lg:hidden btn-icon-xs p-1.5 rounded-lg hover:bg-slate-700 transition text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
       </div>
       <!-- Demo mode banner -->
       <div x-show="user?.is_demo" class="mx-3 mt-3 mb-1 bg-amber-400/10 border border-amber-400/30 rounded-lg px-3 py-2 text-xs text-amber-300 flex items-start gap-2">
@@ -544,67 +590,67 @@
         </div>
       </div>
 
-      <nav class="flex-1 py-4 space-y-1 px-3">
-        <button @click="view='dashboard'" :class="view==='dashboard' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+      <nav class="flex-1 py-4 space-y-1 px-3 overflow-y-auto">
+        <button @click="view='dashboard'; sidebarOpen=false" :class="view==='dashboard' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-table-columns w-4"></i> Dashboard
         </button>
-        <button @click="view='columns'" :class="view==='columns' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='columns'; sidebarOpen=false" :class="view==='columns' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-sliders w-4"></i> Manage Columns
         </button>
-        <button @click="view='categories'; loadCategories()" :class="view==='categories' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='categories'; loadCategories(); sidebarOpen=false" :class="view==='categories' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-tags w-4"></i> Categories
         </button>
-        <button @click="view='budget'; loadProjectDashboard()" :class="view==='budget' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='budget'; loadProjectDashboard(); sidebarOpen=false" :class="view==='budget' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-scale-balanced w-4"></i> Budget vs Actual
         </button>
-        <button @click="view='holdback'; loadProjectDashboard()" :class="view==='holdback' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='holdback'; loadProjectDashboard(); sidebarOpen=false" :class="view==='holdback' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-hand-holding-dollar w-4"></i> Holdback
           <span x-show="(projectDash?.holdback?.unreleased_count||0)>0"
                 class="ml-auto text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold"
                 x-text="projectDash.holdback.unreleased_count"></span>
         </button>
-        <button @click="view='approvals'; loadProjectDashboard()" :class="view==='approvals' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='approvals'; loadProjectDashboard(); sidebarOpen=false" :class="view==='approvals' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-clipboard-check w-4"></i> Approvals
           <span x-show="(projectDash?.approval?.pending||0)>0"
                 class="ml-auto text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold"
                 x-text="projectDash.approval.pending"></span>
         </button>
-        <button @click="view='cashflow'; loadCashFlow()" :class="view==='cashflow' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='cashflow'; loadCashFlow(); sidebarOpen=false" :class="view==='cashflow' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-arrow-trend-up w-4"></i> Cash Flow
         </button>
-        <button @click="view='subcontractors'; loadSubcontractors()" :class="view==='subcontractors' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='subcontractors'; loadSubcontractors(); sidebarOpen=false" :class="view==='subcontractors' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-hard-hat w-4"></i> Subcontractors
         </button>
-        <button @click="view='milestones'; loadMilestones()" :class="view==='milestones' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='milestones'; loadMilestones(); sidebarOpen=false" :class="view==='milestones' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-flag-checkered w-4"></i> Milestones
         </button>
-        <button @click="view='lienwaivers'; loadLienWaivers()" :class="view==='lienwaivers' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='lienwaivers'; loadLienWaivers(); sidebarOpen=false" :class="view==='lienwaivers' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-file-signature w-4"></i> Lien Waivers
         </button>
-        <button @click="view='documents'; loadDocuments()" :class="view==='documents' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='documents'; loadDocuments(); sidebarOpen=false" :class="view==='documents' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-paperclip w-4"></i> Documents
         </button>
-        <button @click="view='lenderlinks'; loadLenderTokens()" :class="view==='lenderlinks' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='lenderlinks'; loadLenderTokens(); sidebarOpen=false" :class="view==='lenderlinks' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-share-nodes w-4"></i> Lender Links
         </button>
-        <button @click="view='finance'; loadProjectDashboard()" :class="view==='finance' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='finance'; loadProjectDashboard(); sidebarOpen=false" :class="view==='finance' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-chart-pie w-4"></i> Project Finance
         </button>
-        <button @click="view='filetools'" :class="view==='filetools' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='filetools'; sidebarOpen=false" :class="view==='filetools' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-folder-open w-4"></i> File Tools
         </button>
-        <button @click="view='portfolio'; loadPortfolio()" :class="view==='portfolio' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='portfolio'; loadPortfolio(); sidebarOpen=false" :class="view==='portfolio' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-layer-group w-4"></i> Portfolio
         </button>
-        <button @click="view='agedpayables'; loadAgedPayables()" :class="view==='agedpayables' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='agedpayables'; loadAgedPayables(); sidebarOpen=false" :class="view==='agedpayables' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-clock-rotate-left w-4"></i> Aged Payables
         </button>
-        <button @click="view='ai'; loadAiInsights()" :class="view==='ai' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='ai'; loadAiInsights(); sidebarOpen=false" :class="view==='ai' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-brain w-4"></i>
           <span class="flex-1 text-left">AI Insights</span>
           <span x-show="aiInsights && aiInsights.total_alerts > 0" x-text="aiInsights?.total_alerts" class="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
         </button>
-        <button @click="view='settings'" :class="view==='settings' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="view='settings'; sidebarOpen=false" :class="view==='settings' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-gear w-4"></i> Settings
         </button>
       </nav>
@@ -621,7 +667,7 @@
     </aside>
 
     <!-- Main content -->
-    <main class="flex-1 overflow-auto bg-gray-50">
+    <main class="flex-1 overflow-auto bg-gray-50 lg:pb-0">
 
       <!-- ── DASHBOARD ─────────────────────────────────────────────── -->
       <div x-show="view==='dashboard'" class="p-6">
@@ -4702,11 +4748,18 @@
         @drop.prevent="handleDrop($event)"
       >
         <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-300 mb-3 block"></i>
-        <p class="text-sm text-gray-600 mb-1">Drag &amp; drop files here, or</p>
-        <label class="cursor-pointer text-blue-600 text-sm font-semibold hover:underline">
-          browse files
-          <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.webp" class="hidden" @change="handleFileSelect($event)" />
-        </label>
+        <p class="text-sm text-gray-600 mb-1 hidden sm:block">Drag &amp; drop files here, or</p>
+        <div class="flex items-center gap-2 flex-wrap justify-center">
+          <label class="cursor-pointer text-blue-600 text-sm font-semibold hover:underline">
+            Browse files
+            <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.webp" class="hidden" @change="handleFileSelect($event)" />
+          </label>
+          <!-- Camera button — visible on mobile only -->
+          <label class="sm:hidden cursor-pointer inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+            <i class="fa-solid fa-camera"></i> Take Photo
+            <input type="file" accept="image/*" capture="environment" class="hidden" @change="handleFileSelect($event)" />
+          </label>
+        </div>
         <p class="text-xs text-gray-400 mt-2">PDF, JPG, PNG, TIFF, WEBP · max 50 MB each</p>
       </div>
 
@@ -5055,5 +5108,64 @@
     Try Demo
   </button>
 </div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MOBILE BOTTOM NAVIGATION BAR
+     Shows on phones only (< 1024px). Top 5 most-used views
+     with badge counts for approvals + AI alerts.
+══════════════════════════════════════════════════════════════ -->
+<div x-show="view !== 'login' && view !== 'landing'"
+     class="lg:hidden fixed bottom-0 inset-x-0 z-50 bottom-nav-shadow bg-white pb-safe">
+  <div class="flex items-stretch h-16">
+
+    <button @click="view='dashboard'; sidebarOpen=false"
+            class="flex-1 flex flex-col items-center justify-center gap-0.5 px-1 transition"
+            :class="view==='dashboard' ? 'text-blue-600' : 'text-gray-500'">
+      <i class="fa-solid fa-table-columns text-xl"></i>
+      <span class="text-xs font-medium">Home</span>
+    </button>
+
+    <button @click="view='invoices'; sidebarOpen=false"
+            class="flex-1 flex flex-col items-center justify-center gap-0.5 px-1 transition"
+            :class="view==='invoices' ? 'text-blue-600' : 'text-gray-500'">
+      <i class="fa-solid fa-file-invoice text-xl"></i>
+      <span class="text-xs font-medium">Invoices</span>
+    </button>
+
+    <!-- Upload FAB in centre -->
+    <button @click="showUploadModal=true"
+            class="flex-1 flex flex-col items-center justify-center px-1">
+      <div class="w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 flex items-center justify-center shadow-lg -mt-4 transition">
+        <i class="fa-solid fa-cloud-arrow-up text-white text-lg"></i>
+      </div>
+    </button>
+
+    <button @click="view='approvals'; loadProjectDashboard(); sidebarOpen=false"
+            class="flex-1 flex flex-col items-center justify-center gap-0.5 px-1 relative transition"
+            :class="view==='approvals' ? 'text-blue-600' : 'text-gray-500'">
+      <div class="relative">
+        <i class="fa-solid fa-clipboard-check text-xl"></i>
+        <span x-show="(projectDash?.approval?.pending||0)>0"
+              class="absolute -top-1.5 -right-2.5 w-4 h-4 bg-amber-400 text-amber-900 text-xs rounded-full flex items-center justify-center font-bold leading-none"
+              x-text="projectDash.approval.pending"></span>
+      </div>
+      <span class="text-xs font-medium">Approve</span>
+    </button>
+
+    <button @click="view='ai'; loadAiInsights(); sidebarOpen=false"
+            class="flex-1 flex flex-col items-center justify-center gap-0.5 px-1 relative transition"
+            :class="view==='ai' ? 'text-blue-600' : 'text-gray-500'">
+      <div class="relative">
+        <i class="fa-solid fa-brain text-xl"></i>
+        <span x-show="(aiInsights?.total_alerts||0)>0"
+              class="absolute -top-1.5 -right-2.5 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold leading-none"
+              x-text="aiInsights.total_alerts"></span>
+      </div>
+      <span class="text-xs font-medium">AI</span>
+    </button>
+
+  </div>
+</div>
+
 </body>
 </html>

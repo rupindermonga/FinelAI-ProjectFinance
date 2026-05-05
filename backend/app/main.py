@@ -274,6 +274,15 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    """Serve the PWA service worker from root scope so it can control the whole app."""
+    from fastapi.responses import FileResponse
+    sw_path = os.path.join(static_dir, "sw.js")
+    return FileResponse(sw_path, media_type="application/javascript",
+                        headers={"Service-Worker-Allowed": "/"})
+
+
 @app.get("/lender/{token}", include_in_schema=False)
 async def lender_view(token: str):
     """Serve the public lender HTML page (token is handled client-side)."""
