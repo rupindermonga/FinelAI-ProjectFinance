@@ -124,6 +124,13 @@ function app() {
     bulkUploading: false,
     bulkResults: null,
 
+    // ── Change Orders ─────────────────────────────────────────────
+    showCoModal: false,
+    coForm: { co_number: '', description: '', amount: 0, status: 'pending', category_id: '', issued_by: '', date: '', notes: '' },
+    coFormError: '',
+    coFormLoading: false,
+    editingCoId: null,
+
     // ── Draws & Claims ──────────────────────────────────────────
     financeView: 'draws',    // 'draws' | 'provincial' | 'federal'
     draws: [],
@@ -248,6 +255,39 @@ function app() {
       } catch (e) {
         this.newProjectError = e.message || 'Failed to create project';
       } finally { this.newProjectLoading = false; }
+    },
+
+    async saveChangeOrder() {
+      if (!this.coForm.co_number.trim() || !this.coForm.description.trim()) {
+        this.coFormError = 'CO number and description are required.'; return;
+      }
+      this.coFormLoading = true; this.coFormError = '';
+      try {
+        const payload = { ...this.coForm, amount: parseFloat(this.coForm.amount) || 0, category_id: this.coForm.category_id || null };
+        if (this.editingCoId) {
+          await this.put(`/api/project/change-orders/${this.editingCoId}`, payload);
+        } else {
+          await this.post(`/api/project/change-orders${this._pid}`, payload);
+        }
+        this.showCoModal = false;
+        this.editingCoId = null;
+        this.coForm = { co_number: '', description: '', amount: 0, status: 'pending', category_id: '', issued_by: '', date: '', notes: '' };
+        await this.loadProjectDashboard();
+      } catch (e) { this.coFormError = e.message || 'Save failed'; }
+      finally { this.coFormLoading = false; }
+    },
+
+    openEditCo(co) {
+      this.editingCoId = co.id;
+      this.coForm = { co_number: co.co_number, description: co.description, amount: co.amount, status: co.status, category_id: co.category_id || '', issued_by: co.issued_by || '', date: co.date || '', notes: co.notes || '' };
+      this.coFormError = '';
+      this.showCoModal = true;
+    },
+
+    async deleteCo(id) {
+      if (!confirm('Delete this change order?')) return;
+      await this.del(`/api/project/change-orders/${id}`);
+      await this.loadProjectDashboard();
     },
 
     async tryDemo() {

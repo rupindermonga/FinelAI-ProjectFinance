@@ -14,7 +14,7 @@ from ..database import get_db
 from ..models import (
     User, Project, SubDivision, CostCategory, CostSubCategory,
     SubDivisionBudget, Invoice, InvoiceAllocation, Payment,
-    Draw, Claim, PayrollEntry,
+    Draw, Claim, PayrollEntry, ChangeOrder,
 )
 from ..schemas import (
     ProjectCreate, ProjectUpdate, ProjectOut,
@@ -659,6 +659,82 @@ def get_fx_rate(date: Optional[str] = None):
     return {"date": target_date, "rate": 1.0, "source": "fallback"}
 
 
+# ─── Change Orders ───────────────────────────────────────────────────────────
+
+@router.get("/change-orders")
+def list_change_orders(proj: Optional[Project] = Depends(_get_proj), db: Session = Depends(get_db)):
+    if not proj:
+        return []
+    return [
+        {
+            "id": co.id, "co_number": co.co_number, "description": co.description,
+            "amount": co.amount, "status": co.status, "issued_by": co.issued_by,
+            "date": co.date, "notes": co.notes, "created_at": str(co.created_at),
+            "category_id": co.category_id,
+            "category_name": co.category.name if co.category else None,
+        }
+        for co in db.query(ChangeOrder)
+        .filter(ChangeOrder.project_id == proj.id)
+        .order_by(ChangeOrder.date.desc(), ChangeOrder.id.desc())
+        .all()
+    ]
+
+
+@router.post("/change-orders")
+def create_change_order(body: dict, proj: Project = Depends(_req_proj), db: Session = Depends(get_db)):
+    if not body.get("co_number"):
+        raise HTTPException(status_code=400, detail="co_number is required")
+    if not body.get("description"):
+        raise HTTPException(status_code=400, detail="description is required")
+    if body.get("amount") is None:
+        raise HTTPException(status_code=400, detail="amount is required")
+    cat_id = body.get("category_id")
+    if cat_id:
+        cat = db.query(CostCategory).filter(CostCategory.id == cat_id, CostCategory.project_id == proj.id).first()
+        if not cat:
+            raise HTTPException(status_code=404, detail="Cost category not found in this project")
+    co = ChangeOrder(
+        project_id=proj.id,
+        category_id=cat_id,
+        co_number=body["co_number"],
+        description=body["description"],
+        amount=float(body["amount"]),
+        status=body.get("status", "pending"),
+        issued_by=body.get("issued_by"),
+        date=body.get("date"),
+        notes=body.get("notes"),
+    )
+    db.add(co)
+    db.commit()
+    db.refresh(co)
+    return {"id": co.id, "co_number": co.co_number, "amount": co.amount, "status": co.status}
+
+
+@router.put("/change-orders/{co_id}")
+def update_change_order(co_id: int, body: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    co = (db.query(ChangeOrder).join(Project, Project.id == ChangeOrder.project_id)
+          .filter(ChangeOrder.id == co_id, Project.user_id == current_user.id).first())
+    if not co:
+        raise HTTPException(status_code=404, detail="Change order not found")
+    for field in ("co_number", "description", "amount", "status", "issued_by", "date", "notes", "category_id"):
+        if field in body:
+            setattr(co, field, body[field])
+    db.commit()
+    db.refresh(co)
+    return {"id": co.id, "co_number": co.co_number, "amount": co.amount, "status": co.status}
+
+
+@router.delete("/change-orders/{co_id}")
+def delete_change_order(co_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    co = (db.query(ChangeOrder).join(Project, Project.id == ChangeOrder.project_id)
+          .filter(ChangeOrder.id == co_id, Project.user_id == current_user.id).first())
+    if not co:
+        raise HTTPException(status_code=404, detail="Change order not found")
+    db.delete(co)
+    db.commit()
+    return {"message": "Deleted"}
+
+
 # ─── Dashboard ────────────────────────────────────────────────────────────────
 
 @router.get("/dashboard")
@@ -679,6 +755,18 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
         .order_by(SubDivision.display_order)
         .all()
     )
+
+    # Pre-load all approved change orders for this project keyed by category_id
+    approved_cos = db.query(ChangeOrder).filter(
+        ChangeOrder.project_id == proj.id, ChangeOrder.status == "approved"
+    ).all()
+    co_by_cat: dict = {}
+    co_project_level = 0.0
+    for co in approved_cos:
+        if co.category_id:
+            co_by_cat[co.category_id] = co_by_cat.get(co.category_id, 0.0) + co.amount
+        else:
+            co_project_level += co.amount
 
     # Build category summary
     cat_summary = []
@@ -718,14 +806,18 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
                 "remaining": round((sc.budget or 0) - sc_invoiced, 2),
             })
 
-        pct_burn = round((alloc_sum / cat.budget * 100) if cat.budget else 0, 1)
+        co_adj = co_by_cat.get(cat.id, 0.0)
+        revised_budget = cat.budget + co_adj
+        pct_burn = round((alloc_sum / revised_budget * 100) if revised_budget else 0, 1)
         cat_data = {
             "id": cat.id,
             "name": cat.name,
             "budget": cat.budget,
+            "co_adjustment": round(co_adj, 2),
+            "revised_budget": round(revised_budget, 2),
             "invoiced": round(alloc_sum, 2),
             "paid": round(paid_sum, 2),
-            "remaining": round(cat.budget - alloc_sum, 2),
+            "remaining": round(revised_budget - alloc_sum, 2),
             "pct_burn": pct_burn,
             "is_per_subdivision": cat.is_per_subdivision,
             "sub_categories": sc_data,
@@ -759,8 +851,10 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
 
         cat_summary.append(cat_data)
 
-    # Overall totals
+    # Overall totals (use revised budget = original + approved COs)
     total_budget = sum(c["budget"] for c in cat_summary)
+    total_co_adjustment = sum(c["co_adjustment"] for c in cat_summary) + co_project_level
+    total_revised_budget = total_budget + total_co_adjustment
     total_invoiced = sum(c["invoiced"] for c in cat_summary)
     total_paid = sum(c["paid"] for c in cat_summary)
 
@@ -829,13 +923,26 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
     payroll_lender_approved = sum(p.lender_approved_amt or 0 for p in payroll_entries)
     payroll_govt_approved = sum(p.govt_approved_amt or 0 for p in payroll_entries)
 
+    # All change orders (all statuses) for the CO log
+    all_cos = db.query(ChangeOrder).filter(ChangeOrder.project_id == proj.id)\
+        .order_by(ChangeOrder.date.desc(), ChangeOrder.id.desc()).all()
+
     return {
         "project": ProjectOut.model_validate(proj).model_dump(),
         "total_budget": total_budget,
+        "total_co_adjustment": round(total_co_adjustment, 2),
+        "total_revised_budget": round(total_revised_budget, 2),
         "total_invoiced": round(total_invoiced, 2),
         "total_paid": round(total_paid, 2),
-        "total_remaining": round(total_budget - total_invoiced, 2),
+        "total_remaining": round(total_revised_budget - total_invoiced, 2),
         "categories": cat_summary,
+        "change_orders": [
+            {"id": co.id, "co_number": co.co_number, "description": co.description,
+             "amount": co.amount, "status": co.status, "date": co.date,
+             "issued_by": co.issued_by, "category_id": co.category_id,
+             "category_name": co.category.name if co.category else None}
+            for co in all_cos
+        ],
         "unallocated_invoices": unallocated,
         "aging": {k: round(v, 2) for k, v in aging.items()},
         "draws": draws_summary,

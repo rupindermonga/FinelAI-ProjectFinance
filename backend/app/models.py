@@ -369,6 +369,26 @@ class PayrollEntry(Base):
     project = relationship("Project")
 
 
+class ChangeOrder(Base):
+    """A change order adjusts the approved budget for a cost category (positive = scope increase, negative = reduction)."""
+    __tablename__ = "change_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    category_id = Column(Integer, ForeignKey("cost_categories.id"), nullable=True)   # None = project-level CO
+    co_number = Column(String, nullable=False)        # e.g. "CO-001"
+    description = Column(Text, nullable=False)
+    amount = Column(Float, nullable=False)            # positive = increase, negative = credit/reduction
+    status = Column(String, default="pending")        # pending | approved | rejected
+    issued_by = Column(String, nullable=True)         # contractor / trade name
+    date = Column(String, nullable=True)              # YYYY-MM-DD
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project")
+    category = relationship("CostCategory")
+
+
 class GeminiApiKey(Base):
     """Admin-managed pool of Gemini API keys — tried in priority order with fallback."""
     __tablename__ = "gemini_api_keys"
