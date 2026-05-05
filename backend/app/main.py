@@ -205,7 +205,9 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     _run_migrations()
     _retire_default_admin()
-    os.makedirs(os.getenv("UPLOAD_FOLDER", "./uploads"), exist_ok=True)
+    _upload_dir = os.getenv("UPLOAD_FOLDER", "./uploads")
+    os.makedirs(_upload_dir, mode=0o700, exist_ok=True)
+    os.makedirs(os.path.join(_upload_dir, "docs"), mode=0o700, exist_ok=True)
     yield
 
 

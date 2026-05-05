@@ -657,6 +657,14 @@ def get_claim_invoices(claim_id: int, db: Session = Depends(get_db), current_use
 def get_fx_rate(date: Optional[str] = None):
     """Fetch USD→CAD rate from Bank of Canada for a given date. Falls back to 1.0 on error."""
     import urllib.request, json as _json
+    if date:
+        import re as _re
+        if not _re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+            raise HTTPException(status_code=400, detail="date must be in YYYY-MM-DD format")
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date")
     target_date = date or datetime.utcnow().strftime("%Y-%m-%d")
     try:
         url = f"https://www.bankofcanada.ca/valet/observations/FXUSDCAD/json?start_date={target_date}&end_date={target_date}"

@@ -2,11 +2,30 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, Any, List, Literal
 from datetime import datetime
 import re
+import math
 
 VALID_FIELD_TYPES = ("string", "number", "date", "boolean")
 
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9_\-]+$")
 _FIELD_KEY_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
+_HTML_TAG_RE  = re.compile(r"<[^>]+>")
+_DATE_RE      = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _strip_html(v: str) -> str:
+    """Remove HTML tags from user-supplied text fields."""
+    return _HTML_TAG_RE.sub("", v).strip() if v else v
+
+
+def _safe_float(v: float | None, field: str, min_val: float = 0.0) -> float | None:
+    """Reject NaN, Infinity, and values below min_val."""
+    if v is None:
+        return v
+    if math.isnan(v) or math.isinf(v):
+        raise ValueError(f"{field} must be a finite number")
+    if v < min_val:
+        raise ValueError(f"{field} must be ≥ {min_val}")
+    return v
 
 
 # ─── Auth ────────────────────────────────────────────────────────────────────
@@ -200,20 +219,40 @@ class ProjectCreate(BaseModel):
     address: Optional[str] = Field(None, max_length=500)
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    total_budget: float = 0.0
-    lender_budget: Optional[float] = None
+    total_budget: float = Field(0.0, ge=0)
+    lender_budget: Optional[float] = Field(None, ge=0)
     currency: str = "CAD"
 
+    @field_validator("name", "code", "client", "address", mode="before")
+    @classmethod
+    def strip_html_tags(cls, v):
+        return _strip_html(v) if isinstance(v, str) else v
+
+    @field_validator("total_budget", "lender_budget", mode="before")
+    @classmethod
+    def finite_budget(cls, v):
+        return _safe_float(v, "budget")
+
 class ProjectUpdate(BaseModel):
-    name: Optional[str] = None
-    code: Optional[str] = None
-    client: Optional[str] = None
-    address: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=200)
+    code: Optional[str] = Field(None, max_length=50)
+    client: Optional[str] = Field(None, max_length=200)
+    address: Optional[str] = Field(None, max_length=500)
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    total_budget: Optional[float] = None
-    lender_budget: Optional[float] = None
+    total_budget: Optional[float] = Field(None, ge=0)
+    lender_budget: Optional[float] = Field(None, ge=0)
     currency: Optional[str] = None
+
+    @field_validator("name", "code", "client", "address", mode="before")
+    @classmethod
+    def strip_html_tags(cls, v):
+        return _strip_html(v) if isinstance(v, str) else v
+
+    @field_validator("total_budget", "lender_budget", mode="before")
+    @classmethod
+    def finite_budget(cls, v):
+        return _safe_float(v, "budget")
 
 class ProjectOut(BaseModel):
     id: int
@@ -262,15 +301,23 @@ class CostCategoryOut(BaseModel):
         from_attributes = True
 
 class CostCategoryCreate(BaseModel):
-    name: str
-    budget: float = 0.0
-    lender_budget: Optional[float] = None
+    name: str = Field(..., min_length=1, max_length=200)
+    budget: float = Field(0.0, ge=0)
+    lender_budget: Optional[float] = Field(None, ge=0)
     is_per_subdivision: bool = False
 
+    @field_validator("name", mode="before")
+    @classmethod
+    def strip_html(cls, v): return _strip_html(v) if isinstance(v, str) else v
+
 class CostCategoryUpdate(BaseModel):
-    name: Optional[str] = None
-    budget: Optional[float] = None
-    lender_budget: Optional[float] = None
+    name: Optional[str] = Field(None, max_length=200)
+    budget: Optional[float] = Field(None, ge=0)
+    lender_budget: Optional[float] = Field(None, ge=0)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def strip_html(cls, v): return _strip_html(v) if isinstance(v, str) else v
 
 class CostSubCategoryCreate(BaseModel):
     name: str

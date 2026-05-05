@@ -18,10 +18,12 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "10080"))
 
 # ── In-memory rate limiter (separate buckets per endpoint) ───────────────────
-_LOGIN_MAX = int(os.getenv("LOGIN_RATE_LIMIT", "30"))  # max failed login attempts per window per IP
-_REGISTER_MAX = 20          # max register attempts per window per IP
-_WINDOW_SECONDS = 120       # 2-minute window (balances security vs QA stability)
-_login_attempts: dict = defaultdict(list)
+_LOGIN_MAX    = int(os.getenv("LOGIN_RATE_LIMIT", "10"))  # 10 failed attempts per window
+_DEMO_MAX     = 5            # max demo logins per window per IP
+_REGISTER_MAX = 20           # max register attempts per window per IP
+_WINDOW_SECONDS = 120        # 2-minute rolling window
+_login_attempts: dict  = defaultdict(list)
+_demo_attempts: dict   = defaultdict(list)
 _register_attempts: dict = defaultdict(list)
 
 
@@ -31,13 +33,23 @@ def _check_rate_limit(request: Request):
     now = time.time()
     _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < _WINDOW_SECONDS]
     if len(_login_attempts[ip]) >= _LOGIN_MAX:
-        raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
+        raise HTTPException(status_code=429, detail="Too many failed login attempts. Try again in 2 minutes.")
 
 
 def _record_failed_attempt(request: Request):
     """Record a failed login attempt for rate limiting."""
     ip = request.client.host if request.client else "unknown"
     _login_attempts[ip].append(time.time())
+
+
+def _check_demo_rate(request: Request):
+    """Raise 429 if the client IP has too many demo logins."""
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    _demo_attempts[ip] = [t for t in _demo_attempts[ip] if now - t < _WINDOW_SECONDS]
+    if len(_demo_attempts[ip]) >= _DEMO_MAX:
+        raise HTTPException(status_code=429, detail="Too many demo requests. Try again in 2 minutes.")
+    _demo_attempts[ip].append(now)
 
 
 def _check_register_rate(request: Request):
@@ -86,9 +98,10 @@ def login(body: UserLogin, request: Request = None, db: Session = Depends(get_db
 
 
 @router.post("/demo", response_model=Token)
-def demo_login(db: Session = Depends(get_db)):
+def demo_login(request: Request = None, db: Session = Depends(get_db)):
     """One-click demo login — returns a token for the pre-seeded demo account.
     Requires DEMO_ENABLED=true in env. Run create_demo.py first to seed the account."""
+    _check_demo_rate(request)
     if os.getenv("DEMO_ENABLED", "false").strip().lower() not in ("1", "true", "yes"):
         raise HTTPException(status_code=403, detail="Demo mode is not enabled on this instance.")
     user = db.query(User).filter(User.username == "demo").first()
