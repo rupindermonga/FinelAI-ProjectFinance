@@ -697,6 +697,28 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
             if inv:
                 paid_sum += (inv.amount_paid or 0.0) * (a.percentage / 100.0)
 
+        # Sub-category invoiced/paid amounts
+        sc_data = []
+        for sc in cat.sub_categories:
+            sc_invoiced = (
+                db.query(func.coalesce(func.sum(InvoiceAllocation.amount), 0.0))
+                .filter(InvoiceAllocation.category_id == cat.id, InvoiceAllocation.sub_category_id == sc.id)
+                .scalar()
+            )
+            sc_paid = sum(
+                (db.query(Invoice).filter(Invoice.id == a.invoice_id).first().amount_paid or 0.0) * (a.percentage / 100.0)
+                for a in db.query(InvoiceAllocation).filter(
+                    InvoiceAllocation.category_id == cat.id, InvoiceAllocation.sub_category_id == sc.id
+                ).all()
+                if db.query(Invoice).filter(Invoice.id == a.invoice_id).first()
+            )
+            sc_data.append({
+                "id": sc.id, "name": sc.name, "budget": sc.budget or 0,
+                "invoiced": round(sc_invoiced, 2), "paid": round(sc_paid, 2),
+                "remaining": round((sc.budget or 0) - sc_invoiced, 2),
+            })
+
+        pct_burn = round((alloc_sum / cat.budget * 100) if cat.budget else 0, 1)
         cat_data = {
             "id": cat.id,
             "name": cat.name,
@@ -704,8 +726,9 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
             "invoiced": round(alloc_sum, 2),
             "paid": round(paid_sum, 2),
             "remaining": round(cat.budget - alloc_sum, 2),
+            "pct_burn": pct_burn,
             "is_per_subdivision": cat.is_per_subdivision,
-            "sub_categories": [{"id": sc.id, "name": sc.name, "budget": sc.budget} for sc in cat.sub_categories],
+            "sub_categories": sc_data,
         }
 
         # Per-subdivision breakdown for Fiber Build

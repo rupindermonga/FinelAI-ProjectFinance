@@ -554,6 +554,9 @@
         <button @click="view='categories'; loadCategories()" :class="view==='categories' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-tags w-4"></i> Categories
         </button>
+        <button @click="view='budget'; loadProjectDashboard()" :class="view==='budget' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-scale-balanced w-4"></i> Budget vs Actual
+        </button>
         <button @click="view='finance'; loadProjectDashboard()" :class="view==='finance' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-chart-pie w-4"></i> Project Finance
         </button>
@@ -1227,6 +1230,161 @@
 
 
       <!-- ── PROJECT FINANCE ──────────────────────────────────────────── -->
+      <!-- ── BUDGET VS ACTUAL ────────────────────────────────────── -->
+      <div x-show="view==='budget'" class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-scale-balanced mr-2 text-blue-600"></i>Budget vs Actual</h2>
+            <p class="text-sm text-gray-500" x-text="projectDash?.project?.name || 'Loading…'"></p>
+          </div>
+        </div>
+
+        <template x-if="!projectDash?.project">
+          <div class="text-center text-gray-400 py-16 text-sm">No project data. Add cost categories in Project Finance to see budget tracking.</div>
+        </template>
+
+        <template x-if="projectDash?.project">
+          <div>
+            <!-- Overall summary bar -->
+            <div class="bg-white rounded-xl border p-5 mb-6">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-semibold text-gray-700">Overall Project Burn</span>
+                <span class="text-sm font-bold" :class="(projectDash.total_invoiced/projectDash.total_budget*100) > 100 ? 'text-red-600' : 'text-gray-700'"
+                      x-text="projectDash.total_budget > 0 ? (projectDash.total_invoiced/projectDash.total_budget*100).toFixed(1)+'%' : '—'"></span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-3 mb-3">
+                <div class="h-3 rounded-full transition-all"
+                     :style="`width:${Math.min((projectDash.total_invoiced/projectDash.total_budget*100),100)}%`"
+                     :class="(projectDash.total_invoiced/projectDash.total_budget*100) > 100 ? 'bg-red-500' : (projectDash.total_invoiced/projectDash.total_budget*100) > 75 ? 'bg-amber-400' : 'bg-blue-500'">
+                </div>
+              </div>
+              <div class="grid grid-cols-4 gap-4 text-center">
+                <div>
+                  <div class="text-xs text-gray-400 mb-0.5">Total Budget</div>
+                  <div class="text-base font-bold text-gray-800" x-text="'$'+(projectDash.total_budget||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-400 mb-0.5">Invoiced</div>
+                  <div class="text-base font-bold text-blue-600" x-text="'$'+(projectDash.total_invoiced||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-400 mb-0.5">Paid</div>
+                  <div class="text-base font-bold text-green-600" x-text="'$'+(projectDash.total_paid||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                </div>
+                <div>
+                  <div class="text-xs text-gray-400 mb-0.5">Remaining</div>
+                  <div class="text-base font-bold" :class="(projectDash.total_remaining||0)<0?'text-red-600':'text-green-600'"
+                       x-text="'$'+(projectDash.total_remaining||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Category table -->
+            <div class="bg-white rounded-xl border overflow-hidden mb-6"
+                 x-data="{ expanded: {} }">
+              <!-- Header -->
+              <div class="grid gap-3 px-4 py-3 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide"
+                   style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 120px">
+                <div>Category</div>
+                <div class="text-right">Budget</div>
+                <div class="text-right">Invoiced</div>
+                <div class="text-right">Paid</div>
+                <div class="text-right">Remaining</div>
+                <div class="text-center">Burn %</div>
+              </div>
+
+              <template x-for="cat in (projectDash.categories || [])" :key="cat.id">
+                <div>
+                  <!-- Category row -->
+                  <div class="grid gap-3 px-4 py-3 border-b hover:bg-gray-50 cursor-pointer items-center"
+                       style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 120px"
+                       @click="expanded[cat.id] = !expanded[cat.id]"
+                       :class="cat.pct_burn > 100 ? 'bg-red-50 hover:bg-red-50' : cat.pct_burn > 75 ? 'bg-amber-50 hover:bg-amber-50' : ''">
+                    <div class="flex items-center gap-2">
+                      <i class="fa-solid text-xs text-gray-400 w-3"
+                         :class="cat.sub_categories?.length ? (expanded[cat.id] ? 'fa-chevron-down' : 'fa-chevron-right') : 'fa-minus'"></i>
+                      <span class="text-sm font-medium text-gray-800" x-text="cat.name"></span>
+                      <span x-show="cat.pct_burn > 100" class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">Over Budget</span>
+                    </div>
+                    <div class="text-right text-sm text-gray-600" x-text="'$'+(cat.budget||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                    <div class="text-right text-sm font-medium text-blue-600" x-text="'$'+(cat.invoiced||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                    <div class="text-right text-sm text-green-600" x-text="'$'+(cat.paid||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                    <div class="text-right text-sm font-medium"
+                         :class="cat.remaining < 0 ? 'text-red-600' : 'text-gray-700'"
+                         x-text="'$'+(cat.remaining||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 bg-gray-100 rounded-full h-1.5">
+                        <div class="h-1.5 rounded-full transition-all"
+                             :style="`width:${Math.min(cat.pct_burn||0,100)}%`"
+                             :class="cat.pct_burn > 100 ? 'bg-red-500' : cat.pct_burn > 75 ? 'bg-amber-400' : 'bg-blue-500'">
+                        </div>
+                      </div>
+                      <span class="text-xs font-semibold w-10 text-right"
+                            :class="cat.pct_burn > 100 ? 'text-red-600' : cat.pct_burn > 75 ? 'text-amber-600' : 'text-gray-500'"
+                            x-text="(cat.pct_burn||0).toFixed(0)+'%'"></span>
+                    </div>
+                  </div>
+
+                  <!-- Sub-category rows (expanded) -->
+                  <template x-if="expanded[cat.id] && cat.sub_categories?.length">
+                    <div>
+                      <template x-for="sc in cat.sub_categories" :key="sc.id">
+                        <div class="grid gap-3 px-4 py-2 bg-slate-50 border-b items-center text-xs"
+                             style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 120px">
+                          <div class="flex items-center gap-2 pl-5 text-gray-600">
+                            <i class="fa-solid fa-corner-down-right text-gray-300 text-[10px]"></i>
+                            <span x-text="sc.name"></span>
+                          </div>
+                          <div class="text-right text-gray-500" x-text="sc.budget > 0 ? '$'+sc.budget.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—'"></div>
+                          <div class="text-right text-blue-500" x-text="sc.invoiced > 0 ? '$'+sc.invoiced.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—'"></div>
+                          <div class="text-right text-green-500" x-text="sc.paid > 0 ? '$'+sc.paid.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—'"></div>
+                          <div class="text-right"
+                               :class="sc.remaining < 0 ? 'text-red-500' : 'text-gray-500'"
+                               x-text="sc.budget > 0 ? '$'+sc.remaining.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—'"></div>
+                          <div class="flex items-center gap-1.5" x-show="sc.budget > 0">
+                            <div class="flex-1 bg-gray-200 rounded-full h-1">
+                              <div class="h-1 rounded-full"
+                                   :style="`width:${Math.min(sc.budget>0?sc.invoiced/sc.budget*100:0,100)}%`"
+                                   :class="(sc.budget>0&&sc.invoiced/sc.budget*100>100)?'bg-red-400':(sc.budget>0&&sc.invoiced/sc.budget*100>75)?'bg-amber-400':'bg-blue-400'">
+                              </div>
+                            </div>
+                            <span class="w-8 text-right text-gray-400"
+                                  x-text="sc.budget>0?(sc.invoiced/sc.budget*100).toFixed(0)+'%':'—'"></span>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Totals row -->
+              <div class="grid gap-3 px-4 py-3 bg-gray-100 items-center font-semibold"
+                   style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 120px">
+                <div class="text-sm text-gray-700">Total</div>
+                <div class="text-right text-sm text-gray-700" x-text="'$'+(projectDash.total_budget||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                <div class="text-right text-sm text-blue-700" x-text="'$'+(projectDash.total_invoiced||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                <div class="text-right text-sm text-green-700" x-text="'$'+(projectDash.total_paid||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                <div class="text-right text-sm" :class="(projectDash.total_remaining||0)<0?'text-red-700':'text-green-700'"
+                     x-text="'$'+(projectDash.total_remaining||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                <div class="text-center text-xs text-gray-500"
+                     x-text="projectDash.total_budget>0?(projectDash.total_invoiced/projectDash.total_budget*100).toFixed(1)+'%':'—'"></div>
+              </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="flex items-center gap-6 text-xs text-gray-400">
+              <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-full bg-blue-500"></span>Under 75%</span>
+              <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-full bg-amber-400"></span>75–100%</span>
+              <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-full bg-red-500"></span>Over budget</span>
+              <span class="ml-auto">Click a category row to expand sub-categories</span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+
+      <!-- ── FINANCE ──────────────────────────────────────────────── -->
       <div x-show="view==='finance'" class="p-6">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-chart-pie mr-2 text-blue-600"></i>Project Finance</h2>
