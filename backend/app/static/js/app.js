@@ -124,6 +124,10 @@ function app() {
     bulkUploading: false,
     bulkResults: null,
 
+    // ── Holdback & Approvals ──────────────────────────────────────
+    holdbackFilter: 'outstanding',
+    approvalFilter: 'pending',
+
     // ── Committed Costs ───────────────────────────────────────────
     showCcModal: false,
     ccForm: { vendor: '', description: '', contract_amount: 0, status: 'active', category_id: '', contract_date: '', expected_completion: '', notes: '' },
@@ -262,6 +266,38 @@ function app() {
       } catch (e) {
         this.newProjectError = e.message || 'Failed to create project';
       } finally { this.newProjectLoading = false; }
+    },
+
+    async releaseHoldback(invoiceId, undo = false) {
+      try {
+        const body = undo
+          ? { holdback_released: false, holdback_released_date: null }
+          : { holdback_released: true };
+        await this.put(`/api/invoices/${invoiceId}/holdback`, body);
+        // Update local invoice state
+        const inv = this.invoices.find(i => i.id === invoiceId);
+        if (inv) { inv.holdback_released = !undo; inv.holdback_released_date = undo ? null : new Date().toISOString().split('T')[0]; }
+        await this.loadProjectDashboard();
+      } catch (e) { alert('Failed: ' + e.message); }
+    },
+
+    async setApproval(invoiceId, status) {
+      try {
+        const data = await this.put(`/api/invoices/${invoiceId}/approval`, { approval_status: status });
+        const inv = this.invoices.find(i => i.id === invoiceId);
+        if (inv) { inv.approval_status = data.approval_status; inv.approved_by = data.approved_by; inv.approved_at = data.approved_at; }
+        await this.loadProjectDashboard();
+      } catch (e) { alert('Failed: ' + e.message); }
+    },
+
+    async bulkApproveByDraw() {
+      const draw_id = this.uploadDrawId || prompt('Enter Draw ID to bulk-approve:');
+      if (!draw_id) return;
+      try {
+        const data = await this.post('/api/invoices/bulk-approve', { draw_id: parseInt(draw_id) });
+        alert(`Approved ${data.approved} invoices.`);
+        await Promise.all([this.loadInvoices(), this.loadProjectDashboard()]);
+      } catch (e) { alert('Failed: ' + e.message); }
     },
 
     async saveCc() {

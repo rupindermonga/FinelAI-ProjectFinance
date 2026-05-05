@@ -94,6 +94,16 @@ class Invoice(Base):
     provincial_claim_id = Column(Integer, ForeignKey("claims.id"), nullable=True)
     federal_claim_id = Column(Integer, ForeignKey("claims.id"), nullable=True)
 
+    # Holdback / retainage (Ontario Construction Act — typically 10%)
+    holdback_pct = Column(Float, default=10.0)         # % withheld (0 = no holdback)
+    holdback_released = Column(Boolean, default=False)
+    holdback_released_date = Column(String, nullable=True)   # YYYY-MM-DD
+
+    # Invoice approval workflow
+    approval_status = Column(String, default="pending")  # pending | approved | rejected
+    approved_by = Column(String, nullable=True)           # username of approver
+    approved_at = Column(String, nullable=True)           # YYYY-MM-DD
+
     # Payroll flag
     is_payroll = Column(Boolean, default=False)
 

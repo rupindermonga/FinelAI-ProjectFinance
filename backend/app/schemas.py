@@ -159,6 +159,16 @@ class InvoiceOut(BaseModel):
     federal_claim_id: Optional[int] = None
     is_payroll: bool = False
 
+    # Holdback / retainage
+    holdback_pct: Optional[float] = 10.0
+    holdback_released: Optional[bool] = False
+    holdback_released_date: Optional[str] = None
+
+    # Approval workflow
+    approval_status: Optional[str] = "pending"
+    approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
+
     class Config:
         from_attributes = True
 

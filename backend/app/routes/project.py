@@ -1012,6 +1012,25 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
     payroll_lender_approved = sum(p.lender_approved_amt or 0 for p in payroll_entries)
     payroll_govt_approved = sum(p.govt_approved_amt or 0 for p in payroll_entries)
 
+    # Holdback aggregates
+    holdback_invoices = db.query(Invoice).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.status == "processed",
+        Invoice.holdback_pct > 0,
+    ).all()
+    holdback_held = sum(round((inv.subtotal or inv.total_due or 0) * (inv.holdback_pct or 0) / 100, 2)
+                        for inv in holdback_invoices if not inv.holdback_released)
+    holdback_released_total = sum(round((inv.subtotal or inv.total_due or 0) * (inv.holdback_pct or 0) / 100, 2)
+                                   for inv in holdback_invoices if inv.holdback_released)
+    holdback_total = holdback_held + holdback_released_total
+
+    # Approval summary
+    approval_counts = {
+        "pending": db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.approval_status == "pending").count(),
+        "approved": db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.approval_status == "approved").count(),
+        "rejected": db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed", Invoice.approval_status == "rejected").count(),
+    }
+
     # All change orders (all statuses) for the CO log
     all_cos = db.query(ChangeOrder).filter(ChangeOrder.project_id == proj.id)\
         .order_by(ChangeOrder.date.desc(), ChangeOrder.id.desc()).all()
@@ -1038,6 +1057,14 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
             for co in all_cos
         ],
         "committed_costs": [_cc_out(cc, db) for cc in all_ccs],
+        "holdback": {
+            "held": round(holdback_held, 2),
+            "released": round(holdback_released_total, 2),
+            "total": round(holdback_total, 2),
+            "invoice_count": len(holdback_invoices),
+            "unreleased_count": sum(1 for i in holdback_invoices if not i.holdback_released),
+        },
+        "approval": approval_counts,
         "unallocated_invoices": unallocated,
         "aging": {k: round(v, 2) for k, v in aging.items()},
         "draws": draws_summary,

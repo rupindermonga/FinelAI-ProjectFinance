@@ -304,6 +304,81 @@ async def get_invoice_file(
     )
 
 
+@router.put("/{invoice_id}/holdback")
+def update_holdback(invoice_id: int, body: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Set holdback_pct and/or mark holdback as released."""
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.user_id == current_user.id).first()
+    if not inv:
+        raise HTTPException(status_code=404)
+    if "holdback_pct" in body:
+        pct = float(body["holdback_pct"])
+        if pct < 0 or pct > 100:
+            raise HTTPException(status_code=400, detail="holdback_pct must be 0–100")
+        inv.holdback_pct = pct
+    if "holdback_released" in body:
+        inv.holdback_released = bool(body["holdback_released"])
+        if inv.holdback_released and not inv.holdback_released_date:
+            inv.holdback_released_date = body.get("holdback_released_date") or datetime.utcnow().strftime("%Y-%m-%d")
+    if "holdback_released_date" in body:
+        inv.holdback_released_date = body["holdback_released_date"]
+    db.commit()
+    return {"id": inv.id, "holdback_pct": inv.holdback_pct, "holdback_released": inv.holdback_released, "holdback_released_date": inv.holdback_released_date}
+
+
+@router.put("/{invoice_id}/approval")
+def update_approval(invoice_id: int, body: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Approve or reject an invoice (PM workflow)."""
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.user_id == current_user.id).first()
+    if not inv:
+        raise HTTPException(status_code=404)
+    status = body.get("approval_status", "").lower()
+    if status not in ("pending", "approved", "rejected"):
+        raise HTTPException(status_code=400, detail="approval_status must be pending | approved | rejected")
+    inv.approval_status = status
+    if status == "approved":
+        inv.approved_by = current_user.username
+        inv.approved_at = datetime.utcnow().strftime("%Y-%m-%d")
+    elif status == "pending":
+        inv.approved_by = None
+        inv.approved_at = None
+    db.commit()
+    return {"id": inv.id, "approval_status": inv.approval_status, "approved_by": inv.approved_by, "approved_at": inv.approved_at}
+
+
+@router.post("/bulk-holdback")
+def bulk_set_holdback(body: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Set holdback_pct on all invoices in a draw (or all user invoices if no draw_id)."""
+    pct = float(body.get("holdback_pct", 10.0))
+    if pct < 0 or pct > 100:
+        raise HTTPException(status_code=400, detail="holdback_pct must be 0–100")
+    draw_id = body.get("draw_id")
+    q = db.query(Invoice).filter(Invoice.user_id == current_user.id)
+    if draw_id:
+        q = q.filter(Invoice.draw_id == draw_id)
+    count = 0
+    for inv in q.all():
+        inv.holdback_pct = pct
+        count += 1
+    db.commit()
+    return {"updated": count, "holdback_pct": pct}
+
+
+@router.post("/bulk-approve")
+def bulk_approve(body: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Approve all invoices in a draw in one step."""
+    draw_id = body.get("draw_id")
+    if not draw_id:
+        raise HTTPException(status_code=400, detail="draw_id required")
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    invs = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.draw_id == draw_id).all()
+    for inv in invs:
+        inv.approval_status = "approved"
+        inv.approved_by = current_user.username
+        inv.approved_at = today
+    db.commit()
+    return {"approved": len(invs)}
+
+
 @router.delete("/{invoice_id}")
 def delete_invoice(
     invoice_id: int,
