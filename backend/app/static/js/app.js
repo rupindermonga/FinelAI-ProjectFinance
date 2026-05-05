@@ -128,6 +128,69 @@ function app() {
     cashFlow: null,
     cashFlowLoading: false,
 
+    // ── Milestones ────────────────────────────────────────────────
+    milestones: [],
+    showMsModal: false,
+    msForm: { name:'', description:'', target_date:'', actual_date:'', pct_complete:0, status:'pending' },
+    msFormError: '',
+    msFormLoading: false,
+    editingMsId: null,
+
+    async loadMilestones() {
+      try { this.milestones = await this.get(`/api/project/milestones${this._pid}`); } catch(e) {}
+    },
+
+    async saveMs() {
+      if (!this.msForm.name.trim()) { this.msFormError = 'Name required'; return; }
+      this.msFormLoading = true; this.msFormError = '';
+      try {
+        const payload = { ...this.msForm, pct_complete: parseFloat(this.msForm.pct_complete) || 0 };
+        if (this.editingMsId) await this.put(`/api/project/milestones/${this.editingMsId}`, payload);
+        else await this.post(`/api/project/milestones${this._pid}`, payload);
+        this.showMsModal = false; this.editingMsId = null;
+        this.msForm = { name:'', description:'', target_date:'', actual_date:'', pct_complete:0, status:'pending' };
+        await this.loadMilestones();
+      } catch(e) { this.msFormError = e.message || 'Save failed'; }
+      finally { this.msFormLoading = false; }
+    },
+
+    async deleteMs(id) {
+      if (!confirm('Delete this milestone?')) return;
+      await this.del(`/api/project/milestones/${id}`);
+      await this.loadMilestones();
+    },
+
+    // ── Lien Waivers ──────────────────────────────────────────────
+    lienWaivers: [],
+    showLwModal: false,
+    lwForm: { vendor_name:'', waiver_type:'conditional', draw_id:'', subcontractor_id:'', amount:'', date_received:'', notes:'' },
+    lwFormError: '',
+    lwFormLoading: false,
+
+    async loadLienWaivers() {
+      try { this.lienWaivers = await this.get(`/api/project/lien-waivers${this._pid}`); } catch(e) {}
+    },
+
+    async saveLw() {
+      if (!this.lwForm.vendor_name?.trim() && !this.lwForm.subcontractor_id) { this.lwFormError = 'Vendor name or subcontractor required'; return; }
+      if (!this.lwForm.waiver_type) { this.lwFormError = 'Waiver type required'; return; }
+      this.lwFormLoading = true; this.lwFormError = '';
+      try {
+        const payload = { ...this.lwForm, amount: this.lwForm.amount ? parseFloat(this.lwForm.amount) : null, draw_id: this.lwForm.draw_id || null, subcontractor_id: this.lwForm.subcontractor_id || null };
+        await this.post(`/api/project/lien-waivers${this._pid}`, payload);
+        this.showLwModal = false;
+        this.lwForm = { vendor_name:'', waiver_type:'conditional', draw_id:'', subcontractor_id:'', amount:'', date_received:'', notes:'' };
+        await this.loadLienWaivers();
+      } catch(e) { this.lwFormError = e.message || 'Save failed'; }
+      finally { this.lwFormLoading = false; }
+    },
+
+    async deleteLw(id) {
+      if (!confirm('Delete this lien waiver record?')) return;
+      await this.del(`/api/project/lien-waivers/${id}`);
+      await this.loadLienWaivers();
+    },
+
     // ── Documents ─────────────────────────────────────────────────
     documents: [],
     docTypeFilter: 'all',

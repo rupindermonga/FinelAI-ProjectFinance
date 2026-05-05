@@ -575,6 +575,12 @@
         <button @click="view='subcontractors'; loadSubcontractors()" :class="view==='subcontractors' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-hard-hat w-4"></i> Subcontractors
         </button>
+        <button @click="view='milestones'; loadMilestones()" :class="view==='milestones' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-flag-checkered w-4"></i> Milestones
+        </button>
+        <button @click="view='lienwaivers'; loadLienWaivers()" :class="view==='lienwaivers' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-file-signature w-4"></i> Lien Waivers
+        </button>
         <button @click="view='documents'; loadDocuments()" :class="view==='documents' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-paperclip w-4"></i> Documents
         </button>
@@ -1524,6 +1530,107 @@
             </div>
           </div>
         </template>
+      </div>
+
+
+      <!-- ── MILESTONES ───────────────────────────────────────── -->
+      <div x-show="view==='milestones'" class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-flag-checkered mr-2 text-blue-600"></i>Milestones</h2>
+            <p class="text-sm text-gray-500">Key project dates with % completion and status tracking.</p>
+          </div>
+          <button @click="msForm={name:'',description:'',target_date:'',actual_date:'',pct_complete:0,status:'pending'}; editingMsId=null; msFormError=''; showMsModal=true"
+                  class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">
+            <i class="fa-solid fa-plus"></i> Add Milestone
+          </button>
+        </div>
+
+        <div x-show="milestones.length===0" class="text-center text-gray-400 text-sm py-16">No milestones yet. Add key dates like Substantial Completion, Final Inspection, etc.</div>
+
+        <div x-show="milestones.length>0" class="space-y-3">
+          <template x-for="m in milestones" :key="m.id">
+            <div class="bg-white rounded-xl border p-4">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="font-medium text-gray-800" x-text="m.name"></span>
+                    <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
+                          :class="m.status==='complete'?'bg-green-100 text-green-700':m.status==='in_progress'?'bg-blue-100 text-blue-700':m.status==='delayed'?'bg-red-100 text-red-700':'bg-gray-100 text-gray-500'"
+                          x-text="m.status.replace('_',' ').charAt(0).toUpperCase()+m.status.replace('_',' ').slice(1)"></span>
+                  </div>
+                  <div x-show="m.description" class="text-xs text-gray-500 mb-2" x-text="m.description"></div>
+                  <!-- Progress bar -->
+                  <div class="flex items-center gap-3">
+                    <div class="flex-1 bg-gray-100 rounded-full h-2">
+                      <div class="h-2 rounded-full transition-all"
+                           :style="`width:${m.pct_complete||0}%`"
+                           :class="m.pct_complete>=100?'bg-green-500':m.status==='delayed'?'bg-red-400':'bg-blue-500'"></div>
+                    </div>
+                    <span class="text-xs font-semibold text-gray-600 w-10 text-right" x-text="(m.pct_complete||0)+'%'"></span>
+                  </div>
+                </div>
+                <div class="text-right text-xs text-gray-400 flex-shrink-0 space-y-0.5">
+                  <div x-show="m.target_date"><span class="text-gray-500">Target:</span> <span x-text="m.target_date"></span></div>
+                  <div x-show="m.actual_date"><span class="text-green-600">Completed:</span> <span x-text="m.actual_date"></span></div>
+                  <div class="flex gap-1 mt-2 justify-end">
+                    <button @click="editingMsId=m.id; msForm={name:m.name,description:m.description||'',target_date:m.target_date||'',actual_date:m.actual_date||'',pct_complete:m.pct_complete,status:m.status}; msFormError=''; showMsModal=true"
+                            class="text-blue-500 hover:text-blue-700 text-xs"><i class="fa-solid fa-pen"></i></button>
+                    <button @click="deleteMs(m.id)" class="text-red-400 hover:text-red-600 text-xs ml-1"><i class="fa-solid fa-trash"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+
+      <!-- ── LIEN WAIVERS ──────────────────────────────────────── -->
+      <div x-show="view==='lienwaivers'" class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-file-signature mr-2 text-blue-600"></i>Lien Waivers</h2>
+            <p class="text-sm text-gray-500">Track conditional and unconditional lien waiver receipt per trade / draw.</p>
+          </div>
+          <button @click="lwForm={vendor_name:'',waiver_type:'conditional',draw_id:'',subcontractor_id:'',amount:'',date_received:'',notes:''}; lwFormError=''; showLwModal=true"
+                  class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">
+            <i class="fa-solid fa-plus"></i> Add Waiver
+          </button>
+        </div>
+
+        <div x-show="lienWaivers.length===0" class="text-center text-gray-400 text-sm py-16">No lien waivers recorded yet.</div>
+
+        <div x-show="lienWaivers.length>0" class="bg-white rounded-xl border overflow-hidden">
+          <table class="w-full text-sm">
+            <thead><tr class="border-b text-xs text-gray-400 uppercase tracking-wide bg-gray-50">
+              <th class="text-left px-4 py-3">Vendor / Trade</th>
+              <th class="text-left px-4 py-3">Draw</th>
+              <th class="text-center px-4 py-3">Type</th>
+              <th class="text-right px-4 py-3">Amount</th>
+              <th class="text-left px-4 py-3">Date Received</th>
+              <th class="px-4 py-3"></th>
+            </tr></thead>
+            <tbody>
+              <template x-for="w in lienWaivers" :key="w.id">
+                <tr class="border-b last:border-0 hover:bg-gray-50">
+                  <td class="px-4 py-3 font-medium text-gray-800" x-text="w.vendor_name || '—'"></td>
+                  <td class="px-4 py-3 text-gray-500 text-xs" x-text="w.draw_id ? 'Draw #'+w.draw_id : '—'"></td>
+                  <td class="px-4 py-3 text-center">
+                    <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
+                          :class="w.waiver_type==='unconditional'?'bg-green-100 text-green-700':'bg-amber-100 text-amber-700'"
+                          x-text="w.waiver_type.charAt(0).toUpperCase()+w.waiver_type.slice(1)"></span>
+                  </td>
+                  <td class="px-4 py-3 text-right text-gray-700" x-text="w.amount ? '$'+w.amount.toLocaleString('en-CA',{minimumFractionDigits:2}) : '—'"></td>
+                  <td class="px-4 py-3 text-gray-500 text-xs" x-text="w.date_received || '—'"></td>
+                  <td class="px-4 py-3 text-right">
+                    <button @click="deleteLw(w.id)" class="text-red-400 hover:text-red-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
       </div>
 
 
@@ -3080,6 +3187,115 @@
     </main>
     </div><!-- /app-row (sidebar + main) -->
   </div><!-- /app-shell (FinelStrip + app-row) -->
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       MILESTONE MODAL
+  ══════════════════════════════════════════════════════════════ -->
+  <div x-show="showMsModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showMsModal=false">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-bold text-gray-800" x-text="editingMsId ? 'Edit Milestone' : 'Add Milestone'"></h3>
+        <button @click="showMsModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-gray-700 mb-1">Milestone Name *</label>
+            <input x-model="msForm.name" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Substantial Completion" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Status</label>
+            <select x-model="msForm.status" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="complete">Complete</option>
+              <option value="delayed">Delayed</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">% Complete</label>
+            <input x-model.number="msForm.pct_complete" type="number" min="0" max="100" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Target Date</label>
+            <input x-model="msForm.target_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Actual Completion</label>
+            <input x-model="msForm.actual_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-gray-700 mb-1">Description</label>
+            <input x-model="msForm.description" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+        <div x-show="msFormError" class="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="msFormError"></div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button @click="showMsModal=false" class="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+        <button @click="saveMs()" :disabled="msFormLoading" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+          <span x-show="!msFormLoading" x-text="editingMsId ? 'Save' : 'Add Milestone'"></span>
+          <span x-show="msFormLoading"><i class="fa-solid fa-spinner fa-spin"></i></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LIEN WAIVER MODAL
+  ══════════════════════════════════════════════════════════════ -->
+  <div x-show="showLwModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showLwModal=false">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-bold text-gray-800">Add Lien Waiver</h3>
+        <button @click="showLwModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-gray-700 mb-1">Vendor / Trade *</label>
+            <input x-model="lwForm.vendor_name" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Apex Electrical Ltd." />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Waiver Type *</label>
+            <select x-model="lwForm.waiver_type" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="conditional">Conditional</option>
+              <option value="unconditional">Unconditional</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Draw</label>
+            <select x-model="lwForm.draw_id" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">No specific draw</option>
+              <template x-for="d in draws" :key="d.id"><option :value="d.id" x-text="'Draw '+d.draw_number"></option></template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Amount Covered</label>
+            <input x-model.number="lwForm.amount" type="number" step="100" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Date Received</label>
+            <input x-model="lwForm.date_received" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+            <input x-model="lwForm.notes" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+        <div x-show="lwFormError" class="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="lwFormError"></div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button @click="showLwModal=false" class="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+        <button @click="saveLw()" :disabled="lwFormLoading" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+          <span x-show="!lwFormLoading">Add Waiver</span>
+          <span x-show="lwFormLoading"><i class="fa-solid fa-spinner fa-spin"></i></span>
+        </button>
+      </div>
+    </div>
+  </div>
 
 
   <!-- ══════════════════════════════════════════════════════════════

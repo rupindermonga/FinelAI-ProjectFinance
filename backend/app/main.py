@@ -62,6 +62,30 @@ def _run_migrations():
             "ALTER TABLE invoices ADD COLUMN approval_status TEXT DEFAULT 'pending'",
             "ALTER TABLE invoices ADD COLUMN approved_by TEXT",
             "ALTER TABLE invoices ADD COLUMN approved_at TEXT",
+            """CREATE TABLE IF NOT EXISTS milestones (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                name TEXT NOT NULL,
+                description TEXT,
+                target_date TEXT,
+                actual_date TEXT,
+                pct_complete REAL DEFAULT 0,
+                status TEXT DEFAULT 'pending',
+                display_order INTEGER DEFAULT 100,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS lien_waivers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                draw_id INTEGER REFERENCES draws(id),
+                subcontractor_id INTEGER REFERENCES subcontractors(id),
+                vendor_name TEXT,
+                waiver_type TEXT NOT NULL,
+                amount REAL,
+                date_received TEXT,
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
             """CREATE TABLE IF NOT EXISTS project_documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL REFERENCES projects(id),

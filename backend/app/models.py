@@ -442,6 +442,44 @@ class ChangeOrder(Base):
     category = relationship("CostCategory")
 
 
+class Milestone(Base):
+    """Project schedule milestones — key dates and completion tracking."""
+    __tablename__ = "milestones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    target_date = Column(String, nullable=True)           # YYYY-MM-DD
+    actual_date = Column(String, nullable=True)           # YYYY-MM-DD (filled on completion)
+    pct_complete = Column(Float, default=0.0)             # 0–100
+    status = Column(String, default="pending")            # pending | in_progress | complete | delayed
+    display_order = Column(Integer, default=100)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project")
+
+
+class LienWaiver(Base):
+    """Lien waiver records — tracks receipt of conditional/unconditional waivers per trade/draw."""
+    __tablename__ = "lien_waivers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    draw_id = Column(Integer, ForeignKey("draws.id"), nullable=True)
+    subcontractor_id = Column(Integer, ForeignKey("subcontractors.id"), nullable=True)
+    vendor_name = Column(String, nullable=True)           # free-text if no subcontractor record
+    waiver_type = Column(String, nullable=False)          # conditional | unconditional
+    amount = Column(Float, nullable=True)                 # amount covered by the waiver
+    date_received = Column(String, nullable=True)         # YYYY-MM-DD
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project")
+    draw = relationship("Draw")
+    subcontractor = relationship("Subcontractor")
+
+
 class ProjectDocument(Base):
     """Non-invoice documents filed against a project: contracts, permits, RFIs, submittals, etc."""
     __tablename__ = "project_documents"

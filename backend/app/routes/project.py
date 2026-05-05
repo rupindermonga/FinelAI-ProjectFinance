@@ -16,7 +16,8 @@ from ..database import get_db
 from ..models import (
     User, Project, SubDivision, CostCategory, CostSubCategory,
     SubDivisionBudget, Invoice, InvoiceAllocation, Payment,
-    Draw, Claim, PayrollEntry, ChangeOrder, CommittedCost, Subcontractor, LenderToken, ProjectDocument,
+    Draw, Claim, PayrollEntry, ChangeOrder, CommittedCost, Subcontractor,
+    LenderToken, ProjectDocument, Milestone, LienWaiver,
 )
 from ..schemas import (
     ProjectCreate, ProjectUpdate, ProjectOut,
@@ -735,6 +736,82 @@ def delete_change_order(co_id: int, db: Session = Depends(get_db), current_user:
     db.delete(co)
     db.commit()
     return {"message": "Deleted"}
+
+
+# ─── Milestones ──────────────────────────────────────────────────────────────
+
+@router.get("/milestones")
+def list_milestones(proj: Optional[Project] = Depends(_get_proj), db: Session = Depends(get_db)):
+    if not proj: return []
+    return [
+        {"id": m.id, "name": m.name, "description": m.description, "target_date": m.target_date,
+         "actual_date": m.actual_date, "pct_complete": m.pct_complete, "status": m.status,
+         "display_order": m.display_order}
+        for m in db.query(Milestone).filter(Milestone.project_id == proj.id).order_by(Milestone.display_order).all()
+    ]
+
+
+@router.post("/milestones")
+def create_milestone(body: dict, proj: Project = Depends(_req_proj), db: Session = Depends(get_db)):
+    if not body.get("name"): raise HTTPException(status_code=400, detail="name required")
+    m = Milestone(project_id=proj.id, name=body["name"], description=body.get("description"),
+                  target_date=body.get("target_date"), actual_date=body.get("actual_date"),
+                  pct_complete=float(body.get("pct_complete", 0)), status=body.get("status", "pending"),
+                  display_order=int(body.get("display_order", 100)))
+    db.add(m); db.commit(); db.refresh(m)
+    return {"id": m.id, "name": m.name, "status": m.status}
+
+
+@router.put("/milestones/{ms_id}")
+def update_milestone(ms_id: int, body: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    m = (db.query(Milestone).join(Project, Project.id == Milestone.project_id)
+         .filter(Milestone.id == ms_id, Project.user_id == current_user.id).first())
+    if not m: raise HTTPException(status_code=404)
+    for f in ("name","description","target_date","actual_date","pct_complete","status","display_order"):
+        if f in body: setattr(m, f, body[f])
+    db.commit(); db.refresh(m)
+    return {"id": m.id, "pct_complete": m.pct_complete, "status": m.status}
+
+
+@router.delete("/milestones/{ms_id}")
+def delete_milestone(ms_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    m = (db.query(Milestone).join(Project, Project.id == Milestone.project_id)
+         .filter(Milestone.id == ms_id, Project.user_id == current_user.id).first())
+    if not m: raise HTTPException(status_code=404)
+    db.delete(m); db.commit(); return {"message": "Deleted"}
+
+
+# ─── Lien Waivers ─────────────────────────────────────────────────────────────
+
+@router.get("/lien-waivers")
+def list_lien_waivers(proj: Optional[Project] = Depends(_get_proj), db: Session = Depends(get_db)):
+    if not proj: return []
+    return [
+        {"id": w.id, "draw_id": w.draw_id, "vendor_name": w.vendor_name or (w.subcontractor.name if w.subcontractor else None),
+         "waiver_type": w.waiver_type, "amount": w.amount, "date_received": w.date_received,
+         "notes": w.notes, "subcontractor_id": w.subcontractor_id}
+        for w in db.query(LienWaiver).filter(LienWaiver.project_id == proj.id).order_by(LienWaiver.date_received.desc(), LienWaiver.id.desc()).all()
+    ]
+
+
+@router.post("/lien-waivers")
+def create_lien_waiver(body: dict, proj: Project = Depends(_req_proj), db: Session = Depends(get_db)):
+    if body.get("waiver_type") not in ("conditional", "unconditional"):
+        raise HTTPException(status_code=400, detail="waiver_type must be conditional or unconditional")
+    w = LienWaiver(project_id=proj.id, draw_id=body.get("draw_id"),
+                   subcontractor_id=body.get("subcontractor_id"), vendor_name=body.get("vendor_name"),
+                   waiver_type=body["waiver_type"], amount=body.get("amount"),
+                   date_received=body.get("date_received"), notes=body.get("notes"))
+    db.add(w); db.commit(); db.refresh(w)
+    return {"id": w.id, "waiver_type": w.waiver_type}
+
+
+@router.delete("/lien-waivers/{w_id}")
+def delete_lien_waiver(w_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    w = (db.query(LienWaiver).join(Project, Project.id == LienWaiver.project_id)
+         .filter(LienWaiver.id == w_id, Project.user_id == current_user.id).first())
+    if not w: raise HTTPException(status_code=404)
+    db.delete(w); db.commit(); return {"message": "Deleted"}
 
 
 # ─── Project Documents ───────────────────────────────────────────────────────
