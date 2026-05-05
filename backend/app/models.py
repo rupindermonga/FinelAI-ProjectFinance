@@ -189,6 +189,7 @@ class Project(Base):
     start_date = Column(String, nullable=True)
     end_date = Column(String, nullable=True)
     total_budget = Column(Float, default=0.0)
+    lender_budget = Column(Float, nullable=True)        # approved budget as presented to lender (may differ)
     currency = Column(String, default="CAD")
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -216,7 +217,8 @@ class CostCategory(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     name = Column(String, nullable=False)
-    budget = Column(Float, default=0.0)              # total budget for this category
+    budget = Column(Float, default=0.0)              # internal budget for this category
+    lender_budget = Column(Float, nullable=True)      # budget as presented to lender (None = use internal)
     is_per_subdivision = Column(Boolean, default=False)  # True = Fiber Build (budget per sub-division)
     display_order = Column(Integer, default=100)
 

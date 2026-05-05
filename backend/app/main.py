@@ -56,6 +56,8 @@ def _run_migrations():
             "ALTER TABLE invoices ADD COLUMN is_payroll BOOLEAN DEFAULT 0",
             "ALTER TABLE users ADD COLUMN is_demo BOOLEAN DEFAULT 0",
             "ALTER TABLE invoices ADD COLUMN project_id INTEGER REFERENCES projects(id)",
+            "ALTER TABLE projects ADD COLUMN lender_budget REAL",
+            "ALTER TABLE cost_categories ADD COLUMN lender_budget REAL",
             "ALTER TABLE invoices ADD COLUMN holdback_pct REAL DEFAULT 10.0",
             "ALTER TABLE invoices ADD COLUMN holdback_released BOOLEAN DEFAULT 0",
             "ALTER TABLE invoices ADD COLUMN holdback_released_date TEXT",

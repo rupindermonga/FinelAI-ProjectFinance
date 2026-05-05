@@ -1273,10 +1273,27 @@
             <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-scale-balanced mr-2 text-blue-600"></i>Budget vs Actual</h2>
             <p class="text-sm text-gray-500" x-text="projectDash?.project?.name || 'Loading…'"></p>
           </div>
-          <button @click="window.open('/report' + (_pid ? _pid.replace('?','?') : ''), '_blank')"
-                  class="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition">
-            <i class="fa-solid fa-print"></i> Print Status Report
-          </button>
+          <div class="flex items-center gap-3">
+            <!-- Internal / Lender view toggle -->
+            <div class="flex items-center bg-gray-100 rounded-lg p-0.5 text-xs font-medium">
+              <button @click="budgetView='internal'"
+                      :class="budgetView==='internal' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'"
+                      class="px-3 py-1.5 rounded-md transition">Internal</button>
+              <button @click="budgetView='lender'"
+                      :class="budgetView==='lender' ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700'"
+                      class="px-3 py-1.5 rounded-md transition">Lender</button>
+            </div>
+            <button @click="window.open('/report' + (_pid ? _pid.replace('?','?') : ''), '_blank')"
+                    class="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition">
+              <i class="fa-solid fa-print"></i> Print Report
+            </button>
+          </div>
+        </div>
+        <!-- Lender view notice -->
+        <div x-show="budgetView==='lender'" class="mb-4 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2 text-xs text-blue-700 flex items-center gap-2">
+          <i class="fa-solid fa-circle-info"></i>
+          Lender view — shows lender-approved budgets vs actual invoiced amounts. Lender budget per category can be set in the category edit.
+          <span x-show="!projectDash?.total_lender_budget || projectDash.total_lender_budget === projectDash.total_revised_budget" class="ml-2 text-blue-500">(No separate lender budgets set — showing internal budgets.)</span>
         </div>
 
         <template x-if="!projectDash?.project">
@@ -1288,20 +1305,28 @@
             <!-- Overall summary bar -->
             <div class="bg-white rounded-xl border p-5 mb-6">
               <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-semibold text-gray-700">Overall Project Burn</span>
-                <span class="text-sm font-bold" :class="(projectDash.total_invoiced/projectDash.total_budget*100) > 100 ? 'text-red-600' : 'text-gray-700'"
-                      x-text="projectDash.total_budget > 0 ? (projectDash.total_invoiced/projectDash.total_budget*100).toFixed(1)+'%' : '—'"></span>
+                <span class="text-sm font-semibold text-gray-700">Overall Project Burn
+                  <span x-show="budgetView==='lender'" class="text-blue-600 text-xs font-normal ml-1">(Lender View)</span>
+                </span>
+                <span class="text-sm font-bold"
+                      :class="((projectDash.total_invoiced)/((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget||1)*100) > 100 ? 'text-red-600' : 'text-gray-700'"
+                      x-text="((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget||0) > 0 ? (projectDash.total_invoiced/((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget)*100).toFixed(1)+'%' : '—'"></span>
               </div>
               <div class="w-full bg-gray-100 rounded-full h-3 mb-3">
                 <div class="h-3 rounded-full transition-all"
-                     :style="`width:${Math.min((projectDash.total_invoiced/projectDash.total_budget*100),100)}%`"
-                     :class="(projectDash.total_invoiced/projectDash.total_budget*100) > 100 ? 'bg-red-500' : (projectDash.total_invoiced/projectDash.total_budget*100) > 75 ? 'bg-amber-400' : 'bg-blue-500'">
+                     :style="`width:${Math.min((projectDash.total_invoiced/(((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget)||1)*100),100)}%`"
+                     :class="(projectDash.total_invoiced/(((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget)||1)*100) > 100 ? 'bg-red-500' : (projectDash.total_invoiced/(((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget)||1)*100) > 75 ? 'bg-amber-400' : 'bg-blue-500'">
                 </div>
               </div>
               <div class="grid grid-cols-5 gap-4 text-center">
                 <div>
-                  <div class="text-xs text-gray-400 mb-0.5">Revised Budget</div>
-                  <div class="text-base font-bold text-gray-800" x-text="'$'+(projectDash.total_revised_budget||projectDash.total_budget||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                  <div class="text-xs text-gray-400 mb-0.5">
+                    <span x-show="budgetView==='internal'">Revised Budget</span>
+                    <span x-show="budgetView==='lender'" class="text-blue-600">Lender Budget</span>
+                  </div>
+                  <div class="text-base font-bold"
+                       :class="budgetView==='lender' ? 'text-blue-700' : 'text-gray-800'"
+                       x-text="'$'+((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget||projectDash.total_budget||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                 </div>
                 <div>
                   <div class="text-xs text-gray-400 mb-0.5">Committed</div>
@@ -1316,9 +1341,13 @@
                   <div class="text-base font-bold text-green-600" x-text="'$'+(projectDash.total_paid||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                 </div>
                 <div>
-                  <div class="text-xs text-gray-400 mb-0.5">Remaining</div>
-                  <div class="text-base font-bold" :class="(projectDash.total_remaining||0)<0?'text-red-600':'text-green-600'"
-                       x-text="'$'+(projectDash.total_remaining||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                  <div class="text-xs text-gray-400 mb-0.5">
+                    <span x-show="budgetView==='internal'">Remaining</span>
+                    <span x-show="budgetView==='lender'" class="text-blue-600">Lender Remaining</span>
+                  </div>
+                  <div class="text-base font-bold"
+                       :class="((budgetView==='lender' ? projectDash.total_lender_remaining : projectDash.total_remaining)||0)<0?'text-red-600':'text-green-600'"
+                       x-text="'$'+((budgetView==='lender' ? projectDash.total_lender_remaining : projectDash.total_remaining)||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                 </div>
               </div>
             </div>
@@ -1330,7 +1359,10 @@
               <div class="grid gap-3 px-4 py-3 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide"
                    style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 120px">
                 <div>Category</div>
-                <div class="text-right">Budget <span class="normal-case font-normal text-gray-400">(revised)</span></div>
+                <div class="text-right">
+                  <span x-show="budgetView==='internal'">Budget <span class="normal-case font-normal text-gray-400">(revised)</span></span>
+                  <span x-show="budgetView==='lender'" class="text-blue-700">Lender Budget</span>
+                </div>
                 <div class="text-right">Committed</div>
                 <div class="text-right">Invoiced</div>
                 <div class="text-right">Paid</div>
@@ -1351,26 +1383,32 @@
                       <span class="text-sm font-medium text-gray-800" x-text="cat.name"></span>
                       <span x-show="cat.pct_burn > 100" class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">Over Budget</span>
                     </div>
-                    <div class="text-right text-sm" :class="cat.co_adjustment ? 'text-amber-600 font-medium' : 'text-gray-600'"
+                    <!-- Budget cell — switches between internal (revised) and lender -->
+                    <div x-show="budgetView==='internal'"
+                         class="text-right text-sm" :class="cat.co_adjustment ? 'text-amber-600 font-medium' : 'text-gray-600'"
                          :title="cat.co_adjustment ? 'Original: $' + (cat.budget||0).toLocaleString('en-CA') + ' + CO: $' + (cat.co_adjustment||0).toLocaleString('en-CA') : ''"
                          x-text="'$'+(cat.revised_budget||cat.budget||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                    <div x-show="budgetView==='lender'"
+                         class="text-right text-sm font-medium text-blue-700"
+                         :title="cat.lender_budget_raw ? 'Lender: $'+cat.lender_budget.toLocaleString('en-CA')+' (internal: $'+(cat.revised_budget||0).toLocaleString('en-CA')+')' : 'No separate lender budget — using internal'"
+                         x-text="'$'+(cat.lender_budget||cat.revised_budget||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                     <div class="text-right text-sm text-purple-600"
                          x-text="(cat.committed||0)>0 ? '$'+(cat.committed).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—'"></div>
                     <div class="text-right text-sm font-medium text-blue-600" x-text="'$'+(cat.invoiced||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                     <div class="text-right text-sm text-green-600" x-text="'$'+(cat.paid||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                     <div class="text-right text-sm font-medium"
-                         :class="cat.remaining < 0 ? 'text-red-600' : 'text-gray-700'"
-                         x-text="'$'+(cat.remaining||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                         :class="(budgetView==='lender'?(cat.lender_remaining||0):(cat.remaining||0)) < 0 ? 'text-red-600' : 'text-gray-700'"
+                         x-text="'$'+(budgetView==='lender'?(cat.lender_remaining||cat.remaining||0):(cat.remaining||0)).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                     <div class="flex items-center gap-2">
                       <div class="flex-1 bg-gray-100 rounded-full h-1.5">
                         <div class="h-1.5 rounded-full transition-all"
-                             :style="`width:${Math.min(cat.pct_burn||0,100)}%`"
-                             :class="cat.pct_burn > 100 ? 'bg-red-500' : cat.pct_burn > 75 ? 'bg-amber-400' : 'bg-blue-500'">
+                             :style="`width:${Math.min((budgetView==='lender'?cat.lender_pct_burn:cat.pct_burn)||0,100)}%`"
+                             :class="(budgetView==='lender'?cat.lender_pct_burn:cat.pct_burn) > 100 ? 'bg-red-500' : (budgetView==='lender'?cat.lender_pct_burn:cat.pct_burn) > 75 ? 'bg-amber-400' : 'bg-blue-500'">
                         </div>
                       </div>
                       <span class="text-xs font-semibold w-10 text-right"
-                            :class="cat.pct_burn > 100 ? 'text-red-600' : cat.pct_burn > 75 ? 'text-amber-600' : 'text-gray-500'"
-                            x-text="(cat.pct_burn||0).toFixed(0)+'%'"></span>
+                            :class="(budgetView==='lender'?cat.lender_pct_burn:cat.pct_burn) > 100 ? 'text-red-600' : (budgetView==='lender'?cat.lender_pct_burn:cat.pct_burn) > 75 ? 'text-amber-600' : 'text-gray-500'"
+                            x-text="((budgetView==='lender'?cat.lender_pct_burn:cat.pct_burn)||0).toFixed(0)+'%'"></span>
                     </div>
                   </div>
 
@@ -1411,14 +1449,16 @@
               <div class="grid gap-3 px-4 py-3 bg-gray-100 items-center font-semibold"
                    style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 120px">
                 <div class="text-sm text-gray-700">Total</div>
-                <div class="text-right text-sm text-gray-700" x-text="'$'+(projectDash.total_revised_budget||projectDash.total_budget||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                <div class="text-right text-sm font-semibold"
+                     :class="budgetView==='lender' ? 'text-blue-700' : 'text-gray-700'"
+                     x-text="'$'+((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget||projectDash.total_budget||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                 <div class="text-right text-sm text-purple-700" x-text="(projectDash.total_committed||0)>0?'$'+(projectDash.total_committed||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0}):'—'"></div>
                 <div class="text-right text-sm text-blue-700" x-text="'$'+(projectDash.total_invoiced||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                 <div class="text-right text-sm text-green-700" x-text="'$'+(projectDash.total_paid||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
-                <div class="text-right text-sm" :class="(projectDash.total_remaining||0)<0?'text-red-700':'text-green-700'"
-                     x-text="'$'+(projectDash.total_remaining||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+                <div class="text-right text-sm" :class="((budgetView==='lender'?projectDash.total_lender_remaining:projectDash.total_remaining)||0)<0?'text-red-700':'text-green-700'"
+                     x-text="'$'+((budgetView==='lender'?projectDash.total_lender_remaining:projectDash.total_remaining)||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
                 <div class="text-center text-xs text-gray-500"
-                     x-text="(projectDash.total_revised_budget||0)>0?(projectDash.total_invoiced/(projectDash.total_revised_budget)*100).toFixed(1)+'%':'—'"></div>
+                     x-text="((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget||0)>0?(projectDash.total_invoiced/((budgetView==='lender'&&projectDash.total_lender_budget)||projectDash.total_revised_budget)*100).toFixed(1)+'%':'—'"></div>
               </div>
             </div>
 
@@ -2214,7 +2254,8 @@
                 <thead class="bg-gray-50 border-b">
                   <tr>
                     <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500">Category</th>
-                    <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">Budget</th>
+                    <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">Internal Budget</th>
+                    <th class="text-right px-4 py-3 text-xs font-semibold text-blue-600">Lender Budget <span class="font-normal text-gray-400 normal-case">(click to set)</span></th>
                     <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">Invoiced</th>
                     <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">Paid</th>
                     <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">Remaining</th>
@@ -2229,6 +2270,13 @@
                         <span x-show="cat.is_per_subdivision" class="ml-1 text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">per sub-div</span>
                       </td>
                       <td class="px-4 py-3 text-right text-gray-700" x-text="'$' + cat.budget.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
+                      <!-- Lender budget — click to set/edit -->
+                      <td class="px-4 py-3 text-right cursor-pointer group"
+                          @click="const v=prompt('Lender budget for '+cat.name+' (blank = same as internal):',cat.lender_budget_raw||''); if(v!==null)updateCategoryLenderBudget(cat.id,v)">
+                        <span x-show="cat.lender_budget_raw" class="text-blue-700 font-medium group-hover:underline"
+                              x-text="'$' + cat.lender_budget.toLocaleString('en-CA', {minimumFractionDigits:2})"></span>
+                        <span x-show="!cat.lender_budget_raw" class="text-gray-300 text-xs group-hover:text-blue-400 transition">Set…</span>
+                      </td>
                       <td class="px-4 py-3 text-right text-blue-600" x-text="'$' + cat.invoiced.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
                       <td class="px-4 py-3 text-right text-green-600" x-text="'$' + cat.paid.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
                       <td class="px-4 py-3 text-right font-semibold" :class="cat.remaining < 0 ? 'text-red-600' : 'text-green-600'" x-text="'$' + cat.remaining.toLocaleString('en-CA', {minimumFractionDigits:2})"></td>
@@ -3816,9 +3864,13 @@
             <label class="block text-xs font-medium text-gray-700 mb-1">End Date</label>
             <input x-model="newProjectForm.end_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
-          <div class="col-span-2">
-            <label class="block text-xs font-medium text-gray-700 mb-1">Total Budget</label>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Internal Budget</label>
             <input x-model.number="newProjectForm.total_budget" type="number" min="0" step="1000" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Lender Budget <span class="font-normal text-gray-400">(optional)</span></label>
+            <input x-model.number="newProjectForm.lender_budget" type="number" min="0" step="1000" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Leave blank if same" />
           </div>
         </div>
         <div x-show="newProjectError" class="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="newProjectError"></div>

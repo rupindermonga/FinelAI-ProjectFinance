@@ -201,6 +201,7 @@ class ProjectCreate(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     total_budget: float = 0.0
+    lender_budget: Optional[float] = None
     currency: str = "CAD"
 
 class ProjectUpdate(BaseModel):
@@ -211,6 +212,7 @@ class ProjectUpdate(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     total_budget: Optional[float] = None
+    lender_budget: Optional[float] = None
     currency: Optional[str] = None
 
 class ProjectOut(BaseModel):
@@ -222,6 +224,7 @@ class ProjectOut(BaseModel):
     start_date: Optional[str]
     end_date: Optional[str]
     total_budget: float
+    lender_budget: Optional[float] = None
     currency: str
     created_at: datetime
     class Config:
@@ -251,6 +254,7 @@ class CostCategoryOut(BaseModel):
     project_id: int
     name: str
     budget: float
+    lender_budget: Optional[float] = None
     is_per_subdivision: bool
     display_order: int
     sub_categories: List[CostSubCategoryOut] = []
@@ -260,11 +264,13 @@ class CostCategoryOut(BaseModel):
 class CostCategoryCreate(BaseModel):
     name: str
     budget: float = 0.0
+    lender_budget: Optional[float] = None
     is_per_subdivision: bool = False
 
 class CostCategoryUpdate(BaseModel):
     name: Optional[str] = None
     budget: Optional[float] = None
+    lender_budget: Optional[float] = None
 
 class CostSubCategoryCreate(BaseModel):
     name: str

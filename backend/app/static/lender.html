@@ -254,12 +254,14 @@
         const tbody = document.getElementById('cat-tbody');
         tbody.innerHTML = '';
         d.categories.forEach(cat => {
-          const pct = cat.budget > 0 ? ((cat.invoiced / cat.budget) * 100).toFixed(1) + '%' : '—';
+          // Use lender_budget if available, else fall back to internal
+          const effBudget = cat.lender_budget || cat.budget;
+          const pct = effBudget > 0 ? ((cat.invoiced / effBudget) * 100).toFixed(1) + '%' : '—';
           const tr = document.createElement('tr');
           tr.className = 'border-b last:border-0';
           tr.innerHTML = `
             <td class="py-3 font-medium text-gray-800">${cat.name}</td>
-            <td class="py-3 text-right text-gray-600">${fmtN(cat.budget)}</td>
+            <td class="py-3 text-right text-gray-600">${fmtN(effBudget)}</td>
             <td class="py-3 text-right text-blue-600">${fmtN(cat.invoiced)}</td>
             <td class="py-3 text-right text-green-600 font-medium">${fmtN(cat.lender_approved)}</td>
             <td class="py-3 text-right text-xs text-gray-400">${pct}</td>

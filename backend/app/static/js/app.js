@@ -18,7 +18,7 @@ function app() {
     projects: [],
     currentProject: null,
     showNewProjectModal: false,
-    newProjectForm: { name: '', code: '', client: '', address: '', start_date: '', end_date: '', total_budget: 0, currency: 'CAD' },
+    newProjectForm: { name: '', code: '', client: '', address: '', start_date: '', end_date: '', total_budget: 0, lender_budget: null, currency: 'CAD' },
     newProjectError: '',
     newProjectLoading: false,
 
@@ -127,6 +127,9 @@ function app() {
     // ── Cash Flow ─────────────────────────────────────────────────
     cashFlow: null,
     cashFlowLoading: false,
+
+    // ── Budget view toggle ────────────────────────────────────────
+    budgetView: 'internal',   // 'internal' | 'lender'
 
     // ── Portfolio / Aged Payables ─────────────────────────────────
     portfolio: null,
@@ -440,7 +443,7 @@ function app() {
         this.currentProject = proj;
         localStorage.setItem('currentProjectId', proj.id);
         this.showNewProjectModal = false;
-        this.newProjectForm = { name: '', code: '', client: '', address: '', start_date: '', end_date: '', total_budget: 0, currency: 'CAD' };
+        this.newProjectForm = { name: '', code: '', client: '', address: '', start_date: '', end_date: '', total_budget: 0, lender_budget: null, currency: 'CAD' };
         await this.loadProjectDashboard();
       } catch (e) {
         this.newProjectError = e.message || 'Failed to create project';
@@ -1217,6 +1220,11 @@ function app() {
 
     async updateCategoryBudget(catId, budget) {
       try { await this.put(`/api/project/categories/${catId}`, { budget: parseFloat(budget) }); await this.loadProjectDashboard(); } catch (e) { alert(e.message); }
+    },
+
+    async updateCategoryLenderBudget(catId, lenderBudget) {
+      const val = lenderBudget === '' || lenderBudget == null ? null : parseFloat(lenderBudget);
+      try { await this.put(`/api/project/categories/${catId}`, { lender_budget: val }); await this.loadProjectDashboard(); } catch (e) { alert(e.message); }
     },
 
     // Allocation modal

@@ -80,7 +80,7 @@ def create_project(body: ProjectCreate, db: Session = Depends(get_db), current_u
 
 @router.put("", response_model=ProjectOut)
 def update_project(body: ProjectUpdate, proj: Project = Depends(_req_proj), db: Session = Depends(get_db)):
-    _ALLOWED = {"name", "code", "client", "address", "start_date", "end_date", "total_budget", "currency"}
+    _ALLOWED = {"name", "code", "client", "address", "start_date", "end_date", "total_budget", "lender_budget", "currency"}
     for field, value in body.model_dump(exclude_unset=True).items():
         if field in _ALLOWED:
             setattr(proj, field, value)
@@ -155,7 +155,7 @@ def update_cost_category(cat_id: int, body: CostCategoryUpdate, proj: Project = 
     updates = body.model_dump(exclude_unset=True)
     if "budget" in updates and updates["budget"] is not None and updates["budget"] < 0:
         raise HTTPException(status_code=400, detail="Budget must be non-negative")
-    _ALLOWED = {"name", "budget"}
+    _ALLOWED = {"name", "budget", "lender_budget"}
     for field, value in updates.items():
         if field in _ALLOWED:
             setattr(cat, field, value)
@@ -1226,7 +1226,9 @@ def lender_package(token: str, db: Session = Depends(get_db)):
                 lender_app += (inv.lender_approved_amt or 0) * (a.percentage / 100)
         if invoiced > 0:
             cat_rows.append({
-                "name": cat.name, "budget": cat.budget,
+                "name": cat.name,
+                "budget": cat.lender_budget or cat.budget,   # lender sees lender budget if set
+                "lender_budget": cat.lender_budget,
                 "invoiced": round(invoiced, 2), "lender_approved": round(lender_app, 2),
             })
 
@@ -1566,19 +1568,26 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
         co_adj = co_by_cat.get(cat.id, 0.0)
         committed = round(cc_by_cat.get(cat.id, 0.0), 2)
         revised_budget = cat.budget + co_adj
+        # Lender budget: explicit lender_budget field, or fall back to internal revised budget
+        lender_budget = (cat.lender_budget or cat.budget) + co_adj
         pct_burn = round((alloc_sum / revised_budget * 100) if revised_budget else 0, 1)
+        lender_pct_burn = round((alloc_sum / lender_budget * 100) if lender_budget else 0, 1)
         cat_data = {
             "id": cat.id,
             "name": cat.name,
             "budget": cat.budget,
+            "lender_budget_raw": cat.lender_budget,       # None means "same as internal"
             "co_adjustment": round(co_adj, 2),
             "revised_budget": round(revised_budget, 2),
-            "committed": committed,                           # POs / contracts not yet invoiced
-            "exposed": round(committed - alloc_sum, 2),      # committed beyond what's already invoiced
+            "lender_budget": round(lender_budget, 2),     # lender view: lender_budget_raw + CO
+            "committed": committed,
+            "exposed": round(committed - alloc_sum, 2),
             "invoiced": round(alloc_sum, 2),
             "paid": round(paid_sum, 2),
             "remaining": round(revised_budget - alloc_sum, 2),
+            "lender_remaining": round(lender_budget - alloc_sum, 2),
             "pct_burn": pct_burn,
+            "lender_pct_burn": lender_pct_burn,
             "is_per_subdivision": cat.is_per_subdivision,
             "sub_categories": sc_data,
         }
@@ -1615,6 +1624,9 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
     total_budget = sum(c["budget"] for c in cat_summary)
     total_co_adjustment = sum(c["co_adjustment"] for c in cat_summary) + co_project_level
     total_revised_budget = total_budget + total_co_adjustment
+    # Lender total budget: use project.lender_budget if set, else sum category lender budgets
+    total_lender_budget_cats = sum(c["lender_budget"] for c in cat_summary)
+    total_lender_budget = (proj.lender_budget + total_co_adjustment) if proj.lender_budget else total_lender_budget_cats
     total_committed = round(sum(cc.contract_amount for cc in active_ccs), 2)
     total_invoiced = sum(c["invoiced"] for c in cat_summary)
     total_paid = sum(c["paid"] for c in cat_summary)
@@ -1714,12 +1726,14 @@ def project_dashboard(proj: Optional[Project] = Depends(_get_proj), db: Session 
     return {
         "project": ProjectOut.model_validate(proj).model_dump(),
         "total_budget": total_budget,
+        "total_lender_budget": round(total_lender_budget, 2),
         "total_co_adjustment": round(total_co_adjustment, 2),
         "total_revised_budget": round(total_revised_budget, 2),
         "total_committed": total_committed,
         "total_invoiced": round(total_invoiced, 2),
         "total_paid": round(total_paid, 2),
         "total_remaining": round(total_revised_budget - total_invoiced, 2),
+        "total_lender_remaining": round(total_lender_budget - total_invoiced, 2),
         "categories": cat_summary,
         "change_orders": [
             {"id": co.id, "co_number": co.co_number, "description": co.description,
