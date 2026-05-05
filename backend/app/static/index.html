@@ -569,6 +569,9 @@
                 class="ml-auto text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold"
                 x-text="projectDash.approval.pending"></span>
         </button>
+        <button @click="view='cashflow'; loadCashFlow()" :class="view==='cashflow' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-arrow-trend-up w-4"></i> Cash Flow
+        </button>
         <button @click="view='finance'; loadProjectDashboard()" :class="view==='finance' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-chart-pie w-4"></i> Project Finance
         </button>
@@ -1506,6 +1509,125 @@
                 </table>
               </div>
             </div>
+          </div>
+        </template>
+      </div>
+
+
+      <!-- ── CASH FLOW ─────────────────────────────────────────── -->
+      <div x-show="view==='cashflow'" class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-arrow-trend-up mr-2 text-blue-600"></i>Cash Flow</h2>
+            <p class="text-sm text-gray-500">Month-by-month spend vs draw receipts. Projected spend from active contracts with completion dates.</p>
+          </div>
+          <button @click="loadCashFlow()" class="text-sm text-gray-500 hover:text-gray-800 flex items-center gap-1.5">
+            <i class="fa-solid fa-rotate" :class="cashFlowLoading?'animate-spin':''"></i> Refresh
+          </button>
+        </div>
+
+        <div x-show="cashFlowLoading" class="text-center text-gray-400 py-16 text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading…</div>
+
+        <template x-if="cashFlow && !cashFlowLoading">
+          <div>
+            <!-- Summary totals -->
+            <div class="grid grid-cols-4 gap-4 mb-6">
+              <div class="bg-white rounded-xl border p-4 text-center">
+                <div class="text-xs text-gray-400 mb-1">Total Invoiced</div>
+                <div class="text-lg font-bold text-blue-600" x-text="'$'+(cashFlow.totals?.invoiced||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+              </div>
+              <div class="bg-white rounded-xl border p-4 text-center">
+                <div class="text-xs text-gray-400 mb-1">Total Paid</div>
+                <div class="text-lg font-bold text-green-600" x-text="'$'+(cashFlow.totals?.paid||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+              </div>
+              <div class="bg-white rounded-xl border p-4 text-center">
+                <div class="text-xs text-gray-400 mb-1">Draw Receipts</div>
+                <div class="text-lg font-bold text-emerald-600" x-text="'$'+(cashFlow.totals?.draw_receipts||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+              </div>
+              <div class="bg-white rounded-xl border p-4 text-center">
+                <div class="text-xs text-gray-400 mb-1">Projected Future Spend</div>
+                <div class="text-lg font-bold text-purple-600" x-text="'$'+(cashFlow.totals?.projected_spend||0).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></div>
+              </div>
+            </div>
+
+            <!-- Monthly table with inline bars -->
+            <div class="bg-white rounded-xl border overflow-hidden">
+              <div class="grid text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-3 bg-gray-50 border-b"
+                   style="grid-template-columns: 90px 1fr 1fr 1fr 1fr 80px">
+                <div>Month</div>
+                <div>Invoiced</div>
+                <div>Paid Out</div>
+                <div>Draw Receipts</div>
+                <div>Proj. Spend</div>
+                <div class="text-right">Net</div>
+              </div>
+              <template x-if="cashFlow.months.length === 0">
+                <div class="text-center text-gray-400 text-sm py-8">No transaction data yet. Upload invoices and set draw submission dates to see cash flow.</div>
+              </template>
+              <template x-for="row in cashFlow.months" :key="row.month">
+                <div class="grid items-center px-5 py-3 border-b last:border-0 hover:bg-gray-50 text-sm"
+                     style="grid-template-columns: 90px 1fr 1fr 1fr 1fr 80px"
+                     :class="row.net < 0 ? 'bg-red-50 hover:bg-red-50' : ''">
+                  <div class="font-semibold text-gray-700" x-text="row.month"></div>
+                  <!-- Invoiced bar -->
+                  <div class="pr-3">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 bg-gray-100 rounded-full h-2 min-w-[40px]">
+                        <div class="h-2 rounded-full bg-blue-400"
+                             :style="`width:${cashFlow.totals?.invoiced>0?Math.min(row.invoiced/cashFlow.totals.invoiced*100*4,100):0}%`"></div>
+                      </div>
+                      <span class="text-xs text-blue-600 font-medium w-20 text-right"
+                            x-show="row.invoiced>0" x-text="'$'+row.invoiced.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></span>
+                      <span class="text-xs text-gray-300" x-show="row.invoiced===0">—</span>
+                    </div>
+                  </div>
+                  <!-- Paid bar -->
+                  <div class="pr-3">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 bg-gray-100 rounded-full h-2 min-w-[40px]">
+                        <div class="h-2 rounded-full bg-green-400"
+                             :style="`width:${cashFlow.totals?.paid>0?Math.min(row.paid/cashFlow.totals.paid*100*4,100):0}%`"></div>
+                      </div>
+                      <span class="text-xs text-green-600 font-medium w-20 text-right"
+                            x-show="row.paid>0" x-text="'$'+row.paid.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></span>
+                      <span class="text-xs text-gray-300" x-show="row.paid===0">—</span>
+                    </div>
+                  </div>
+                  <!-- Receipts bar -->
+                  <div class="pr-3">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 bg-gray-100 rounded-full h-2 min-w-[40px]">
+                        <div class="h-2 rounded-full bg-emerald-400"
+                             :style="`width:${cashFlow.totals?.draw_receipts>0?Math.min(row.draw_receipts/cashFlow.totals.draw_receipts*100*4,100):0}%`"></div>
+                      </div>
+                      <span class="text-xs text-emerald-600 font-medium w-20 text-right"
+                            x-show="row.draw_receipts>0" x-text="'$'+row.draw_receipts.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></span>
+                      <span class="text-xs text-gray-300" x-show="row.draw_receipts===0">—</span>
+                    </div>
+                  </div>
+                  <!-- Projected bar -->
+                  <div class="pr-3">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 bg-gray-100 rounded-full h-2 min-w-[40px]">
+                        <div class="h-2 rounded-full bg-purple-300"
+                             :style="`width:${cashFlow.totals?.projected_spend>0?Math.min(row.projected_spend/cashFlow.totals.projected_spend*100*4,100):0}%`"></div>
+                      </div>
+                      <span class="text-xs text-purple-600 font-medium w-20 text-right"
+                            x-show="row.projected_spend>0" x-text="'$'+row.projected_spend.toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0})"></span>
+                      <span class="text-xs text-gray-300" x-show="row.projected_spend===0">—</span>
+                    </div>
+                  </div>
+                  <!-- Net -->
+                  <div class="text-right font-bold text-xs"
+                       :class="row.net > 0 ? 'text-emerald-600' : row.net < 0 ? 'text-red-600' : 'text-gray-400'"
+                       x-text="row.net!==0 ? (row.net>0?'+':'')+'$'+Math.abs(row.net).toLocaleString('en-CA',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—'"></div>
+                </div>
+              </template>
+            </div>
+            <p class="text-xs text-gray-400 mt-3">
+              Net = Draw Receipts − Invoiced (positive = funded ahead of spend).
+              Projected Spend comes from active contracts with an expected completion date.
+            </p>
           </div>
         </template>
       </div>

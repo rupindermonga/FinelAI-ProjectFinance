@@ -811,6 +811,94 @@ def delete_committed_cost(cc_id: int, db: Session = Depends(get_db), current_use
     return {"message": "Deleted"}
 
 
+# ─── Cash Flow Projection ────────────────────────────────────────────────────
+
+@router.get("/cash-flow")
+def cash_flow(
+    proj: Optional[Project] = Depends(_get_proj),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Month-by-month cash flow: actual spend (invoiced), actual paid, draw receipts, and projected future spend from committed costs."""
+    if not proj:
+        return {"months": []}
+
+    from collections import defaultdict
+    from datetime import datetime as dt
+
+    spend: dict = defaultdict(float)     # invoiced by invoice_date month
+    paid: dict = defaultdict(float)      # actual payments by payment_date month
+    receipts: dict = defaultdict(float)  # draw lender_approved by submission_date month
+    projected: dict = defaultdict(float) # committed costs by expected_completion month
+
+    # Actual spend — invoices by invoice_date
+    for inv in db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed").all():
+        date_str = inv.invoice_date or (str(inv.processed_at)[:10] if inv.processed_at else None)
+        if date_str and len(date_str) >= 7:
+            m = date_str[:7]  # YYYY-MM
+            spend[m] += inv.total_due or 0
+
+    # Actual payments by payment date
+    for payment in db.query(Payment).join(Invoice, Invoice.id == Payment.invoice_id).filter(Invoice.user_id == current_user.id).all():
+        if payment.payment_date and len(payment.payment_date) >= 7:
+            m = payment.payment_date[:7]
+            paid[m] += payment.amount or 0
+
+    # Draw receipts — lender-approved amounts by draw submission_date
+    for draw in db.query(Draw).filter(Draw.project_id == proj.id).all():
+        if draw.submission_date and len(draw.submission_date) >= 7:
+            m = draw.submission_date[:7]
+            # Sum lender_approved_amt for all invoices in this draw
+            draw_total = db.query(func.coalesce(func.sum(Invoice.lender_approved_amt), 0.0)).filter(
+                Invoice.draw_id == draw.id, Invoice.user_id == current_user.id
+            ).scalar() or 0
+            receipts[m] += draw_total
+
+    # Projected future spend from active committed costs by expected_completion
+    today_m = dt.utcnow().strftime("%Y-%m")
+    for cc in db.query(CommittedCost).filter(CommittedCost.project_id == proj.id, CommittedCost.status == "active").all():
+        if cc.expected_completion and len(cc.expected_completion) >= 7:
+            m = cc.expected_completion[:7]
+            if m >= today_m:  # only future months
+                remaining = cc.contract_amount - (cc.invoiced_to_date or 0)
+                if remaining > 0:
+                    projected[m] += remaining
+
+    # Merge all months, sort chronologically
+    all_months = sorted(set(list(spend.keys()) + list(paid.keys()) + list(receipts.keys()) + list(projected.keys())))
+    if not all_months:
+        return {"months": []}
+
+    cumulative = 0.0
+    result = []
+    for m in all_months:
+        s = round(spend.get(m, 0), 2)
+        p = round(paid.get(m, 0), 2)
+        r = round(receipts.get(m, 0), 2)
+        pr = round(projected.get(m, 0), 2)
+        net = round(r - s, 2)
+        cumulative = round(cumulative + net, 2)
+        result.append({
+            "month": m,
+            "invoiced": s,
+            "paid": p,
+            "draw_receipts": r,
+            "projected_spend": pr,
+            "net": net,
+            "cumulative": cumulative,
+        })
+
+    return {
+        "months": result,
+        "totals": {
+            "invoiced": round(sum(m["invoiced"] for m in result), 2),
+            "paid": round(sum(m["paid"] for m in result), 2),
+            "draw_receipts": round(sum(m["draw_receipts"] for m in result), 2),
+            "projected_spend": round(sum(m["projected_spend"] for m in result), 2),
+        },
+    }
+
+
 # ─── Dashboard ────────────────────────────────────────────────────────────────
 
 @router.get("/dashboard")

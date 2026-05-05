@@ -124,6 +124,10 @@ function app() {
     bulkUploading: false,
     bulkResults: null,
 
+    // ── Cash Flow ─────────────────────────────────────────────────
+    cashFlow: null,
+    cashFlowLoading: false,
+
     // ── Holdback & Approvals ──────────────────────────────────────
     holdbackFilter: 'outstanding',
     approvalFilter: 'pending',
@@ -266,6 +270,14 @@ function app() {
       } catch (e) {
         this.newProjectError = e.message || 'Failed to create project';
       } finally { this.newProjectLoading = false; }
+    },
+
+    async loadCashFlow() {
+      this.cashFlowLoading = true;
+      try {
+        this.cashFlow = await this.get(`/api/project/cash-flow${this._pid}`);
+      } catch (e) { console.error(e); }
+      finally { this.cashFlowLoading = false; }
     },
 
     async releaseHoldback(invoiceId, undo = false) {
