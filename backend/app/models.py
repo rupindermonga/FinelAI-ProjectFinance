@@ -442,6 +442,24 @@ class ChangeOrder(Base):
     category = relationship("CostCategory")
 
 
+class LenderToken(Base):
+    """Shareable read-only token for external lender view of a draw package."""
+    __tablename__ = "lender_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    draw_id = Column(Integer, ForeignKey("draws.id"), nullable=True)   # None = all draws
+    token = Column(String, unique=True, nullable=False, index=True)
+    label = Column(String, nullable=False)              # e.g. "Draw 1 — TD Bank"
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    is_active = Column(Boolean, default=True)
+    expires_at = Column(String, nullable=True)          # YYYY-MM-DD, None = never
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project")
+    draw = relationship("Draw")
+
+
 class GeminiApiKey(Base):
     """Admin-managed pool of Gemini API keys — tried in priority order with fallback."""
     __tablename__ = "gemini_api_keys"

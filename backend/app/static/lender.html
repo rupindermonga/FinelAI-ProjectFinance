@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finel AI · Lender Draw Package</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter','ui-sans-serif','system-ui','sans-serif'],
+            serif: ['"Playfair Display"','ui-serif','Georgia','serif'],
+          },
+          colors: {
+            blue: { 50:'#e5f7ff',100:'#ccefff',200:'#99dfff',300:'#66cfff',
+                    400:'#33bfff',500:'#00acff',600:'#00acff',700:'#008ecc',
+                    800:'#007199',900:'#005366',950:'#003d4d' },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { -webkit-font-smoothing: antialiased; }
+    @media print {
+      .no-print { display: none !important; }
+      body { font-size: 12px; }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans" id="app">
+
+  <!-- Loading state -->
+  <div id="loading" class="min-h-screen flex items-center justify-center">
+    <div class="text-center">
+      <img src="/static/favicon.svg" class="w-12 h-12 mx-auto mb-4 rounded-xl animate-pulse" />
+      <p class="text-gray-400 text-sm">Loading draw package…</p>
+    </div>
+  </div>
+
+  <!-- Error state -->
+  <div id="error" class="min-h-screen flex items-center justify-center hidden">
+    <div class="text-center max-w-sm mx-auto px-4">
+      <img src="/static/favicon.svg" class="w-12 h-12 mx-auto mb-4 rounded-xl opacity-40" />
+      <h2 class="text-lg font-semibold text-gray-700 mb-2">Link not available</h2>
+      <p id="error-msg" class="text-gray-400 text-sm">This link may have expired or been deactivated.</p>
+      <a href="https://finel.ai" class="mt-6 inline-block text-blue-500 text-sm hover:underline">finel.ai</a>
+    </div>
+  </div>
+
+  <!-- Package content -->
+  <div id="content" class="hidden">
+    <!-- Header nav -->
+    <nav class="bg-white border-b border-gray-100 sticky top-0 z-50 no-print">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+        <a href="https://finel.ai" class="flex items-center gap-2">
+          <img src="/static/favicon.svg" class="h-8 w-8 rounded-lg" />
+          <div>
+            <div class="font-bold text-slate-900 leading-none">Finel AI</div>
+            <div class="text-[10px] text-slate-400 uppercase tracking-widest">Project Finance</div>
+          </div>
+        </a>
+        <div class="flex items-center gap-3">
+          <span id="nav-label" class="text-sm text-gray-500"></span>
+          <button onclick="window.print()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            Print
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+
+      <!-- Project header -->
+      <div class="bg-white rounded-2xl border p-6 mb-6">
+        <div class="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <h1 id="proj-name" class="font-serif text-3xl text-slate-900 mb-1"></h1>
+            <div id="proj-code" class="text-sm text-gray-400"></div>
+          </div>
+          <div class="text-right text-sm text-gray-500">
+            <div id="proj-client" class="font-medium text-gray-700"></div>
+            <div id="proj-address"></div>
+            <div id="gen-date" class="mt-1 text-xs text-gray-400"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6" id="summary-cards"></div>
+
+      <!-- Per-draw sections -->
+      <div id="draws-section"></div>
+
+      <!-- Category breakdown -->
+      <div class="bg-white rounded-2xl border p-6 mb-6" id="categories-section" style="display:none">
+        <h2 class="font-serif text-xl text-slate-900 mb-4">Cost Breakdown by Category</h2>
+        <table class="w-full text-sm" id="cat-table">
+          <thead>
+            <tr class="border-b text-xs text-gray-400 uppercase tracking-wide">
+              <th class="text-left pb-3">Category</th>
+              <th class="text-right pb-3">Budget</th>
+              <th class="text-right pb-3">Invoiced</th>
+              <th class="text-right pb-3">Lender Approved</th>
+              <th class="text-right pb-3">% of Budget</th>
+            </tr>
+          </thead>
+          <tbody id="cat-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Footer -->
+      <div class="text-center text-xs text-gray-300 py-6">
+        Generated by <a href="https://finel.ai" class="text-blue-400 hover:underline">Finel AI Project Finance</a>.
+        This document is confidential and intended only for the named lender.
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const fmt = (n) => n != null ? '$' + Number(n).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+    const fmtN = (n) => n != null ? '$' + Number(n).toLocaleString('en-CA', {minimumFractionDigits:0, maximumFractionDigits:0}) : '—';
+
+    async function load() {
+      const token = window.location.pathname.split('/lender/')[1];
+      if (!token) { showError('No token in URL.'); return; }
+      try {
+        const res = await fetch('/api/lender/' + token);
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          showError(j.detail || 'Link not available.');
+          return;
+        }
+        const data = await res.json();
+        render(data);
+      } catch(e) {
+        showError('Failed to load: ' + e.message);
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('error').classList.remove('hidden');
+      document.getElementById('error-msg').textContent = msg;
+    }
+
+    function render(d) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+      document.title = 'Finel AI · ' + d.label;
+
+      // Nav label
+      document.getElementById('nav-label').textContent = d.label;
+
+      // Project header
+      document.getElementById('proj-name').textContent = d.project.name;
+      document.getElementById('proj-code').textContent = d.project.code || '';
+      document.getElementById('proj-client').textContent = d.project.client || '';
+      document.getElementById('proj-address').textContent = d.project.address || '';
+      document.getElementById('gen-date').textContent = 'Prepared: ' + d.generated_at;
+
+      // Summary cards
+      const s = d.summary;
+      const cards = [
+        { label: 'Invoices', val: s.invoice_count, fmt: (v) => v },
+        { label: 'Total Invoiced', val: s.total_invoiced, fmt: fmtN, color: 'text-blue-600' },
+        { label: 'Lender Submitted', val: s.total_lender_submitted, fmt: fmtN, color: 'text-amber-600' },
+        { label: 'Lender Approved', val: s.total_lender_approved, fmt: fmtN, color: 'text-green-600' },
+      ];
+      if (s.holdback_held > 0) {
+        cards.push({ label: 'Holdback Held', val: s.holdback_held, fmt: fmtN, color: 'text-orange-500' });
+      }
+      const sc = document.getElementById('summary-cards');
+      sc.innerHTML = '';
+      cards.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'bg-white rounded-xl border p-4 text-center';
+        div.innerHTML = `<div class="text-xs text-gray-400 mb-1">${c.label}</div>
+          <div class="text-xl font-bold ${c.color||'text-gray-800'}">${c.fmt(c.val)}</div>`;
+        sc.appendChild(div);
+      });
+
+      // Draws
+      const ds = document.getElementById('draws-section');
+      ds.innerHTML = '';
+      d.draws.forEach(draw => {
+        const statusColor = draw.status === 'approved' ? 'bg-green-100 text-green-700' :
+                            draw.status === 'submitted' ? 'bg-amber-100 text-amber-700' :
+                            draw.status === 'funded' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-600';
+        let invRows = '';
+        draw.invoices.forEach(inv => {
+          const lenderColor = inv.lender_status === 'approved' ? 'text-green-600' :
+                              inv.lender_status === 'rejected' ? 'text-red-600' : 'text-amber-600';
+          invRows += `<tr class="border-b last:border-0 hover:bg-gray-50">
+            <td class="px-4 py-2 text-gray-700">${inv.invoice_number || '—'}</td>
+            <td class="px-4 py-2 text-gray-600">${inv.vendor || '—'}</td>
+            <td class="px-4 py-2 text-gray-500 text-xs">${inv.date || '—'}</td>
+            <td class="px-4 py-2 text-right">${fmt(inv.total)}</td>
+            <td class="px-4 py-2 text-right text-amber-600">${fmt(inv.lender_submitted)}</td>
+            <td class="px-4 py-2 text-right font-medium ${lenderColor}">${fmt(inv.lender_approved)}</td>
+            <td class="px-4 py-2 text-center">
+              <span class="inline-block px-1.5 py-0.5 rounded text-xs ${lenderColor}">
+                ${(inv.lender_status||'pending').charAt(0).toUpperCase()+(inv.lender_status||'pending').slice(1)}
+              </span>
+            </td>
+          </tr>`;
+        });
+
+        const section = document.createElement('div');
+        section.className = 'bg-white rounded-2xl border mb-6 overflow-hidden';
+        section.innerHTML = `
+          <div class="px-6 py-4 border-b flex flex-wrap items-start gap-4 justify-between">
+            <div>
+              <h2 class="font-serif text-xl text-slate-900">Draw ${draw.draw_number}</h2>
+              <div class="text-sm text-gray-400 mt-0.5">${draw.submission_date ? 'Submitted: ' + draw.submission_date : ''}</div>
+            </div>
+            <div class="flex flex-wrap gap-4 text-sm text-right">
+              <div><div class="text-xs text-gray-400">Invoiced</div><div class="font-bold text-blue-600">${fmtN(draw.total_invoiced)}</div></div>
+              <div><div class="text-xs text-gray-400">Submitted</div><div class="font-bold text-amber-600">${fmtN(draw.total_lender_submitted)}</div></div>
+              <div><div class="text-xs text-gray-400">Approved</div><div class="font-bold text-green-600">${fmtN(draw.total_lender_approved)}</div></div>
+              <div><span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}">${draw.status.charAt(0).toUpperCase()+draw.status.slice(1)}</span></div>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="bg-gray-50 border-b text-xs text-gray-400 uppercase tracking-wide">
+                <th class="text-left px-4 py-3">Invoice #</th>
+                <th class="text-left px-4 py-3">Vendor</th>
+                <th class="text-left px-4 py-3">Date</th>
+                <th class="text-right px-4 py-3">Total</th>
+                <th class="text-right px-4 py-3">Submitted</th>
+                <th class="text-right px-4 py-3">Approved</th>
+                <th class="text-center px-4 py-3">Status</th>
+              </tr></thead>
+              <tbody>${invRows}</tbody>
+            </table>
+          </div>
+          ${draw.notes ? `<div class="px-6 py-3 text-xs text-gray-400 border-t bg-gray-50">Notes: ${draw.notes}</div>` : ''}
+        `;
+        ds.appendChild(section);
+      });
+
+      // Categories
+      if (d.categories && d.categories.length > 0) {
+        document.getElementById('categories-section').style.display = '';
+        const tbody = document.getElementById('cat-tbody');
+        tbody.innerHTML = '';
+        d.categories.forEach(cat => {
+          const pct = cat.budget > 0 ? ((cat.invoiced / cat.budget) * 100).toFixed(1) + '%' : '—';
+          const tr = document.createElement('tr');
+          tr.className = 'border-b last:border-0';
+          tr.innerHTML = `
+            <td class="py-3 font-medium text-gray-800">${cat.name}</td>
+            <td class="py-3 text-right text-gray-600">${fmtN(cat.budget)}</td>
+            <td class="py-3 text-right text-blue-600">${fmtN(cat.invoiced)}</td>
+            <td class="py-3 text-right text-green-600 font-medium">${fmtN(cat.lender_approved)}</td>
+            <td class="py-3 text-right text-xs text-gray-400">${pct}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

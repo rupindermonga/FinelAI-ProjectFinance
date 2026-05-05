@@ -62,6 +62,17 @@ def _run_migrations():
             "ALTER TABLE invoices ADD COLUMN approval_status TEXT DEFAULT 'pending'",
             "ALTER TABLE invoices ADD COLUMN approved_by TEXT",
             "ALTER TABLE invoices ADD COLUMN approved_at TEXT",
+            """CREATE TABLE IF NOT EXISTS lender_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                draw_id INTEGER REFERENCES draws(id),
+                token TEXT UNIQUE NOT NULL,
+                label TEXT NOT NULL,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                is_active INTEGER DEFAULT 1,
+                expires_at TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
             """CREATE TABLE IF NOT EXISTS subcontractors (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL REFERENCES projects(id),
@@ -202,6 +213,7 @@ app.include_router(categories.router)
 app.include_router(export.router)
 app.include_router(admin.router)
 app.include_router(project.router)
+app.include_router(project._lender_router)
 app.include_router(filetools.router)
 
 # Serve static frontend
@@ -209,11 +221,16 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
+@app.get("/lender/{token}", include_in_schema=False)
+async def lender_view(token: str):
+    """Serve the public lender HTML page (token is handled client-side)."""
+    return FileResponse(os.path.join(static_dir, "lender.html"))
+
+
 @app.get("/", include_in_schema=False)
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_spa(full_path: str = ""):
-    # API routes take priority (handled above); everything else serves the SPA
-    _blocked = {"api/", "static/", "docs", "redoc", "openapi.json"}
+    _blocked = {"api/", "static/", "docs", "redoc", "openapi.json", "lender/"}
     if any(full_path.startswith(b) or full_path == b for b in _blocked):
         from fastapi import HTTPException
         raise HTTPException(status_code=404)

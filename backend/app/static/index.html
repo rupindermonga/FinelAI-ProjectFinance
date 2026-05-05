@@ -575,6 +575,9 @@
         <button @click="view='subcontractors'; loadSubcontractors()" :class="view==='subcontractors' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-hard-hat w-4"></i> Subcontractors
         </button>
+        <button @click="view='lenderlinks'; loadLenderTokens()" :class="view==='lenderlinks' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <i class="fa-solid fa-share-nodes w-4"></i> Lender Links
+        </button>
         <button @click="view='finance'; loadProjectDashboard()" :class="view==='finance' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-chart-pie w-4"></i> Project Finance
         </button>
@@ -1514,6 +1517,63 @@
             </div>
           </div>
         </template>
+      </div>
+
+
+      <!-- ── LENDER LINKS ─────────────────────────────────────── -->
+      <div x-show="view==='lenderlinks'" class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-share-nodes mr-2 text-blue-600"></i>Lender Links</h2>
+            <p class="text-sm text-gray-500">Generate shareable read-only draw packages for your lenders — no login required. Each link is token-secured and can be revoked.</p>
+          </div>
+          <button @click="lenderTokenForm={label:'',draw_id:'',expires_at:''}; lenderTokenError=''; showLenderTokenModal=true"
+                  class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">
+            <i class="fa-solid fa-link"></i> New Link
+          </button>
+        </div>
+
+        <div x-show="lenderTokens.length === 0" class="text-center text-gray-400 text-sm py-16">
+          <i class="fa-solid fa-link text-3xl mb-3 text-gray-200"></i><br>
+          No lender links yet. Click "New Link" to generate a shareable draw package URL.
+        </div>
+
+        <div x-show="lenderTokens.length > 0" class="space-y-3">
+          <template x-for="t in lenderTokens" :key="t.id">
+            <div class="bg-white rounded-xl border p-4 flex items-center justify-between gap-4"
+                 :class="!t.is_active ? 'opacity-60' : ''">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-medium text-gray-800" x-text="t.label"></span>
+                  <span class="inline-block px-1.5 py-0.5 rounded-full text-xs font-medium"
+                        :class="t.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+                        x-text="t.is_active ? 'Active' : 'Deactivated'"></span>
+                </div>
+                <div class="text-xs text-gray-400 font-mono truncate max-w-md"
+                     x-text="window.location.origin + '/lender/' + t.token"></div>
+                <div class="text-xs text-gray-400 mt-0.5" x-show="t.expires_at">Expires: <span x-text="t.expires_at"></span></div>
+                <div class="text-xs text-gray-400" x-show="!t.expires_at">No expiry</div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <button x-show="t.is_active" @click="copyLenderLink(t.token)"
+                        class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition font-medium">
+                  <i class="fa-solid fa-copy"></i> Copy
+                </button>
+                <a x-show="t.is_active" :href="'/lender/' + t.token" target="_blank"
+                   class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> Preview
+                </a>
+                <button @click="toggleLenderToken(t.id)"
+                        class="px-3 py-1.5 text-xs rounded-lg transition"
+                        :class="t.is_active ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-green-50 text-green-700 hover:bg-green-100'"
+                        x-text="t.is_active ? 'Deactivate' : 'Reactivate'"></button>
+                <button @click="deleteLenderToken(t.id)" class="text-red-400 hover:text-red-600 text-xs px-2 py-1.5">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
 
 
@@ -2947,6 +3007,51 @@
     </main>
     </div><!-- /app-row (sidebar + main) -->
   </div><!-- /app-shell (FinelStrip + app-row) -->
+
+
+  <!-- ══════════════════════════════════════════════════════════════
+       LENDER TOKEN MODAL
+  ══════════════════════════════════════════════════════════════ -->
+  <div x-show="showLenderTokenModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showLenderTokenModal=false">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-lg font-bold text-gray-800">New Lender Link</h3>
+        <button @click="showLenderTokenModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Label * <span class="font-normal text-gray-400">(shown to lender in header)</span></label>
+          <input x-model="lenderTokenForm.label" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Draw 1 — TD Construction Finance" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Scope — which draws to include</label>
+          <select x-model="lenderTokenForm.draw_id" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">All draws in project</option>
+            <template x-for="d in draws" :key="d.id">
+              <option :value="d.id" x-text="'Draw ' + d.draw_number + (d.status?' — '+d.status:'')"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Expires <span class="font-normal text-gray-400">(leave blank = no expiry)</span></label>
+          <input x-model="lenderTokenForm.expires_at" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-700">
+          <i class="fa-solid fa-circle-info mr-1"></i>
+          The generated link gives <strong>read-only</strong> access to the draw package. No login required. You can deactivate or delete it at any time from Lender Links.
+          Internal data (markup %, government claims, payroll) is <strong>not</strong> included.
+        </div>
+        <div x-show="lenderTokenError" class="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2" x-text="lenderTokenError"></div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button @click="showLenderTokenModal=false" class="flex-1 border rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+        <button @click="createLenderToken()" :disabled="lenderTokenLoading" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition">
+          <span x-show="!lenderTokenLoading">Generate Link</span>
+          <span x-show="lenderTokenLoading"><i class="fa-solid fa-spinner fa-spin mr-1"></i></span>
+        </button>
+      </div>
+    </div>
+  </div>
 
 
   <!-- ══════════════════════════════════════════════════════════════

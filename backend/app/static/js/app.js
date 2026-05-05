@@ -128,6 +128,48 @@ function app() {
     cashFlow: null,
     cashFlowLoading: false,
 
+    // ── Lender Tokens ─────────────────────────────────────────────
+    lenderTokens: [],
+    showLenderTokenModal: false,
+    lenderTokenForm: { label: '', draw_id: '', expires_at: '' },
+    lenderTokenError: '',
+    lenderTokenLoading: false,
+
+    async loadLenderTokens() {
+      try { this.lenderTokens = await this.get(`/api/project/lender-tokens${this._pid}`); } catch(e) {}
+    },
+
+    async createLenderToken() {
+      if (!this.lenderTokenForm.label.trim()) { this.lenderTokenError = 'Label required'; return; }
+      this.lenderTokenLoading = true; this.lenderTokenError = '';
+      try {
+        const payload = { label: this.lenderTokenForm.label, draw_id: this.lenderTokenForm.draw_id ? parseInt(this.lenderTokenForm.draw_id) : null, expires_at: this.lenderTokenForm.expires_at || null };
+        const t = await this.post(`/api/project/lender-tokens${this._pid}`, payload);
+        this.lenderTokenForm = { label: '', draw_id: '', expires_at: '' };
+        this.showLenderTokenModal = false;
+        await this.loadLenderTokens();
+        const url = window.location.origin + '/lender/' + t.token;
+        prompt('Shareable lender link (copy this):', url);
+      } catch(e) { this.lenderTokenError = e.message || 'Failed'; }
+      finally { this.lenderTokenLoading = false; }
+    },
+
+    async toggleLenderToken(id) {
+      await this.put(`/api/project/lender-tokens/${id}/toggle`, {});
+      await this.loadLenderTokens();
+    },
+
+    async deleteLenderToken(id) {
+      if (!confirm('Revoke and delete this link?')) return;
+      await this.del(`/api/project/lender-tokens/${id}`);
+      await this.loadLenderTokens();
+    },
+
+    copyLenderLink(token) {
+      const url = window.location.origin + '/lender/' + token;
+      navigator.clipboard?.writeText(url).then(() => alert('Link copied to clipboard!')).catch(() => prompt('Copy this link:', url));
+    },
+
     // ── Subcontractors ────────────────────────────────────────────
     subcontractors: [],
     showSubModal: false,

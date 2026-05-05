@@ -14,7 +14,7 @@ from ..database import get_db
 from ..models import (
     User, Project, SubDivision, CostCategory, CostSubCategory,
     SubDivisionBudget, Invoice, InvoiceAllocation, Payment,
-    Draw, Claim, PayrollEntry, ChangeOrder, CommittedCost, Subcontractor,
+    Draw, Claim, PayrollEntry, ChangeOrder, CommittedCost, Subcontractor, LenderToken,
 )
 from ..schemas import (
     ProjectCreate, ProjectUpdate, ProjectOut,
@@ -874,6 +874,158 @@ def delete_committed_cost(cc_id: int, db: Session = Depends(get_db), current_use
     db.delete(cc)
     db.commit()
     return {"message": "Deleted"}
+
+
+# ─── Lender Tokens ───────────────────────────────────────────────────────────
+
+@router.get("/lender-tokens")
+def list_lender_tokens(proj: Optional[Project] = Depends(_get_proj), db: Session = Depends(get_db)):
+    if not proj:
+        return []
+    tokens = db.query(LenderToken).filter(LenderToken.project_id == proj.id).order_by(LenderToken.created_at.desc()).all()
+    return [
+        {"id": t.id, "label": t.label, "token": t.token, "draw_id": t.draw_id,
+         "is_active": t.is_active, "expires_at": t.expires_at, "created_at": str(t.created_at)}
+        for t in tokens
+    ]
+
+
+@router.post("/lender-tokens")
+def create_lender_token(body: dict, proj: Project = Depends(_req_proj), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    import secrets as _sec
+    if not body.get("label"):
+        raise HTTPException(status_code=400, detail="label is required")
+    draw_id = body.get("draw_id")
+    if draw_id:
+        draw = db.query(Draw).filter(Draw.id == draw_id, Draw.project_id == proj.id).first()
+        if not draw:
+            raise HTTPException(status_code=404, detail="Draw not found in this project")
+    token_str = _sec.token_urlsafe(24)  # 32 chars URL-safe
+    t = LenderToken(
+        project_id=proj.id, draw_id=draw_id,
+        token=token_str, label=body["label"],
+        created_by=current_user.id,
+        is_active=True, expires_at=body.get("expires_at"),
+    )
+    db.add(t); db.commit(); db.refresh(t)
+    return {"id": t.id, "label": t.label, "token": t.token, "draw_id": t.draw_id}
+
+
+@router.put("/lender-tokens/{token_id}/toggle")
+def toggle_lender_token(token_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    t = (db.query(LenderToken).join(Project, Project.id == LenderToken.project_id)
+         .filter(LenderToken.id == token_id, Project.user_id == current_user.id).first())
+    if not t:
+        raise HTTPException(status_code=404)
+    t.is_active = not t.is_active
+    db.commit()
+    return {"id": t.id, "is_active": t.is_active}
+
+
+@router.delete("/lender-tokens/{token_id}")
+def delete_lender_token(token_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    t = (db.query(LenderToken).join(Project, Project.id == LenderToken.project_id)
+         .filter(LenderToken.id == token_id, Project.user_id == current_user.id).first())
+    if not t:
+        raise HTTPException(status_code=404)
+    db.delete(t); db.commit()
+    return {"message": "Deleted"}
+
+
+# ─── Public Lender Package (no auth — token-gated) ───────────────────────────
+
+_lender_router = APIRouter(prefix="/api/lender", tags=["lender"])
+
+
+@_lender_router.get("/{token}")
+def lender_package(token: str, db: Session = Depends(get_db)):
+    """Public endpoint — returns a curated draw package for external lenders.
+    No authentication required; access is controlled by the token secret.
+    Sensitive internal data (markup %, govt claims, payroll) is excluded."""
+    from datetime import datetime as _dt
+    t = db.query(LenderToken).filter(LenderToken.token == token, LenderToken.is_active == True).first()
+    if not t:
+        raise HTTPException(status_code=404, detail="Link not found or has been deactivated.")
+    # Check expiry
+    if t.expires_at and t.expires_at < _dt.utcnow().strftime("%Y-%m-%d"):
+        raise HTTPException(status_code=403, detail="This link has expired.")
+
+    proj = db.query(Project).filter(Project.id == t.project_id).first()
+    if not proj:
+        raise HTTPException(status_code=404)
+
+    # Determine which draws to include
+    if t.draw_id:
+        draws = db.query(Draw).filter(Draw.id == t.draw_id, Draw.project_id == proj.id).all()
+    else:
+        draws = db.query(Draw).filter(Draw.project_id == proj.id).order_by(Draw.draw_number).all()
+
+    draws_out = []
+    all_invoice_ids = set()
+    for draw in draws:
+        invs = db.query(Invoice).filter(Invoice.draw_id == draw.id, Invoice.status == "processed").all()
+        all_invoice_ids.update(i.id for i in invs)
+        draw_invoiced = sum(i.total_due or 0 for i in invs)
+        draw_lender_sub = sum(i.lender_submitted_amt or 0 for i in invs)
+        draw_lender_app = sum(i.lender_approved_amt or 0 for i in invs)
+        inv_rows = []
+        for i in invs:
+            holdback = round((i.subtotal or i.total_due or 0) * (i.holdback_pct or 0) / 100, 2)
+            inv_rows.append({
+                "invoice_number": i.invoice_number, "vendor": i.vendor_name,
+                "date": i.invoice_date, "subtotal": i.subtotal, "tax": i.tax_total,
+                "total": i.total_due, "holdback_pct": i.holdback_pct, "holdback_amt": holdback,
+                "lender_submitted": i.lender_submitted_amt, "lender_approved": i.lender_approved_amt,
+                "lender_status": i.lender_status, "payment_status": i.payment_status,
+                "approval_status": i.approval_status,
+            })
+        draws_out.append({
+            "draw_number": draw.draw_number, "status": draw.status,
+            "submission_date": draw.submission_date, "notes": draw.notes,
+            "total_invoiced": round(draw_invoiced, 2),
+            "total_lender_submitted": round(draw_lender_sub, 2),
+            "total_lender_approved": round(draw_lender_app, 2),
+            "invoice_count": len(invs),
+            "invoices": inv_rows,
+        })
+
+    # Category breakdown (curated — no internal rates)
+    categories = db.query(CostCategory).filter(CostCategory.project_id == proj.id).order_by(CostCategory.display_order).all()
+    cat_rows = []
+    for cat in categories:
+        invoiced = db.query(func.coalesce(func.sum(InvoiceAllocation.amount), 0.0)).filter(
+            InvoiceAllocation.category_id == cat.id
+        ).scalar() or 0
+        lender_app = 0.0
+        for a in db.query(InvoiceAllocation).filter(InvoiceAllocation.category_id == cat.id).all():
+            inv = db.query(Invoice).filter(Invoice.id == a.invoice_id).first()
+            if inv:
+                lender_app += (inv.lender_approved_amt or 0) * (a.percentage / 100)
+        if invoiced > 0:
+            cat_rows.append({
+                "name": cat.name, "budget": cat.budget,
+                "invoiced": round(invoiced, 2), "lender_approved": round(lender_app, 2),
+            })
+
+    # Totals
+    all_invs = db.query(Invoice).filter(Invoice.draw_id.in_(d.id for d in draws), Invoice.status == "processed").all() if draws else []
+    holdback_held = sum(round((i.subtotal or i.total_due or 0) * (i.holdback_pct or 0) / 100, 2)
+                        for i in all_invs if not i.holdback_released)
+
+    return {
+        "project": {"name": proj.name, "code": proj.code, "client": proj.client, "address": proj.address},
+        "label": t.label, "generated_at": _dt.utcnow().strftime("%Y-%m-%d"),
+        "draws": draws_out,
+        "categories": cat_rows,
+        "summary": {
+            "total_invoiced": round(sum(d["total_invoiced"] for d in draws_out), 2),
+            "total_lender_submitted": round(sum(d["total_lender_submitted"] for d in draws_out), 2),
+            "total_lender_approved": round(sum(d["total_lender_approved"] for d in draws_out), 2),
+            "holdback_held": round(holdback_held, 2),
+            "draw_count": len(draws_out),
+            "invoice_count": sum(d["invoice_count"] for d in draws_out),
+        },
+    }
 
 
 # ─── Cash Flow Projection ────────────────────────────────────────────────────
