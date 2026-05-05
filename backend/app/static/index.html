@@ -3399,6 +3399,27 @@
               <button @click="aiActiveTab='mapper'" :class="aiActiveTab==='mapper'?'bg-white shadow text-purple-700 font-semibold':'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap">
                 <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Cost Code Mapper
               </button>
+              <button @click="aiActiveTab='draw-scores'" :class="aiActiveTab==='draw-scores'?'bg-white shadow text-purple-700 font-semibold':'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap">
+                <i class="fa-solid fa-gauge-high mr-1"></i>Approval Scores
+              </button>
+              <button @click="aiActiveTab='closeout'" :class="aiActiveTab==='closeout'?'bg-white shadow text-purple-700 font-semibold':'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap">
+                <i class="fa-solid fa-flag-checkered mr-1"></i>Closeout
+                <span x-show="aiInsights?.closeout?.blocking_count>0" class="ml-1 bg-red-500 text-white rounded-full px-1.5 text-xs" x-text="aiInsights.closeout.blocking_count"></span>
+              </button>
+              <button @click="aiActiveTab='govt'" :class="aiActiveTab==='govt'?'bg-white shadow text-purple-700 font-semibold':'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap">
+                <i class="fa-solid fa-landmark mr-1"></i>Govt Claims
+                <span x-show="(aiInsights?.govt_optimizer?.totals?.recovery_gap||0)>0" class="ml-1 bg-amber-500 text-white rounded-full px-1.5 text-xs">!</span>
+              </button>
+              <button @click="aiActiveTab='co-radar'" :class="aiActiveTab==='co-radar'?'bg-white shadow text-purple-700 font-semibold':'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap">
+                <i class="fa-solid fa-radar mr-1"></i>CO Radar
+                <span x-show="(aiInsights?.co_radar?.signal_count||0)>0" class="ml-1 bg-orange-500 text-white rounded-full px-1.5 text-xs" x-text="aiInsights.co_radar.signal_count"></span>
+              </button>
+              <button @click="aiActiveTab='vendor-risk'" :class="aiActiveTab==='vendor-risk'?'bg-white shadow text-purple-700 font-semibold':'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap">
+                <i class="fa-solid fa-shop mr-1"></i>Vendor Risk
+              </button>
+              <button @click="aiActiveTab='consultant'; loadCostConsultant()" :class="aiActiveTab==='consultant'?'bg-white shadow text-purple-700 font-semibold':'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap">
+                <i class="fa-solid fa-file-contract mr-1"></i>AI Report
+              </button>
             </div>
 
             <!-- ── TAB: COMPLIANCE ── -->
@@ -3748,6 +3769,324 @@
                     </div>
                   </template>
                 </div>
+              </div>
+            </div>
+
+            <!-- ── TAB: DRAW APPROVAL SCORES ── -->
+            <div x-show="aiActiveTab==='draw-scores'">
+              <p class="text-sm text-gray-500 mb-4">Pre-submission scoring — how likely is each draw to be fully approved by your lender? Click a draw to score it.</p>
+              <div x-show="(projectDash?.draws||[]).length===0" class="text-center text-gray-400 text-sm py-8">No draws yet.</div>
+              <div class="space-y-4">
+                <template x-for="draw in (projectDash?.draws||[])" :key="draw.id">
+                  <div class="bg-white border rounded-xl overflow-hidden">
+                    <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" @click="loadDrawApprovalScore(draw.id)">
+                      <div class="flex items-center gap-3">
+                        <div class="font-semibold text-gray-800" x-text="'Draw '+draw.draw_number"></div>
+                        <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="draw.status==='funded'?'bg-green-100 text-green-700':draw.status==='approved'?'bg-blue-100 text-blue-700':draw.status==='submitted'?'bg-purple-100 text-purple-700':'bg-gray-100 text-gray-600'" x-text="draw.status"></span>
+                        <span class="text-xs text-gray-400" x-text="draw.invoice_count+' invoice(s)'"></span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <template x-if="drawApprovalScores[draw.id] && !drawApprovalScores[draw.id].error">
+                          <div class="flex items-center gap-2">
+                            <div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div class="h-full rounded-full" :class="drawApprovalScores[draw.id].approval_probability>=80?'bg-green-500':drawApprovalScores[draw.id].approval_probability>=60?'bg-amber-400':'bg-red-500'" :style="'width:'+drawApprovalScores[draw.id].approval_probability+'%'"></div>
+                            </div>
+                            <span class="text-sm font-bold" :class="drawApprovalScores[draw.id].approval_probability>=80?'text-green-600':drawApprovalScores[draw.id].approval_probability>=60?'text-amber-600':'text-red-600'" x-text="drawApprovalScores[draw.id].approval_probability+'%'"></span>
+                          </div>
+                        </template>
+                        <button @click.stop="loadDrawApprovalScore(draw.id)" :disabled="drawApprovalLoading" class="text-xs px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition">
+                          <i class="fa-solid" :class="drawApprovalLoading?'fa-spinner fa-spin':'fa-gauge-high'"></i> Score
+                        </button>
+                      </div>
+                    </div>
+                    <template x-if="drawApprovalScores[draw.id] && !drawApprovalScores[draw.id].error">
+                      <div class="border-t p-4">
+                        <p class="text-sm font-medium mb-3" :class="drawApprovalScores[draw.id].approval_probability>=80?'text-green-700':drawApprovalScores[draw.id].approval_probability>=60?'text-amber-700':'text-red-700'" x-text="drawApprovalScores[draw.id].prediction"></p>
+                        <div x-show="drawApprovalScores[draw.id].high_risk_count>0" class="text-xs text-red-600 mb-3 font-medium" x-text="drawApprovalScores[draw.id].high_risk_count+' high-risk invoice(s) — $'+drawApprovalScores[draw.id].total_at_risk?.toLocaleString('en-CA',{minimumFractionDigits:2})+' at risk'"></div>
+                        <div class="space-y-2">
+                          <template x-for="inv in (drawApprovalScores[draw.id].invoices||[]).filter(i=>i.risk_level!=='low').slice(0,8)" :key="inv.invoice_id">
+                            <div class="flex items-center justify-between text-xs bg-gray-50 rounded-lg px-3 py-2">
+                              <div>
+                                <span class="font-medium text-gray-800" x-text="inv.vendor||'Unknown'"></span>
+                                <span class="text-gray-400 ml-2" x-text="'#'+(inv.invoice_number||inv.invoice_id)"></span>
+                                <span class="text-gray-500 ml-2" x-text="'$'+(inv.amount||0).toLocaleString('en-CA',{minimumFractionDigits:2})"></span>
+                              </div>
+                              <div class="flex items-center gap-2">
+                                <span class="font-bold" :class="inv.approval_score>=75?'text-green-600':inv.approval_score>=50?'text-amber-600':'text-red-600'" x-text="inv.approval_score+'/100'"></span>
+                                <div class="text-gray-500" x-text="(inv.risk_flags||[]).map(f=>f.flag).slice(0,1).join(', ')"></div>
+                              </div>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- ── TAB: CLOSEOUT READINESS ── -->
+            <div x-show="aiActiveTab==='closeout'">
+              <template x-if="aiInsights.closeout">
+                <div>
+                  <!-- Progress bar -->
+                  <div class="bg-white border rounded-xl p-5 mb-5">
+                    <div class="flex items-center gap-4 mb-3">
+                      <div class="flex-1">
+                        <div class="flex items-center justify-between mb-1">
+                          <span class="text-sm font-semibold text-gray-700">Closeout Completion</span>
+                          <span class="text-sm font-bold" :class="aiInsights.closeout.pct_complete>=90?'text-green-600':aiInsights.closeout.pct_complete>=60?'text-amber-600':'text-red-600'" x-text="aiInsights.closeout.pct_complete+'%'"></span>
+                        </div>
+                        <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+                          <div class="h-full rounded-full transition-all" :class="aiInsights.closeout.pct_complete>=90?'bg-green-500':aiInsights.closeout.pct_complete>=60?'bg-amber-400':'bg-red-500'" :style="'width:'+aiInsights.closeout.pct_complete+'%'"></div>
+                        </div>
+                      </div>
+                      <div class="text-center px-4 py-2 rounded-xl" :class="aiInsights.closeout.is_ready?'bg-green-50 text-green-700':'bg-red-50 text-red-700'">
+                        <div class="text-xs font-bold" x-text="aiInsights.closeout.is_ready?'READY TO CLOSE':'NOT READY'"></div>
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3 text-center text-xs mt-2">
+                      <div><span class="font-bold text-red-600" x-text="aiInsights.closeout.blocking_count"></span> <span class="text-gray-400">Blocking</span></div>
+                      <div><span class="font-bold text-amber-600" x-text="aiInsights.closeout.pending_count"></span> <span class="text-gray-400">Pending</span></div>
+                      <div><span class="font-bold text-green-600" x-text="aiInsights.closeout.done_count"></span> <span class="text-gray-400">Done</span></div>
+                    </div>
+                  </div>
+                  <!-- Checklist grouped by category -->
+                  <template x-for="cat in (aiInsights.closeout.categories||[])" :key="cat">
+                    <div class="bg-white border rounded-xl overflow-hidden mb-3">
+                      <div class="px-4 py-2.5 bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase tracking-wide" x-text="cat"></div>
+                      <div class="divide-y">
+                        <template x-for="item in (aiInsights.closeout.checklist||[]).filter(c=>c.category===cat)" :key="item.label">
+                          <div class="flex items-start gap-3 px-4 py-3">
+                            <i class="fa-solid mt-0.5 text-sm" :class="item.status==='done'?'fa-circle-check text-green-500':item.status==='blocking'?'fa-circle-xmark text-red-500':'fa-circle-exclamation text-amber-500'"></i>
+                            <div class="flex-1">
+                              <div class="text-sm font-medium" :class="item.status==='blocking'?'text-red-700':item.status==='warning'||item.status==='pending'?'text-amber-700':'text-gray-700'" x-text="item.label"></div>
+                              <div class="text-xs text-gray-500 mt-0.5" x-text="item.detail"></div>
+                              <div x-show="item.action" class="text-xs text-blue-600 mt-1 font-medium" x-text="'→ '+item.action"></div>
+                            </div>
+                            <span class="text-xs font-semibold" x-text="item.points+' pts'" :class="item.status==='done'?'text-green-500':'text-gray-400'"></span>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+
+            <!-- ── TAB: GOVERNMENT CLAIM OPTIMIZER ── -->
+            <div x-show="aiActiveTab==='govt'">
+              <template x-if="aiInsights.govt_optimizer">
+                <div>
+                  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 text-sm text-blue-700">
+                    <i class="fa-solid fa-landmark mr-2"></i>
+                    AI splits your project costs into lender-eligible, provincial-eligible, and federal-eligible buckets and recommends the optimal submission order to maximize total recovery.
+                  </div>
+                  <!-- Totals -->
+                  <div class="grid grid-cols-2 gap-3 mb-5 sm:grid-cols-4">
+                    <div class="bg-white border rounded-xl p-4 text-center">
+                      <div class="text-xs text-gray-400 mb-1">Lender Eligible</div>
+                      <div class="text-lg font-bold text-blue-600" x-text="'$'+(aiInsights.govt_optimizer.totals?.lender||0).toLocaleString('en-CA',{minimumFractionDigits:0})"></div>
+                    </div>
+                    <div class="bg-white border rounded-xl p-4 text-center">
+                      <div class="text-xs text-gray-400 mb-1">Provincial Eligible</div>
+                      <div class="text-lg font-bold text-purple-600" x-text="'$'+(aiInsights.govt_optimizer.totals?.provincial||0).toLocaleString('en-CA',{minimumFractionDigits:0})"></div>
+                    </div>
+                    <div class="bg-white border rounded-xl p-4 text-center">
+                      <div class="text-xs text-gray-400 mb-1">Federal Eligible</div>
+                      <div class="text-lg font-bold text-indigo-600" x-text="'$'+(aiInsights.govt_optimizer.totals?.federal||0).toLocaleString('en-CA',{minimumFractionDigits:0})"></div>
+                    </div>
+                    <div class="bg-white border rounded-xl p-4 text-center" :class="(aiInsights.govt_optimizer.totals?.recovery_gap||0)>0?'border-amber-300 bg-amber-50':''">
+                      <div class="text-xs mb-1" :class="(aiInsights.govt_optimizer.totals?.recovery_gap||0)>0?'text-amber-600':'text-gray-400'">Recovery Gap</div>
+                      <div class="text-lg font-bold" :class="(aiInsights.govt_optimizer.totals?.recovery_gap||0)>0?'text-amber-600':'text-gray-400'" x-text="'$'+(aiInsights.govt_optimizer.totals?.recovery_gap||0).toLocaleString('en-CA',{minimumFractionDigits:0})"></div>
+                    </div>
+                  </div>
+                  <!-- Recommendations -->
+                  <div class="space-y-3 mb-5">
+                    <template x-for="rec in (aiInsights.govt_optimizer.recommendations||[])" :key="rec.order">
+                      <div class="flex items-start gap-3 bg-white border rounded-xl p-4">
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" :class="rec.order===0?'bg-amber-500':rec.order===1?'bg-blue-600':rec.order===2?'bg-purple-600':'bg-indigo-600'" x-text="rec.order===0?'!':rec.order"></div>
+                        <div>
+                          <div class="font-semibold text-sm text-gray-800" x-text="rec.action"></div>
+                          <div class="text-xs text-gray-500 mt-0.5" x-text="rec.reason"></div>
+                          <div class="text-xs font-semibold text-blue-600 mt-1" x-text="rec.count+' item(s) · $'+rec.amount.toLocaleString('en-CA',{minimumFractionDigits:0})"></div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                  <!-- Unassigned invoices -->
+                  <div x-show="(aiInsights.govt_optimizer.lender_eligible||[]).length>0">
+                    <div class="text-sm font-semibold text-gray-700 mb-2">Unassigned — Ready to Submit</div>
+                    <div class="bg-white border rounded-xl overflow-hidden">
+                      <div class="grid text-xs font-semibold text-gray-500 px-4 py-2 bg-gray-50 border-b" style="grid-template-columns: 2fr 1fr 1fr 1fr">
+                        <div>Invoice / Vendor</div><div class="text-right">Amount</div><div class="text-center">Category</div><div class="text-center">Billing Type</div>
+                      </div>
+                      <template x-for="inv in (aiInsights.govt_optimizer.lender_eligible||[]).slice(0,10)" :key="inv.invoice_id">
+                        <div class="grid px-4 py-2 border-b text-xs items-center hover:bg-gray-50" style="grid-template-columns: 2fr 1fr 1fr 1fr">
+                          <div><span class="font-medium text-gray-800" x-text="inv.vendor||'Unknown'"></span><span class="text-gray-400 ml-2" x-text="'#'+(inv.invoice_number||inv.invoice_id)"></span></div>
+                          <div class="text-right font-semibold text-gray-700" x-text="'$'+inv.amount.toLocaleString('en-CA',{minimumFractionDigits:2})"></div>
+                          <div class="text-center text-gray-500" x-text="inv.category||'—'"></div>
+                          <div class="text-center text-gray-500" x-text="inv.billing_type||'—'"></div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- ── TAB: CO EARLY WARNING RADAR ── -->
+            <div x-show="aiActiveTab==='co-radar'">
+              <template x-if="aiInsights.co_radar">
+                <div>
+                  <div class="grid grid-cols-3 gap-3 mb-5">
+                    <div class="bg-white border rounded-xl p-4 text-center">
+                      <div class="text-xs text-gray-400 mb-1">Total Signals</div>
+                      <div class="text-2xl font-bold" :class="(aiInsights.co_radar.signal_count||0)>0?'text-orange-600':'text-green-600'" x-text="aiInsights.co_radar.signal_count||0"></div>
+                    </div>
+                    <div class="bg-white border rounded-xl p-4 text-center">
+                      <div class="text-xs text-gray-400 mb-1">High-Severity</div>
+                      <div class="text-2xl font-bold" :class="(aiInsights.co_radar.high_count||0)>0?'text-red-600':'text-green-600'" x-text="aiInsights.co_radar.high_count||0"></div>
+                    </div>
+                    <div class="bg-white border rounded-xl p-4 text-center">
+                      <div class="text-xs text-gray-400 mb-1">Amount at Risk</div>
+                      <div class="text-lg font-bold text-orange-600" x-text="'$'+(aiInsights.co_radar.total_at_risk||0).toLocaleString('en-CA',{minimumFractionDigits:0})"></div>
+                    </div>
+                  </div>
+                  <div x-show="(aiInsights.co_radar.signals||[]).length===0" class="text-center text-green-600 text-sm py-8 bg-green-50 border border-green-200 rounded-xl">
+                    <i class="fa-solid fa-circle-check text-2xl mb-2 block"></i>No change order signals detected.
+                  </div>
+                  <div class="space-y-3">
+                    <template x-for="sig in (aiInsights.co_radar.signals||[])" :key="sig.type+(sig.category||'')">
+                      <div class="rounded-xl border p-4" :class="sig.severity==='high'?'bg-red-50 border-red-200':sig.severity==='warning'?'bg-amber-50 border-amber-200':'bg-blue-50 border-blue-200'">
+                        <div class="flex items-start gap-3">
+                          <i class="fa-solid mt-0.5" :class="sig.severity==='high'?'fa-circle-exclamation text-red-500':sig.severity==='warning'?'fa-triangle-exclamation text-amber-500':'fa-info-circle text-blue-500'"></i>
+                          <div class="flex-1">
+                            <div class="font-semibold text-sm mb-1" :class="sig.severity==='high'?'text-red-800':sig.severity==='warning'?'text-amber-800':'text-blue-800'" x-text="sig.title"></div>
+                            <div class="text-sm text-gray-600 mb-1" x-text="sig.detail"></div>
+                            <div x-show="sig.amount_at_risk>0" class="text-xs font-semibold text-gray-500" x-text="'Amount at risk: $'+sig.amount_at_risk.toLocaleString('en-CA',{minimumFractionDigits:0})"></div>
+                            <div x-show="(sig.items||[]).length>0" class="mt-2 space-y-1">
+                              <template x-for="item in (sig.items||[]).slice(0,3)" :key="JSON.stringify(item)">
+                                <div class="text-xs bg-white bg-opacity-60 rounded px-2 py-1 text-gray-600" x-text="item.vendor||item.co_number||JSON.stringify(item)"></div>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- ── TAB: VENDOR RISK MEMORY ── -->
+            <div x-show="aiActiveTab==='vendor-risk'">
+              <template x-if="aiInsights.vendor_risk">
+                <div>
+                  <div class="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-5 text-sm text-purple-700">
+                    <i class="fa-solid fa-shop mr-2"></i>
+                    Cross-project vendor risk profiles — built from all invoices, change orders, and lien waivers across every project on your account. Add more projects to improve accuracy.
+                  </div>
+                  <div x-show="(aiInsights.vendor_risk||[]).length===0" class="text-center text-gray-400 text-sm py-8">No vendor data yet. Process invoices to build vendor profiles.</div>
+                  <div class="space-y-2">
+                    <template x-for="v in (aiInsights.vendor_risk||[])" :key="v.vendor" x-data="{open:false}">
+                      <div class="bg-white border rounded-xl overflow-hidden">
+                        <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" @click="open=!open">
+                          <div>
+                            <span class="font-semibold text-gray-800 text-sm" x-text="v.vendor"></span>
+                            <span class="text-xs text-gray-400 ml-2" x-text="v.invoice_count+' invoice(s) · $'+v.total_invoiced.toLocaleString('en-CA',{minimumFractionDigits:0})+' total'"></span>
+                          </div>
+                          <div class="flex items-center gap-3">
+                            <div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div class="h-full rounded-full" :class="v.risk_score>=75?'bg-green-500':v.risk_score>=60?'bg-yellow-400':v.risk_score>=40?'bg-orange-500':'bg-red-500'" :style="'width:'+v.risk_score+'%'"></div>
+                            </div>
+                            <span class="text-xs font-bold px-2 py-0.5 rounded-full" :class="riskBadge(v.risk_level)" x-text="v.risk_level.toUpperCase()"></span>
+                            <span class="text-sm font-bold" :class="v.risk_score>=75?'text-green-600':v.risk_score>=60?'text-yellow-600':v.risk_score>=40?'text-orange-600':'text-red-600'" x-text="v.risk_score+'/100'"></span>
+                            <i class="fa-solid fa-chevron-down text-gray-400 text-xs transition" :class="open?'rotate-180':''"></i>
+                          </div>
+                        </div>
+                        <div x-show="open" class="border-t p-4">
+                          <div class="grid grid-cols-4 gap-3 text-xs mb-3">
+                            <div class="text-center"><div class="text-gray-400 mb-0.5">Approval Rate</div><div class="font-bold text-gray-700" x-text="v.approval_rate!=null?v.approval_rate+'%':'N/A'"></div></div>
+                            <div class="text-center"><div class="text-gray-400 mb-0.5">Rejections</div><div class="font-bold" :class="v.rejection_count>0?'text-red-600':'text-green-600'" x-text="v.rejection_count"></div></div>
+                            <div class="text-center"><div class="text-gray-400 mb-0.5">Change Orders</div><div class="font-bold" :class="v.co_count>0?'text-orange-600':'text-green-600'" x-text="v.co_count"></div></div>
+                            <div class="text-center"><div class="text-gray-400 mb-0.5">Duplicates</div><div class="font-bold" :class="v.duplicate_count>0?'text-red-600':'text-green-600'" x-text="v.duplicate_count"></div></div>
+                          </div>
+                          <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div x-show="(v.risk_flags||[]).length>0">
+                              <div class="font-semibold text-red-700 mb-1"><i class="fa-solid fa-circle-xmark mr-1"></i>Risk Factors</div>
+                              <template x-for="f in v.risk_flags" :key="f"><div class="text-gray-600 mb-0.5" x-text="'• '+f"></div></template>
+                            </div>
+                            <div x-show="(v.positive_flags||[]).length>0">
+                              <div class="font-semibold text-green-700 mb-1"><i class="fa-solid fa-circle-check mr-1"></i>Positive</div>
+                              <template x-for="f in v.positive_flags" :key="f"><div class="text-gray-600 mb-0.5" x-text="'• '+f"></div></template>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- ── TAB: AI COST CONSULTANT REPORT ── -->
+            <div x-show="aiActiveTab==='consultant'">
+              <div x-show="costConsultantLoading" class="text-center text-gray-400 text-sm py-12">
+                <i class="fa-solid fa-brain fa-spin text-3xl text-purple-300 mb-3 block"></i>
+                <p>Generating monthly cost consultant commentary…</p>
+              </div>
+              <div x-show="costConsultant?.error" class="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm" x-text="costConsultant?.error"></div>
+              <template x-if="costConsultant && !costConsultant.error && !costConsultantLoading">
+                <div class="space-y-4">
+                  <!-- Generated by badge -->
+                  <div class="flex items-center gap-2 text-xs text-gray-400">
+                    <i class="fa-solid" :class="costConsultant.generated_by==='gemini'?'fa-brain text-purple-500':'fa-file-alt text-gray-400'"></i>
+                    <span x-text="costConsultant.generated_by==='gemini'?'AI-generated commentary (Gemini)':'Template-based commentary'"></span>
+                    <span x-text="'· Generated '+costConsultant.generated_at"></span>
+                    <button @click="loadCostConsultant()" class="ml-auto text-xs text-purple-600 hover:underline"><i class="fa-solid fa-rotate-right mr-1"></i>Regenerate</button>
+                  </div>
+                  <!-- Executive Summary -->
+                  <div class="bg-slate-900 rounded-xl p-5 text-white">
+                    <div class="text-xs font-semibold text-blue-300 mb-2 uppercase tracking-wide">Executive Summary</div>
+                    <p class="text-sm leading-relaxed" x-text="costConsultant.executive_summary"></p>
+                  </div>
+                  <!-- Budget Status -->
+                  <div class="bg-white border rounded-xl p-5">
+                    <div class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide"><i class="fa-solid fa-chart-pie mr-1 text-blue-500"></i>Budget Status</div>
+                    <p class="text-sm text-gray-700 leading-relaxed" x-text="costConsultant.budget_status"></p>
+                  </div>
+                  <!-- Key Risks -->
+                  <div class="bg-red-50 border border-red-200 rounded-xl p-5">
+                    <div class="text-xs font-semibold text-red-700 mb-2 uppercase tracking-wide"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Key Risks</div>
+                    <p class="text-sm text-red-800 leading-relaxed" x-text="costConsultant.key_risks"></p>
+                  </div>
+                  <!-- Recommended Actions -->
+                  <div class="bg-green-50 border border-green-200 rounded-xl p-5">
+                    <div class="text-xs font-semibold text-green-700 mb-3 uppercase tracking-wide"><i class="fa-solid fa-list-check mr-1"></i>Recommended Actions</div>
+                    <div class="space-y-1.5">
+                      <template x-for="line in (costConsultant.recommended_actions||'').split('\n').filter(l=>l.trim())" :key="line">
+                        <p class="text-sm text-green-800" x-text="line"></p>
+                      </template>
+                    </div>
+                  </div>
+                  <!-- Key Numbers -->
+                  <div x-show="costConsultant.data" class="bg-white border rounded-xl p-4">
+                    <div class="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wide">Supporting Data</div>
+                    <div class="grid grid-cols-3 gap-3 text-xs">
+                      <div class="text-center"><div class="text-gray-400">Budget</div><div class="font-bold text-gray-700" x-text="'$'+(costConsultant.data?.total_budget||0).toLocaleString('en-CA',{minimumFractionDigits:0})"></div></div>
+                      <div class="text-center"><div class="text-gray-400">Invoiced</div><div class="font-bold text-gray-700" x-text="'$'+(costConsultant.data?.total_invoiced||0).toLocaleString('en-CA',{minimumFractionDigits:0})"></div></div>
+                      <div class="text-center"><div class="text-gray-400">Burn Rate</div><div class="font-bold" :class="(costConsultant.data?.pct_burn||0)>=85?'text-red-600':'text-gray-700'" x-text="(costConsultant.data?.pct_burn||0)+'%'"></div></div>
+                      <div class="text-center"><div class="text-gray-400">Holdback Held</div><div class="font-bold text-amber-600" x-text="'$'+(costConsultant.data?.holdback_held||0).toLocaleString('en-CA',{minimumFractionDigits:0})"></div></div>
+                      <div class="text-center"><div class="text-gray-400">CO Adjustments</div><div class="font-bold text-gray-700" x-text="'$'+(costConsultant.data?.total_co_adjustments||0).toLocaleString('en-CA',{minimumFractionDigits:0})"></div></div>
+                      <div class="text-center"><div class="text-gray-400">Timeline</div><div class="font-bold text-blue-600" x-text="costConsultant.data?.timeline_pct!=null?costConsultant.data.timeline_pct+'%':'N/A'"></div></div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <div x-show="!costConsultant && !costConsultantLoading" class="text-center text-gray-400 text-sm py-12">
+                <i class="fa-solid fa-file-contract text-4xl text-purple-200 mb-3 block"></i>
+                <p>Click <strong>AI Report</strong> tab to generate your monthly cost consultant commentary.</p>
               </div>
             </div>
 

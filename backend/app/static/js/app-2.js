@@ -385,6 +385,16 @@ function app() {
     aiSuggestion: null,
     aiSuggestionLoading: false,
     aiSuggestionInvoiceId: null,
+    // Feature 8: draw approval scores (keyed by draw_id)
+    drawApprovalScores: {},
+    drawApprovalLoading: false,
+    // Feature 9: closeout (in aiInsights.closeout)
+    // Feature 10: govt optimizer (in aiInsights.govt_optimizer)
+    // Feature 11: cost consultant
+    costConsultant: null,
+    costConsultantLoading: false,
+    // Feature 12: CO radar (in aiInsights.co_radar)
+    // Feature 13: vendor risk (in aiInsights.vendor_risk)
 
     async loadAiInsights() {
       if (!this.currentProject) return;
@@ -443,6 +453,23 @@ function app() {
     aiSeverityBadge(sev) {
       const map = { critical: 'bg-red-100 text-red-700', high: 'bg-orange-100 text-orange-700', warning: 'bg-yellow-100 text-yellow-700', info: 'bg-blue-100 text-blue-700', low: 'bg-green-100 text-green-700', medium: 'bg-yellow-100 text-yellow-700' };
       return map[sev] || 'bg-slate-100 text-slate-700';
+    },
+
+    async loadDrawApprovalScore(drawId) {
+      this.drawApprovalLoading = true;
+      try {
+        this.drawApprovalScores[drawId] = await this.get(`/api/project/ai/draw-approval-score/${drawId}`);
+      } catch(e) { this.drawApprovalScores[drawId] = { error: e.message }; }
+      finally { this.drawApprovalLoading = false; }
+    },
+
+    async loadCostConsultant() {
+      if (!this.currentProject) return;
+      this.costConsultantLoading = true; this.costConsultant = null;
+      try {
+        this.costConsultant = await this.get(`/api/project/ai/cost-consultant${this._pid}`);
+      } catch(e) { this.costConsultant = { error: e.message }; }
+      finally { this.costConsultantLoading = false; }
     },
 
     riskBadge(level) {

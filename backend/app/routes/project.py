@@ -2607,7 +2607,179 @@ def ai_lender_insights(
     return lender_insights(draws, invoices, lien_waivers, documents)
 
 
-# ─── AI Insights — Consolidated endpoint (all 7 in one call) ─────────────────
+# ─── AI Feature 8: Draw Approval Probability Score ───────────────────────────
+
+@router.get("/ai/draw-approval-score/{draw_id}")
+def ai_draw_approval_score(
+    draw_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Score each invoice in a draw 0–100 on lender approval probability before submission."""
+    draw = (db.query(Draw).join(Project, Project.id == Draw.project_id)
+            .filter(Draw.id == draw_id, Project.user_id == current_user.id).first())
+    if not draw:
+        raise HTTPException(status_code=404, detail="Draw not found")
+
+    invoices = db.query(Invoice).filter(Invoice.draw_id == draw_id, Invoice.user_id == current_user.id).all()
+    for inv in invoices:
+        inv._allocs = db.query(InvoiceAllocation).filter(InvoiceAllocation.invoice_id == inv.id).all()
+
+    proj = db.query(Project).filter(Project.id == draw.project_id).first()
+    categories = db.query(CostCategory).filter(CostCategory.project_id == proj.id).all()
+    change_orders = db.query(ChangeOrder).filter(ChangeOrder.project_id == proj.id).all()
+    lien_waivers = db.query(LienWaiver).filter(LienWaiver.project_id == proj.id).all()
+    allocs_by_cat = {
+        cat.id: float(db.query(func.coalesce(func.sum(InvoiceAllocation.amount), 0.0))
+                       .filter(InvoiceAllocation.category_id == cat.id).scalar() or 0)
+        for cat in categories
+    }
+    from ..services.ai_project import draw_approval_probability
+    return draw_approval_probability(draw, invoices, categories, change_orders, lien_waivers, allocs_by_cat)
+
+
+# ─── AI Feature 9: Closeout Readiness Agent ───────────────────────────────────
+
+@router.get("/ai/closeout")
+def ai_closeout_readiness(
+    proj: Optional[Project] = Depends(_get_proj),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Real-time project closeout checklist — what's done and what's still missing."""
+    if not proj:
+        return {"pct_complete": 0, "checklist": []}
+
+    invoices = db.query(Invoice).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.project_id == proj.id,
+        Invoice.status == "processed",
+    ).all()
+    for inv in invoices:
+        inv._allocs = db.query(InvoiceAllocation).filter(InvoiceAllocation.invoice_id == inv.id).all()
+
+    milestones = db.query(Milestone).filter(Milestone.project_id == proj.id).all()
+    lien_waivers = db.query(LienWaiver).filter(LienWaiver.project_id == proj.id).all()
+    documents = db.query(ProjectDocument).filter(ProjectDocument.project_id == proj.id).all()
+    subcontractors = db.query(Subcontractor).filter(Subcontractor.project_id == proj.id).all()
+    draws = db.query(Draw).filter(Draw.project_id == proj.id).all()
+    claims = db.query(Claim).filter(Claim.project_id == proj.id).all()
+
+    from ..services.ai_project import closeout_readiness
+    return closeout_readiness(proj, invoices, milestones, lien_waivers, documents, subcontractors, draws, claims)
+
+
+# ─── AI Feature 10: Government Claim Optimizer ────────────────────────────────
+
+@router.get("/ai/govt-claim-optimizer")
+def ai_govt_claim_optimizer(
+    proj: Optional[Project] = Depends(_get_proj),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Separate costs into lender/provincial/federal/non-eligible buckets and recommend submission order."""
+    if not proj:
+        return {"totals": {}, "recommendations": []}
+
+    invoices = db.query(Invoice).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.project_id == proj.id,
+        Invoice.status == "processed",
+    ).all()
+    for inv in invoices:
+        inv._allocs = db.query(InvoiceAllocation).filter(InvoiceAllocation.invoice_id == inv.id).all()
+
+    from ..models import PayrollEntry as _PE
+    payroll_entries = db.query(_PE).filter(
+        _PE.user_id == current_user.id,
+        _PE.project_id == proj.id,
+        _PE.status == "processed",
+    ).all()
+
+    categories = db.query(CostCategory).filter(CostCategory.project_id == proj.id).all()
+
+    from ..services.ai_project import govt_claim_optimizer
+    return govt_claim_optimizer(invoices, payroll_entries, categories)
+
+
+# ─── AI Feature 11: Cost Consultant in a Box ──────────────────────────────────
+
+@router.get("/ai/cost-consultant")
+def ai_cost_consultant(
+    proj: Optional[Project] = Depends(_get_proj),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a professional monthly cost consultant commentary using Gemini (or template fallback)."""
+    if not proj:
+        return {"error": "No project found"}
+
+    # Reuse dashboard data
+    dashboard = project_dashboard(proj=proj, db=db, current_user=current_user)
+
+    from ..services.ai_project import cost_consultant_commentary
+    return cost_consultant_commentary(proj, dashboard, db)
+
+
+# ─── AI Feature 12: Change Order Early Warning Radar ──────────────────────────
+
+@router.get("/ai/co-radar")
+def ai_co_radar(
+    proj: Optional[Project] = Depends(_get_proj),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Detect likely change orders before they are formally issued."""
+    if not proj:
+        return {"signals": [], "signal_count": 0}
+
+    invoices = db.query(Invoice).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.project_id == proj.id,
+        Invoice.status == "processed",
+    ).all()
+    categories = db.query(CostCategory).filter(CostCategory.project_id == proj.id).all()
+    change_orders = db.query(ChangeOrder).filter(ChangeOrder.project_id == proj.id).all()
+    committed_costs = db.query(CommittedCost).filter(
+        CommittedCost.project_id == proj.id, CommittedCost.status == "active"
+    ).all()
+    allocs_by_cat = {
+        cat.id: float(db.query(func.coalesce(func.sum(InvoiceAllocation.amount), 0.0))
+                       .filter(InvoiceAllocation.category_id == cat.id).scalar() or 0)
+        for cat in categories
+    }
+
+    from ..services.ai_project import co_early_warning
+    return co_early_warning(invoices, categories, change_orders, committed_costs, allocs_by_cat)
+
+
+# ─── AI Feature 13: Vendor Risk Memory ────────────────────────────────────────
+
+@router.get("/ai/vendor-risk")
+def ai_vendor_risk(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cross-project vendor risk profiles based on ALL projects for this user."""
+    # Gather data across all user projects
+    all_projects = db.query(Project).filter(Project.user_id == current_user.id).all()
+    proj_ids = [p.id for p in all_projects]
+
+    all_invoices = db.query(Invoice).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.status == "processed",
+    ).all()
+    all_cos = []
+    all_waivers = []
+    for pid in proj_ids:
+        all_cos.extend(db.query(ChangeOrder).filter(ChangeOrder.project_id == pid).all())
+        all_waivers.extend(db.query(LienWaiver).filter(LienWaiver.project_id == pid).all())
+
+    from ..services.ai_project import vendor_risk_memory
+    return vendor_risk_memory(all_invoices, all_cos, all_waivers)
+
+
+# ─── AI Insights — Consolidated endpoint (all 13 features in one call) ────────
 
 @router.get("/ai/insights")
 def ai_insights_all(
@@ -2615,14 +2787,17 @@ def ai_insights_all(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Run all AI intelligence features for the project in a single call."""
+    """Run all 13 AI intelligence features for the project in a single call."""
     if not proj:
         return {"project": None}
 
     from ..services.ai_project import (
         compliance_alerts, overrun_alerts,
         subcontractor_risk_scores, lender_insights,
+        closeout_readiness, govt_claim_optimizer,
+        co_early_warning, vendor_risk_memory,
     )
+    from ..models import PayrollEntry as _PE
 
     categories = db.query(CostCategory).filter(CostCategory.project_id == proj.id).order_by(CostCategory.display_order).all()
     draws = db.query(Draw).filter(Draw.project_id == proj.id).order_by(Draw.draw_number).all()
@@ -2631,10 +2806,27 @@ def ai_insights_all(
         Invoice.project_id == proj.id,
         Invoice.status == "processed",
     ).all()
-    lien_waivers = db.query(LienWaiver).filter(LienWaiver.project_id == proj.id).all()
+    # Attach allocations to each invoice (needed by several features)
+    for inv in invoices:
+        inv._allocs = db.query(InvoiceAllocation).filter(InvoiceAllocation.invoice_id == inv.id).all()
+
+    lien_waivers  = db.query(LienWaiver).filter(LienWaiver.project_id == proj.id).all()
     subcontractors = db.query(Subcontractor).filter(Subcontractor.project_id == proj.id).all()
-    change_orders = db.query(ChangeOrder).filter(ChangeOrder.project_id == proj.id).all()
-    documents = db.query(ProjectDocument).filter(ProjectDocument.project_id == proj.id).all()
+    change_orders  = db.query(ChangeOrder).filter(ChangeOrder.project_id == proj.id).all()
+    documents      = db.query(ProjectDocument).filter(ProjectDocument.project_id == proj.id).all()
+    milestones     = db.query(Milestone).filter(Milestone.project_id == proj.id).all()
+    claims         = db.query(Claim).filter(Claim.project_id == proj.id).all()
+    committed_costs = db.query(CommittedCost).filter(CommittedCost.project_id == proj.id, CommittedCost.status == "active").all()
+    payroll_entries = db.query(_PE).filter(_PE.user_id == current_user.id, _PE.project_id == proj.id, _PE.status == "processed").all()
+
+    # Cross-project data for vendor risk memory
+    all_invoices_xp = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.status == "processed").all()
+    all_proj_ids = [p.id for p in db.query(Project).filter(Project.user_id == current_user.id).all()]
+    all_cos_xp = []
+    all_waivers_xp = []
+    for pid in all_proj_ids:
+        all_cos_xp.extend(db.query(ChangeOrder).filter(ChangeOrder.project_id == pid).all())
+        all_waivers_xp.extend(db.query(LienWaiver).filter(LienWaiver.project_id == pid).all())
 
     # Allocations by category
     allocs_by_cat: dict = {}
@@ -2651,22 +2843,27 @@ def ai_insights_all(
             co_by_cat[co.category_id] = co_by_cat.get(co.category_id, 0.0) + co.amount
 
     # Unallocated invoice count
-    unallocated_count = sum(
-        1 for inv in invoices
-        if db.query(InvoiceAllocation).filter(InvoiceAllocation.invoice_id == inv.id).count() == 0
-    )
+    unallocated_count = sum(1 for inv in invoices if len(inv._allocs) == 0)
 
-    compliance = compliance_alerts(proj, invoices, draws, lien_waivers)
-    overruns = overrun_alerts(proj, categories, allocs_by_cat, co_by_cat)
-    sub_risks = subcontractor_risk_scores(subcontractors, invoices, change_orders, lien_waivers)
-    lender = lender_insights(draws, invoices, lien_waivers, documents)
+    # Run all features
+    compliance   = compliance_alerts(proj, invoices, draws, lien_waivers)
+    overruns     = overrun_alerts(proj, categories, allocs_by_cat, co_by_cat)
+    sub_risks    = subcontractor_risk_scores(subcontractors, invoices, change_orders, lien_waivers)
+    lender       = lender_insights(draws, invoices, lien_waivers, documents)
+    closeout     = closeout_readiness(proj, invoices, milestones, lien_waivers, documents, subcontractors, draws, claims)
+    govt_optimizer = govt_claim_optimizer(invoices, payroll_entries, categories)
+    co_radar     = co_early_warning(invoices, categories, change_orders, committed_costs, allocs_by_cat)
+    vendor_risk  = vendor_risk_memory(all_invoices_xp, all_cos_xp, all_waivers_xp)
 
     # High-level badge counts for sidebar
     total_alerts = (
         compliance["alert_count"]
         + overruns["alert_count"]
         + lender["pattern_count"]
+        + co_radar["signal_count"]
         + sum(1 for s in sub_risks if s["risk_level"] in ("critical", "high"))
+        + (1 if not closeout["is_ready"] and closeout["blocking_count"] > 0 else 0)
+        + (1 if govt_optimizer["totals"].get("recovery_gap", 0) > 0 else 0)
     )
 
     return {
@@ -2674,8 +2871,14 @@ def ai_insights_all(
         "project_name": proj.name,
         "total_alerts": total_alerts,
         "unallocated_invoices": unallocated_count,
+        # Original 7
         "compliance": compliance,
         "overruns": overruns,
         "subcontractor_risks": sub_risks,
         "lender_insights": lender,
+        # New 6
+        "closeout": closeout,
+        "govt_optimizer": govt_optimizer,
+        "co_radar": co_radar,
+        "vendor_risk": vendor_risk,
     }

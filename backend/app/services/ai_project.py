@@ -1,12 +1,18 @@
 """AI-powered project finance intelligence.
 
-Feature 1: Invoice → Cost Code Mapper (Gemini)
-Feature 2: Lien & Holdback Compliance Brain (Canada rule engine)
-Feature 3: Cost Overrun Early Warning (spending velocity)
-Feature 4: Draw Intelligence Engine (draw readiness checklist)
-Feature 5: Cash Flow Reality Simulator (scenario modeling)
-Feature 6: Subcontractor Risk Score (rule-based scoring)
-Feature 7: Lender Behavior Model (rejection pattern detection)
+Feature 1:  Invoice → Cost Code Mapper (Gemini)
+Feature 2:  Lien & Holdback Compliance Brain (Canada rule engine)
+Feature 3:  Cost Overrun Early Warning (spending velocity)
+Feature 4:  Draw Intelligence Engine (draw readiness checklist)
+Feature 5:  Cash Flow Reality Simulator (scenario modeling)
+Feature 6:  Subcontractor Risk Score (rule-based scoring)
+Feature 7:  Lender Behavior Model (rejection pattern detection)
+Feature 8:  Draw Approval Probability Score (pre-submission risk per invoice)
+Feature 9:  Closeout Readiness Agent (real-time closeout checklist)
+Feature 10: Government Claim Optimizer (lender vs provincial vs federal cost split)
+Feature 11: Cost Consultant in a Box (Gemini monthly commentary)
+Feature 12: Change Order Early Warning Radar (detect COs before formal issue)
+Feature 13: Vendor Risk Memory (cross-project vendor risk profiles)
 """
 from __future__ import annotations
 import json
@@ -957,3 +963,884 @@ def lender_insights(draws: List[Any], invoices: List[Any], lien_waivers: List[An
         "total_approved": round(sum(i.lender_approved_amt or 0 for i in invoices if i.lender_approved_amt), 2),
         "total_rejected": round(sum(i.lender_submitted_amt or 0 for i in rejected_invs), 2),
     }
+
+
+# ─── Feature 8: Draw Approval Probability Score ──────────────────────────────
+
+def draw_approval_probability(draw: Any, invoices: List[Any], categories: List[Any],
+                               change_orders: List[Any], lien_waivers: List[Any],
+                               allocations_by_cat: Dict[int, float]) -> dict:
+    """Score each invoice 0–100 on lender approval likelihood before submission.
+    Lower score = higher risk of rejection or partial approval."""
+    today = _today()
+    cat_map = {c.id: c for c in categories}
+    approved_co_by_cat: Dict[int, float] = {}
+    for co in change_orders:
+        if co.status == "approved" and co.category_id:
+            approved_co_by_cat[co.category_id] = approved_co_by_cat.get(co.category_id, 0.0) + co.amount
+
+    invoice_scores = []
+    draw_score_sum = 0.0
+
+    for inv in invoices:
+        score = 100
+        risk_flags = []
+        good_flags = []
+
+        # 1. Internal approval
+        if inv.approval_status == "rejected":
+            score -= 40
+            risk_flags.append({"flag": "Rejected internally", "impact": -40})
+        elif inv.approval_status == "pending":
+            score -= 20
+            risk_flags.append({"flag": "Pending internal approval", "impact": -20})
+        else:
+            good_flags.append("Internally approved")
+
+        # 2. Lender submitted amount set
+        if inv.lender_submitted_amt is None:
+            score -= 15
+            risk_flags.append({"flag": "No lender submitted amount set", "impact": -15})
+        else:
+            good_flags.append("Submitted amount configured")
+
+        # 3. Category allocation exists
+        alloc_count = len(getattr(inv, '_allocs', []) or [])
+        if alloc_count == 0:
+            score -= 15
+            risk_flags.append({"flag": "Not allocated to a cost category", "impact": -15})
+        else:
+            good_flags.append("Allocated to cost category")
+
+        # 4. Budget burn — is this category already over budget?
+        primary_cat_id = None
+        for a in (getattr(inv, '_allocs', []) or []):
+            primary_cat_id = a.category_id
+            break
+        if primary_cat_id and primary_cat_id in cat_map:
+            cat = cat_map[primary_cat_id]
+            revised_budget = cat.budget + approved_co_by_cat.get(cat.id, 0.0)
+            invoiced = allocations_by_cat.get(cat.id, 0.0)
+            if revised_budget > 0:
+                pct = invoiced / revised_budget * 100
+                if pct > 110:
+                    score -= 20
+                    risk_flags.append({"flag": f"Category '{cat.name}' is {pct:.0f}% over budget — lenders may reject", "impact": -20})
+                elif pct > 95:
+                    score -= 10
+                    risk_flags.append({"flag": f"Category '{cat.name}' is {pct:.0f}% of budget — near limit", "impact": -10})
+                else:
+                    good_flags.append(f"Category '{cat.name}' within budget ({pct:.0f}%)")
+
+        # 5. Holdback applied
+        if (inv.holdback_pct or 0) == 0 and not getattr(inv, 'is_payroll', False):
+            score -= 5
+            risk_flags.append({"flag": "No holdback applied (lender may require 10%)", "impact": -5})
+        else:
+            good_flags.append("Holdback applied")
+
+        # 6. Tax treatment set
+        if inv.billing_type is None and not getattr(inv, 'is_payroll', False):
+            score -= 5
+            risk_flags.append({"flag": "Billing type not set (direct/pass-through unclear)", "impact": -5})
+
+        # 7. Lien waiver for this vendor
+        vendor_lower = (inv.vendor_name or "").lower()
+        has_waiver = any((w.vendor_name or "").lower() == vendor_lower for w in lien_waivers if w.vendor_name)
+        if not has_waiver and not getattr(inv, 'is_payroll', False):
+            score -= 5
+            risk_flags.append({"flag": "No lien waiver on file for this vendor", "impact": -5})
+        elif has_waiver:
+            good_flags.append("Lien waiver on file")
+
+        # 8. Invoice age (very old invoices questioned by lenders)
+        inv_date = inv.invoice_date
+        if inv_date:
+            days_old = _days_between(inv_date, today) or 0
+            if days_old > 180:
+                score -= 10
+                risk_flags.append({"flag": f"Invoice is {days_old} days old — lenders may question inclusion", "impact": -10})
+            elif days_old > 90:
+                score -= 5
+                risk_flags.append({"flag": f"Invoice is {days_old} days old", "impact": -5})
+
+        score = max(0, min(100, score))
+        risk_level = "critical" if score < 40 else "high" if score < 60 else "medium" if score < 75 else "low"
+        draw_score_sum += score
+
+        invoice_scores.append({
+            "invoice_id": inv.id,
+            "invoice_number": inv.invoice_number,
+            "vendor": inv.vendor_name,
+            "amount": inv.total_due,
+            "submitted": inv.lender_submitted_amt,
+            "approval_score": score,
+            "risk_level": risk_level,
+            "risk_flags": risk_flags,
+            "good_flags": good_flags,
+            "approval_status": inv.approval_status,
+            "lender_status": inv.lender_status,
+        })
+
+    invoice_scores.sort(key=lambda x: x["approval_score"])
+
+    draw_avg = round(draw_score_sum / len(invoices), 1) if invoices else 0
+    draw_probability = draw_avg  # 0-100 scale
+
+    prediction = (
+        "HIGH probability of full approval" if draw_probability >= 80
+        else "LIKELY to be partially approved — review flagged invoices" if draw_probability >= 60
+        else "MODERATE rejection risk — address flags before submission" if draw_probability >= 40
+        else "HIGH rejection risk — significant issues require resolution"
+    )
+
+    high_risk_count = sum(1 for s in invoice_scores if s["risk_level"] in ("critical", "high"))
+    total_at_risk = sum(s["submitted"] or s["amount"] or 0
+                        for s in invoice_scores if s["risk_level"] in ("critical", "high"))
+
+    return {
+        "draw_id": draw.id,
+        "draw_number": draw.draw_number,
+        "approval_probability": draw_probability,
+        "prediction": prediction,
+        "invoice_count": len(invoices),
+        "high_risk_count": high_risk_count,
+        "total_at_risk": round(total_at_risk, 2),
+        "invoices": invoice_scores,
+    }
+
+
+# ─── Feature 9: Closeout Readiness Agent ─────────────────────────────────────
+
+def closeout_readiness(project: Any, invoices: List[Any], milestones: List[Any],
+                        lien_waivers: List[Any], documents: List[Any],
+                        subcontractors: List[Any], draws: List[Any],
+                        claims: List[Any]) -> dict:
+    """Real-time project closeout checklist — what's done and what's still needed."""
+    today = _today()
+    checklist = []
+    score_points = 0
+    total_points = 0
+
+    def _add(category: str, label: str, status: str, detail: str, points: int, action: str = ""):
+        nonlocal score_points, total_points
+        total_points += points
+        if status == "done":
+            score_points += points
+        checklist.append({
+            "category": category,
+            "label": label,
+            "status": status,        # done | pending | warning | blocking
+            "detail": detail,
+            "action": action,
+            "points": points,
+        })
+
+    # ── Invoices ──────────────────────────────────────────────────────────────
+    unpaid = [i for i in invoices if i.payment_status != "paid"]
+    unallocated = [i for i in invoices if len(getattr(i, '_allocs', []) or []) == 0]
+    pending_approval = [i for i in invoices if i.approval_status == "pending"]
+
+    _add("Invoices", "All Invoices Paid",
+         "done" if not unpaid else "blocking",
+         f"{len(unpaid)} unpaid invoice(s) outstanding." if unpaid else "All invoices paid.",
+         15, f"Pay {len(unpaid)} outstanding invoice(s)." if unpaid else "")
+
+    _add("Invoices", "All Invoices Allocated",
+         "done" if not unallocated else "warning",
+         f"{len(unallocated)} invoice(s) not allocated to cost categories." if unallocated else "All invoices allocated.",
+         5, "Allocate unallocated invoices." if unallocated else "")
+
+    _add("Invoices", "All Invoices Approved",
+         "done" if not pending_approval else "warning",
+         f"{len(pending_approval)} invoice(s) still pending approval." if pending_approval else "All invoices approved.",
+         5, "Approve or reject pending invoices." if pending_approval else "")
+
+    # ── Holdback ──────────────────────────────────────────────────────────────
+    unreleased_hb = [i for i in invoices
+                     if (i.holdback_pct or 0) > 0 and not i.holdback_released]
+    _add("Holdback", "All Holdback Released",
+         "done" if not unreleased_hb else "pending",
+         f"${sum(round((i.subtotal or i.total_due or 0)*(i.holdback_pct or 0)/100,2) for i in unreleased_hb):,.2f} holdback still unreleased on {len(unreleased_hb)} invoice(s)." if unreleased_hb else "All holdback released.",
+         15, "Release holdback on completed work." if unreleased_hb else "")
+
+    # ── Lien Waivers ──────────────────────────────────────────────────────────
+    paid_vendors = {(i.vendor_name or "").lower() for i in invoices
+                    if i.payment_status == "paid" and i.vendor_name}
+    unconditional_vendors = {(w.vendor_name or "").lower() for w in lien_waivers
+                              if w.waiver_type == "unconditional" and w.vendor_name}
+    missing_unconditional = paid_vendors - unconditional_vendors
+
+    _add("Lien Waivers", "Unconditional Lien Waivers — All Paid Vendors",
+         "done" if not missing_unconditional else "blocking",
+         f"{len(missing_unconditional)} vendor(s) paid but missing unconditional lien waiver." if missing_unconditional else "Unconditional waivers collected from all paid vendors.",
+         20, f"Collect unconditional waivers from: {', '.join(list(missing_unconditional)[:3])}{'...' if len(missing_unconditional)>3 else ''}." if missing_unconditional else "")
+
+    # ── Draws ─────────────────────────────────────────────────────────────────
+    draft_draws = [d for d in draws if d.status == "draft"]
+    unfunded_draws = [d for d in draws if d.status in ("draft", "submitted", "approved")]
+
+    _add("Draws", "All Draws Funded",
+         "done" if not unfunded_draws else "pending",
+         f"{len(unfunded_draws)} draw(s) not yet funded." if unfunded_draws else "All draws funded by lender.",
+         10, "Follow up with lender on outstanding draws." if unfunded_draws else "")
+
+    # ── Milestones ────────────────────────────────────────────────────────────
+    incomplete_ms = [m for m in milestones if m.status not in ("complete",) and m.pct_complete < 100]
+    _add("Milestones", "All Milestones Complete",
+         "done" if not incomplete_ms else "pending",
+         f"{len(incomplete_ms)} milestone(s) not yet marked complete." if incomplete_ms else "All milestones complete.",
+         10, "Mark remaining milestones complete." if incomplete_ms else "")
+
+    # ── Documents ─────────────────────────────────────────────────────────────
+    doc_types_present = {d.doc_type for d in documents}
+    required_types = {"permit", "contract"}
+    recommended_types = {"drawing", "report"}  # as-builts, final reports
+
+    missing_required = required_types - doc_types_present
+    missing_recommended = recommended_types - doc_types_present
+
+    _add("Documents", "Required Documents on File (Permits, Contracts)",
+         "done" if not missing_required else "warning",
+         f"Missing document type(s): {', '.join(missing_required)}." if missing_required else "All required document types on file.",
+         10, f"Upload {', '.join(missing_required)}." if missing_required else "")
+
+    _add("Documents", "As-Builts and Final Reports",
+         "done" if not missing_recommended else "warning",
+         f"Recommended documents missing: {', '.join(missing_recommended)}." if missing_recommended else "As-builts and reports on file.",
+         5, f"Upload {', '.join(missing_recommended)}." if missing_recommended else "")
+
+    # ── Subcontractors ────────────────────────────────────────────────────────
+    active_subs = [s for s in subcontractors if s.status == "active"]
+    _add("Subcontractors", "All Subcontract Work Complete",
+         "done" if not active_subs else "pending",
+         f"{len(active_subs)} subcontractor(s) still marked active." if active_subs else "All subcontracts marked complete.",
+         5, "Mark completed subcontracts as 'complete'." if active_subs else "")
+
+    # ── Claims ────────────────────────────────────────────────────────────────
+    open_claims = [c for c in claims if c.status in ("draft", "submitted")]
+    _add("Claims", "All Government Claims Received",
+         "done" if not open_claims else "pending",
+         f"{len(open_claims)} government claim(s) not yet received/approved." if open_claims else "All government claims received.",
+         5, "Follow up on outstanding claims." if open_claims else "")
+
+    # ── Final project dates ───────────────────────────────────────────────────
+    if project.end_date:
+        days_to_end = _days_between(today, project.end_date)
+        if days_to_end is not None:
+            if days_to_end < 0:
+                _add("Schedule", "Project End Date",
+                     "warning",
+                     f"Project end date was {abs(days_to_end)} days ago ({project.end_date}). Update end date or mark project complete.",
+                     5, "Update project end date.")
+            elif days_to_end <= 30:
+                _add("Schedule", "Project End Date",
+                     "pending",
+                     f"Project end date is {days_to_end} days away ({project.end_date}). Ensure all closeout tasks are addressed.",
+                     5, "Complete all closeout checklist items.")
+            else:
+                _add("Schedule", "Project End Date",
+                     "done",
+                     f"Project end date: {project.end_date} ({days_to_end} days remaining).",
+                     5)
+
+    # ── Compute completion percentage ─────────────────────────────────────────
+    pct_complete = round(score_points / total_points * 100, 1) if total_points else 0
+    blocking = [c for c in checklist if c["status"] == "blocking"]
+    pending = [c for c in checklist if c["status"] in ("pending", "warning")]
+    done = [c for c in checklist if c["status"] == "done"]
+
+    return {
+        "pct_complete": pct_complete,
+        "is_ready": pct_complete >= 90 and not blocking,
+        "blocking_count": len(blocking),
+        "pending_count": len(pending),
+        "done_count": len(done),
+        "total_items": len(checklist),
+        "checklist": checklist,
+        "categories": list({c["category"] for c in checklist}),
+    }
+
+
+# ─── Feature 10: Government Claim Optimizer ──────────────────────────────────
+
+# Categories that are typically non-eligible for government grants/subsidies
+_NON_ELIGIBLE_KEYWORDS = {
+    "contingency", "legal", "financing", "interest", "marketing",
+    "insurance", "bond", "admin", "overhead", "profit",
+}
+
+def govt_claim_optimizer(invoices: List[Any], payroll_entries: List[Any],
+                          categories: List[Any]) -> dict:
+    """Separate project costs into lender-eligible, provincial-eligible, federal-eligible,
+    and non-eligible buckets. Suggest optimal submission order to maximize recovery."""
+    cat_map = {c.id: c for c in categories}
+    today = _today()
+
+    lender_eligible = []
+    provincial_eligible = []
+    federal_eligible = []
+    non_eligible = []
+    already_assigned = []
+
+    total_lender = 0.0
+    total_prov = 0.0
+    total_fed = 0.0
+    total_non = 0.0
+
+    for inv in invoices:
+        # Get primary category name for eligibility check
+        primary_cat = None
+        for a in (getattr(inv, '_allocs', []) or []):
+            c = cat_map.get(a.category_id)
+            if c:
+                primary_cat = c.name.lower()
+                break
+
+        amount = inv.lender_submitted_amt or inv.subtotal or inv.total_due or 0
+
+        # Already assigned to a draw/claim
+        assigned_to = []
+        if inv.draw_id:
+            assigned_to.append(f"Draw #{inv.draw_id}")
+        if inv.provincial_claim_id:
+            assigned_to.append(f"Prov Claim #{inv.provincial_claim_id}")
+        if inv.federal_claim_id:
+            assigned_to.append(f"Fed Claim #{inv.federal_claim_id}")
+
+        inv_record = {
+            "invoice_id": inv.id,
+            "invoice_number": inv.invoice_number,
+            "vendor": inv.vendor_name,
+            "amount": round(amount, 2),
+            "category": primary_cat or "unallocated",
+            "billing_type": inv.billing_type,
+            "currency": inv.currency or "CAD",
+            "assigned_to": assigned_to,
+        }
+
+        # Check eligibility
+        is_non_eligible = primary_cat and any(kw in primary_cat for kw in _NON_ELIGIBLE_KEYWORDS)
+
+        if is_non_eligible:
+            non_eligible.append({**inv_record, "reason": "Category typically ineligible for government claims"})
+            total_non += amount
+        elif assigned_to:
+            already_assigned.append({**inv_record, "note": ", ".join(assigned_to)})
+        else:
+            # Determine eligible buckets
+            lender_eligible.append({**inv_record, "bucket": "lender"})
+            total_lender += amount
+
+            # Government eligibility — tax portion excluded, direct eligible
+            govt_amount = inv.subtotal or (inv.total_due or 0)  # govt gets pre-tax amount
+            if inv.billing_type in ("direct", None):
+                provincial_eligible.append({**inv_record, "amount": round(govt_amount, 2), "bucket": "provincial"})
+                total_prov += govt_amount
+                federal_eligible.append({**inv_record, "amount": round(govt_amount, 2), "bucket": "federal"})
+                total_fed += govt_amount
+
+    # Payroll — separate lender vs govt billable
+    payroll_lender_unsubmitted = []
+    payroll_prov_unsubmitted = []
+    payroll_total_lender = 0.0
+    payroll_total_prov = 0.0
+
+    for p in payroll_entries:
+        if p.lender_billable and p.lender_status == "pending":
+            payroll_lender_unsubmitted.append({
+                "type": "payroll",
+                "employee": p.employee_name or p.company_name or "Unknown",
+                "period": f"{p.pay_period_start} to {p.pay_period_end}" if p.pay_period_start else "—",
+                "amount": round(p.lender_billable or 0, 2),
+                "bucket": "lender",
+            })
+            payroll_total_lender += p.lender_billable or 0
+        if p.govt_billable and p.govt_status == "pending":
+            payroll_prov_unsubmitted.append({
+                "type": "payroll",
+                "employee": p.employee_name or p.company_name or "Unknown",
+                "period": f"{p.pay_period_start} to {p.pay_period_end}" if p.pay_period_start else "—",
+                "amount": round(p.govt_billable or 0, 2),
+                "bucket": "provincial",
+            })
+            payroll_total_prov += p.govt_billable or 0
+
+    # Recovery gap — costs assigned to draw but not to claims
+    draw_only = [i for i in already_assigned
+                 if any("Draw" in a for a in i["assigned_to"])
+                 and not any("Claim" in a for a in i["assigned_to"])]
+    recovery_gap = sum(i["amount"] for i in draw_only)
+
+    # Submission order recommendation
+    recommendations = []
+    if lender_eligible:
+        recommendations.append({
+            "order": 1,
+            "action": "Submit to lender draw first",
+            "reason": "Lender approval typically faster than government. Improves cash flow.",
+            "count": len(lender_eligible),
+            "amount": round(total_lender + payroll_total_lender, 2),
+        })
+    if provincial_eligible:
+        recommendations.append({
+            "order": 2,
+            "action": "Submit to provincial claim second",
+            "reason": "Provincial claims typically process faster than federal.",
+            "count": len(provincial_eligible),
+            "amount": round(total_prov + payroll_total_prov, 2),
+        })
+    if federal_eligible:
+        recommendations.append({
+            "order": 3,
+            "action": "Submit to federal claim last",
+            "reason": "Federal approvals typically slowest. Bundle with provincial-approved amounts.",
+            "count": len(federal_eligible),
+            "amount": round(total_fed, 2),
+        })
+    if recovery_gap > 0:
+        recommendations.append({
+            "order": 0,
+            "action": f"Claim recovery gap: ${recovery_gap:,.2f} in draw-assigned invoices not yet on any government claim",
+            "reason": "These invoices were submitted to lender but may also be eligible for government claims.",
+            "count": len(draw_only),
+            "amount": round(recovery_gap, 2),
+        })
+
+    max_recovery = round(total_lender + payroll_total_lender + total_prov + payroll_total_prov + total_fed, 2)
+
+    return {
+        "lender_eligible": lender_eligible,
+        "provincial_eligible": provincial_eligible,
+        "federal_eligible": federal_eligible,
+        "non_eligible": non_eligible,
+        "already_assigned": already_assigned,
+        "payroll_lender": payroll_lender_unsubmitted,
+        "payroll_provincial": payroll_prov_unsubmitted,
+        "totals": {
+            "lender": round(total_lender + payroll_total_lender, 2),
+            "provincial": round(total_prov + payroll_total_prov, 2),
+            "federal": round(total_fed, 2),
+            "non_eligible": round(total_non, 2),
+            "recovery_gap": round(recovery_gap, 2),
+            "max_potential_recovery": max_recovery,
+        },
+        "recommendations": sorted(recommendations, key=lambda r: r["order"]),
+        "unassigned_count": len(lender_eligible),
+    }
+
+
+# ─── Feature 11: Cost Consultant in a Box ────────────────────────────────────
+
+def cost_consultant_commentary(project: Any, dashboard: dict, db: Any) -> dict:
+    """Use Gemini to generate a professional monthly cost consultant commentary.
+    Falls back to a data-driven template if no API key is available."""
+    from .gemini import _env_keys
+    from ..models import GeminiApiKey
+
+    api_keys = _env_keys()
+    if not api_keys:
+        db_keys = db.query(GeminiApiKey).filter(GeminiApiKey.is_active == True).order_by(GeminiApiKey.priority).all()
+        api_keys = [k.key_value for k in db_keys]
+
+    total_budget  = dashboard.get("total_revised_budget", 0) or dashboard.get("total_budget", 0)
+    total_invoiced = dashboard.get("total_invoiced", 0)
+    total_remaining = dashboard.get("total_remaining", 0)
+    pct_burn = round(total_invoiced / total_budget * 100, 1) if total_budget else 0
+    holdback = (dashboard.get("holdback") or {}).get("held", 0)
+    total_co = dashboard.get("total_co_adjustment", 0)
+    unallocated = dashboard.get("unallocated_invoices", 0)
+    approval = dashboard.get("approval") or {}
+
+    # Build per-category context
+    cat_data = dashboard.get("categories") or []
+    at_risk_cats = [c for c in cat_data if c.get("pct_burn", 0) >= 85]
+    over_budget_cats = [c for c in cat_data if c.get("invoiced", 0) > c.get("revised_budget", 0)]
+
+    # Timeline progress
+    timeline_pct = None
+    if project.start_date and project.end_date:
+        total_days = _days_between(project.start_date, project.end_date)
+        elapsed = _days_between(project.start_date, _today())
+        if total_days and total_days > 0 and elapsed is not None:
+            timeline_pct = max(0.0, min(100.0, round(elapsed / total_days * 100, 1)))
+
+    context = {
+        "project_name": project.name,
+        "total_budget": total_budget,
+        "total_invoiced": total_invoiced,
+        "pct_burn": pct_burn,
+        "total_remaining": total_remaining,
+        "total_co_adjustments": total_co,
+        "holdback_held": holdback,
+        "timeline_pct": timeline_pct,
+        "unallocated_invoices": unallocated,
+        "approval_pending": approval.get("pending", 0),
+        "at_risk_categories": [{"name": c["name"], "pct_burn": c.get("pct_burn"), "remaining": c.get("remaining")} for c in at_risk_cats],
+        "over_budget_categories": [{"name": c["name"], "overrun": round(c.get("invoiced",0) - c.get("revised_budget",0), 2)} for c in over_budget_cats],
+    }
+
+    if api_keys:
+        try:
+            import google.generativeai as genai
+            import json as _json
+            genai.configure(api_key=api_keys[0])
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            prompt = f"""You are a senior construction cost consultant writing a monthly project status commentary for a Canadian real estate developer or infrastructure builder.
+
+Project data:
+{_json.dumps(context, indent=2)}
+
+Write a professional cost consultant commentary with exactly these 4 sections. Be specific, use the numbers, be direct about risks. Maximum 300 words total.
+
+FORMAT YOUR RESPONSE AS JSON with these exact keys:
+{{
+  "executive_summary": "1-2 sentence executive summary of project financial health.",
+  "budget_status": "Paragraph on budget vs actual, burn rate, categories at risk, change orders.",
+  "key_risks": "Paragraph on the top 2-3 financial risks facing the project right now.",
+  "recommended_actions": "Bulleted list of 3-5 specific recommended actions (use \\n between items)."
+}}
+
+Use Canadian construction finance terminology. Be direct, not generic."""
+
+            resp = model.generate_content(prompt)
+            text = resp.text.strip()
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+            sections = _json.loads(text.strip())
+            sections["generated_by"] = "gemini"
+            sections["generated_at"] = _today()
+            sections["data"] = context
+            return sections
+        except Exception as e:
+            logger.warning("Gemini cost consultant failed: %s", e)
+
+    # Template fallback
+    burn_status = "on track" if (timeline_pct is None or abs(pct_burn - (timeline_pct or 0)) <= 10) else ("running ahead of schedule" if pct_burn > (timeline_pct or 0) else "running behind schedule")
+    risk_bullets = []
+    if over_budget_cats:
+        risk_bullets.append(f"Budget overrun: {', '.join(c['name'] for c in over_budget_cats)} exceeded approved budget.")
+    if at_risk_cats:
+        risk_bullets.append(f"Near-limit categories: {', '.join(c['name'] for c in at_risk_cats[:2])} at ≥85% budget burn.")
+    if unallocated > 0:
+        risk_bullets.append(f"{unallocated} invoice(s) not allocated to cost categories — budget tracking incomplete.")
+    if total_co > 0:
+        risk_bullets.append(f"Change orders have increased total budget by ${total_co:,.2f} — monitor for further scope creep.")
+    if not risk_bullets:
+        risk_bullets.append("No material budget risks identified at this time.")
+
+    actions = [
+        f"Review and resolve {approval.get('pending',0)} pending invoice approval(s)." if approval.get('pending',0) > 0 else None,
+        f"Allocate {unallocated} unallocated invoice(s) to cost categories." if unallocated > 0 else None,
+        f"Issue change orders for over-budget categories: {', '.join(c['name'] for c in over_budget_cats)}." if over_budget_cats else None,
+        f"Release holdback on eligible invoices (${holdback:,.2f} currently held)." if holdback > 0 else None,
+        "Submit next draw package to lender to maintain cash flow." if pct_burn > 40 else None,
+    ]
+    actions = [a for a in actions if a][:5]
+
+    return {
+        "executive_summary": f"{project.name} is {pct_burn:.1f}% through its budget with {(str(timeline_pct)+'%') if timeline_pct else 'N/A'} of the project timeline elapsed. Financial health is {'concerning' if over_budget_cats else 'acceptable' if at_risk_cats else 'healthy'}.",
+        "budget_status": f"Total budget of ${total_budget:,.2f} CAD has ${total_invoiced:,.2f} ({pct_burn:.1f}%) invoiced to date, leaving ${total_remaining:,.2f} remaining. The project is {burn_status}. Change orders total ${total_co:,.2f}. Holdback held: ${holdback:,.2f}.",
+        "key_risks": " ".join(risk_bullets),
+        "recommended_actions": "\n".join(f"• {a}" for a in (actions or ["No immediate actions required."])),
+        "generated_by": "template",
+        "generated_at": _today(),
+        "data": context,
+    }
+
+
+# ─── Feature 12: Change Order Early Warning Radar ────────────────────────────
+
+# Keywords in invoice descriptions that often precede formal change orders
+_CO_SIGNAL_KEYWORDS = [
+    "extra", "additional", "unforeseen", "changed", "revised", "scope change",
+    "added", "new requirement", "out of scope", "variation", "modification",
+    "directed", "instruction", "site condition", "differing", "acceleration",
+    "delay", "disruption", "rework", "remediation", "change in",
+]
+
+def co_early_warning(invoices: List[Any], categories: List[Any],
+                      change_orders: List[Any], committed_costs: List[Any],
+                      allocations_by_cat: Dict[int, float]) -> dict:
+    """Detect likely change orders before they are formally issued by reading
+    invoice descriptions, budget drift, and CO velocity."""
+    today = _today()
+    cat_map = {c.id: c for c in categories}
+    signals = []
+
+    # Approved CO amounts by category
+    approved_co_by_cat: Dict[int, float] = {}
+    for co in change_orders:
+        if co.status == "approved" and co.category_id:
+            approved_co_by_cat[co.category_id] = approved_co_by_cat.get(co.category_id, 0.0) + co.amount
+
+    # CO velocity — is the rate of new COs increasing?
+    recent_cos = [co for co in change_orders if co.date and _days_between(co.date, today) is not None and _days_between(co.date, today) <= 30]
+    older_cos  = [co for co in change_orders if co.date and _days_between(co.date, today) is not None and 30 < _days_between(co.date, today) <= 60]
+    co_velocity_signal = len(recent_cos) > len(older_cos) and len(recent_cos) > 0
+
+    if co_velocity_signal:
+        signals.append({
+            "type": "co_velocity",
+            "severity": "warning",
+            "title": f"Change Order Rate Accelerating — {len(recent_cos)} in last 30 days vs {len(older_cos)} in prior 30",
+            "detail": "An increasing change order rate often indicates unresolved scope disputes. Review open COs and pending invoices.",
+            "category": None,
+            "amount_at_risk": round(sum(co.amount for co in recent_cos if co.amount > 0), 2),
+        })
+
+    # Invoice description keyword signals
+    invoice_keyword_hits = []
+    for inv in invoices:
+        if inv.approval_status == "approved":
+            continue  # already processed
+        description = ""
+        if inv.extracted_data and isinstance(inv.extracted_data, dict):
+            description = str(inv.extracted_data.get("description", "") or "")
+            items = inv.extracted_data.get("line_items") or inv.extracted_data.get("items") or []
+            if isinstance(items, list):
+                description += " ".join(str(i) for i in items)
+        description = description.lower()
+        matched = [kw for kw in _CO_SIGNAL_KEYWORDS if kw in description]
+        if matched:
+            invoice_keyword_hits.append({
+                "invoice_id": inv.id,
+                "vendor": inv.vendor_name,
+                "amount": inv.total_due,
+                "matched_keywords": matched[:3],
+            })
+
+    if invoice_keyword_hits:
+        total_at_risk = sum(h["amount"] or 0 for h in invoice_keyword_hits)
+        signals.append({
+            "type": "invoice_description_keywords",
+            "severity": "warning",
+            "title": f"{len(invoice_keyword_hits)} Invoice(s) Contain Change Order Keywords",
+            "detail": f"Invoice descriptions contain terms like 'extra work', 'scope change', or 'unforeseen'. Total value: ${total_at_risk:,.2f}. These may represent undocumented change orders.",
+            "category": None,
+            "amount_at_risk": round(total_at_risk, 2),
+            "items": invoice_keyword_hits[:5],
+        })
+
+    # Budget drift — categories spending faster than timeline suggests
+    for cat in categories:
+        budget = cat.budget + approved_co_by_cat.get(cat.id, 0.0)
+        invoiced = allocations_by_cat.get(cat.id, 0.0)
+        if budget <= 0 or invoiced <= 0:
+            continue
+        pct = invoiced / budget * 100
+
+        # Committed cost gap: contracted more than invoiced — may be accelerating
+        committed_for_cat = sum(cc.contract_amount for cc in committed_costs
+                                 if cc.category_id == cat.id and cc.status == "active")
+        invoiced_committed = sum(cc.invoiced_to_date or 0 for cc in committed_costs
+                                  if cc.category_id == cat.id and cc.status == "active")
+        committed_burn = round(invoiced_committed / committed_for_cat * 100, 1) if committed_for_cat > 0 else 0
+
+        if pct >= 80 and not any(co.category_id == cat.id for co in change_orders if co.status in ("pending", "approved")):
+            signals.append({
+                "type": "budget_drift_no_co",
+                "severity": "high" if pct >= 95 else "warning",
+                "title": f"'{cat.name}' at {pct:.0f}% budget with no pending CO",
+                "detail": f"This category is {pct:.0f}% through its ${budget:,.2f} budget but has no pending or approved change order. If additional work is required, a CO should be issued before further invoicing.",
+                "category": cat.name,
+                "amount_at_risk": round(budget - invoiced, 2),
+            })
+
+        if committed_for_cat > budget * 1.1:
+            overcommit = committed_for_cat - budget
+            signals.append({
+                "type": "over_committed",
+                "severity": "warning",
+                "title": f"'{cat.name}' is over-committed by ${overcommit:,.2f}",
+                "detail": f"Committed contracts (${committed_for_cat:,.2f}) exceed the category budget (${budget:,.2f}) by ${overcommit:,.2f}. A change order is likely required.",
+                "category": cat.name,
+                "amount_at_risk": round(overcommit, 2),
+            })
+
+    # Pending COs — flag high-value ones sitting unapproved
+    pending_cos = [co for co in change_orders if co.status == "pending"]
+    if pending_cos:
+        total_pending = sum(co.amount for co in pending_cos if co.amount > 0)
+        signals.append({
+            "type": "pending_change_orders",
+            "severity": "info",
+            "title": f"{len(pending_cos)} Change Order(s) Pending Approval — ${total_pending:,.2f}",
+            "detail": "Pending change orders represent unapproved budget adjustments. If approved, project budget increases. If rejected, scope must be reduced.",
+            "category": None,
+            "amount_at_risk": round(total_pending, 2),
+            "items": [{"co_number": co.co_number, "description": co.description, "amount": co.amount} for co in pending_cos[:5]],
+        })
+
+    sev_order = {"high": 0, "warning": 1, "info": 2}
+    signals.sort(key=lambda s: sev_order.get(s["severity"], 3))
+
+    total_at_risk = sum(s.get("amount_at_risk", 0) for s in signals)
+
+    return {
+        "signals": signals,
+        "signal_count": len(signals),
+        "high_count": sum(1 for s in signals if s["severity"] == "high"),
+        "total_at_risk": round(total_at_risk, 2),
+        "co_velocity": co_velocity_signal,
+        "pending_co_count": len(pending_cos) if 'pending_cos' in dir() else 0,
+        "total_change_orders": len(change_orders),
+    }
+
+
+# ─── Feature 13: Vendor Risk Memory ──────────────────────────────────────────
+
+def vendor_risk_memory(all_invoices: List[Any], all_change_orders: List[Any],
+                        all_lien_waivers: List[Any]) -> List[dict]:
+    """Cross-project vendor risk profiles — learn which vendors cause overruns,
+    COs, late waivers, duplicates, or rejection-prone submissions."""
+    from collections import defaultdict
+
+    vendor_data: dict = defaultdict(lambda: {
+        "invoice_count": 0,
+        "total_invoiced": 0.0,
+        "total_submitted": 0.0,
+        "total_approved": 0.0,
+        "total_rejected": 0.0,
+        "overdue_count": 0,
+        "duplicate_numbers": set(),
+        "invoice_numbers": [],
+        "co_count": 0,
+        "co_total": 0.0,
+        "waiver_count": 0,
+        "unconditional_waiver_count": 0,
+        "rejected_count": 0,
+        "partial_approval_count": 0,
+    })
+
+    today = _today()
+
+    # Aggregate invoice data per vendor
+    for inv in all_invoices:
+        vendor = (inv.vendor_name or "Unknown").strip()
+        d = vendor_data[vendor]
+        d["invoice_count"] += 1
+        total = inv.total_due or 0
+        d["total_invoiced"] += total
+        d["total_submitted"] += inv.lender_submitted_amt or total
+        d["total_approved"] += inv.lender_approved_amt or 0
+        if inv.lender_status == "rejected":
+            d["total_rejected"] += inv.lender_submitted_amt or total
+            d["rejected_count"] += 1
+        if inv.lender_approved_amt and inv.lender_submitted_amt and inv.lender_approved_amt < inv.lender_submitted_amt * 0.95:
+            d["partial_approval_count"] += 1
+
+        # Overdue check
+        due = inv.due_date or inv.invoice_date
+        if due and inv.payment_status != "paid":
+            days = _days_between(due, today) or 0
+            if days > 60:
+                d["overdue_count"] += 1
+
+        # Duplicate invoice numbers
+        inv_num = inv.invoice_number
+        if inv_num:
+            if inv_num in d["invoice_numbers"]:
+                d["duplicate_numbers"].add(inv_num)
+            d["invoice_numbers"].append(inv_num)
+
+    # CO data
+    for co in all_change_orders:
+        vendor = (co.issued_by or "Unknown").strip()
+        if vendor and vendor != "Unknown":
+            vendor_data[vendor]["co_count"] += 1
+            vendor_data[vendor]["co_total"] += co.amount or 0
+
+    # Lien waiver data
+    for w in all_lien_waivers:
+        vendor = (w.vendor_name or "Unknown").strip()
+        vendor_data[vendor]["waiver_count"] += 1
+        if w.waiver_type == "unconditional":
+            vendor_data[vendor]["unconditional_waiver_count"] += 1
+
+    results = []
+    for vendor, d in vendor_data.items():
+        if vendor == "Unknown" or d["invoice_count"] == 0:
+            continue
+
+        # Compute risk score (0 = very risky, 100 = very reliable)
+        score = 100
+        risk_flags = []
+        positive_flags = []
+
+        # Rejection rate
+        rejection_rate = d["rejected_count"] / d["invoice_count"] if d["invoice_count"] > 0 else 0
+        if rejection_rate > 0.2:
+            score -= 25
+            risk_flags.append(f"High rejection rate: {rejection_rate:.0%} of invoices rejected by lender")
+        elif rejection_rate > 0:
+            score -= 10
+            risk_flags.append(f"Some lender rejections: {d['rejected_count']} invoice(s)")
+
+        # Partial approval rate
+        partial_rate = d["partial_approval_count"] / d["invoice_count"] if d["invoice_count"] > 0 else 0
+        if partial_rate > 0.3:
+            score -= 15
+            risk_flags.append(f"Frequent partial approvals: {partial_rate:.0%} of invoices partially approved")
+
+        # Overdue payments
+        overdue_rate = d["overdue_count"] / d["invoice_count"] if d["invoice_count"] > 0 else 0
+        if overdue_rate > 0.3:
+            score -= 15
+            risk_flags.append(f"{d['overdue_count']} invoice(s) overdue >60 days")
+        elif d["overdue_count"] == 0:
+            positive_flags.append("No overdue invoices")
+
+        # Duplicate invoices
+        if d["duplicate_numbers"]:
+            score -= 20
+            risk_flags.append(f"Duplicate invoice numbers detected: {', '.join(list(d['duplicate_numbers'])[:3])}")
+
+        # Change orders
+        if d["invoice_count"] > 0:
+            co_per_inv = d["co_count"] / d["invoice_count"]
+            if co_per_inv > 0.5:
+                score -= 15
+                risk_flags.append(f"High CO rate: {d['co_count']} change orders across {d['invoice_count']} invoices")
+            elif d["co_count"] == 0:
+                positive_flags.append("No change orders")
+
+        # Lien waiver compliance
+        if d["invoice_count"] > 2:
+            if d["unconditional_waiver_count"] == 0:
+                score -= 15
+                risk_flags.append("No unconditional lien waivers on file")
+            elif d["waiver_count"] > 0:
+                positive_flags.append("Lien waivers on file")
+
+        score = max(0, min(100, score))
+        risk_level = "critical" if score < 40 else "high" if score < 60 else "medium" if score < 75 else "low"
+
+        # Approval rate
+        approval_rate = round(d["total_approved"] / d["total_submitted"] * 100, 1) if d["total_submitted"] > 0 else None
+
+        results.append({
+            "vendor": vendor,
+            "invoice_count": d["invoice_count"],
+            "total_invoiced": round(d["total_invoiced"], 2),
+            "total_submitted": round(d["total_submitted"], 2),
+            "total_approved": round(d["total_approved"], 2),
+            "approval_rate": approval_rate,
+            "rejection_count": d["rejected_count"],
+            "partial_approval_count": d["partial_approval_count"],
+            "overdue_count": d["overdue_count"],
+            "duplicate_count": len(d["duplicate_numbers"]),
+            "co_count": d["co_count"],
+            "co_total": round(d["co_total"], 2),
+            "waiver_count": d["waiver_count"],
+            "unconditional_waiver_count": d["unconditional_waiver_count"],
+            "risk_score": score,
+            "risk_level": risk_level,
+            "risk_flags": risk_flags,
+            "positive_flags": positive_flags,
+        })
+
+    results.sort(key=lambda r: r["risk_score"])
+    return results
