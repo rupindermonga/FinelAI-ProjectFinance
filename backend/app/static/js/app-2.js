@@ -1,4 +1,4 @@
-const API = '';  // same origin
+const API = '';  // same origin — v2
 
 function app() {
   return {
