@@ -28,6 +28,7 @@ def _user_orgs(user_id: int, db: Session) -> list:
             result.append({
                 "id": org.id, "name": org.name, "slug": org.slug,
                 "plan": org.plan, "role": m.role,
+                "is_active": org.is_active, "created_at": org.created_at,
             })
     return result
 
