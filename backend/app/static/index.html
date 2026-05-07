@@ -7,14 +7,11 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
 
   <!-- finel.ai brand fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/fonts/fonts.css" />
 
-  <script src="https://cdn.tailwindcss.com"></script>
+  <style>[x-cloak]{display:none!important}</style>
+  <script src="/static/js/tailwind.min.js"></script>
   <script>
-    // finel.ai brand tokens — remaps Tailwind's blue scale to the corporate palette
-    // (#00acff anchor) and exposes Inter (sans) + Playfair Display (serif).
     tailwind.config = {
       theme: {
         extend: {
@@ -48,10 +45,10 @@
       },
     };
   </script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script defer src="/static/js/alpine.min.js"></script>
+  <link rel="stylesheet" href="/static/css/fontawesome/all.min.css" />
+  <link rel="stylesheet" href="/static/css/flatpickr.min.css" />
+  <script src="/static/js/flatpickr.min.js"></script>
   <link rel="stylesheet" href="/static/css/style.css?v=20260601" />
 
   <!-- PWA -->
@@ -84,8 +81,7 @@
           <a href="https://finel.ai" class="flex-shrink-0 flex items-center">
             <img src="/static/favicon.svg" alt="Finel AI" class="h-10 w-10 mr-2 rounded-lg" />
             <div class="flex flex-col leading-none">
-              <span class="font-bold text-2xl tracking-tight text-slate-900">Finel AI</span>
-              <span class="text-[10px] font-semibold tracking-widest uppercase text-slate-400 mt-0.5">Projects</span>
+              <span class="font-bold text-2xl tracking-tight text-slate-900">Finel AI Projects</span>
             </div>
           </a>
 
@@ -4328,16 +4324,6 @@
           <p x-show="changePwMsg" class="text-sm mt-2" :class="changePwError ? 'text-red-600' : 'text-green-600'" x-text="changePwMsg"></p>
         </div>
 
-        <!-- Gemini Configuration (read-only reference) -->
-        <div class="bg-white rounded-xl border p-6 mb-6">
-          <h3 class="font-semibold text-gray-800 mb-3"><i class="fa-solid fa-key mr-2 text-blue-500"></i>Gemini API Keys</h3>
-          <p class="text-sm text-gray-600 mb-3">API keys are managed in the server's <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">backend/.env</code> file.</p>
-          <div class="bg-gray-50 rounded-lg px-4 py-3 text-xs font-mono text-gray-500 space-y-1">
-            <div>GEMINI_API_KEYS=key1,key2,key3</div>
-            <div>GEMINI_MODEL=gemini-2.5-flash</div>
-          </div>
-        </div>
-
         <!-- User Management (admin only) -->
         <div x-show="user?.is_admin" class="bg-white rounded-xl border p-6 mb-6">
           <div class="flex items-center justify-between mb-4">
@@ -5352,7 +5338,7 @@
 
 
   <!-- ADD CATEGORY MODAL -->
-  <div x-show="showAddCategoryModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showAddCategoryModal=false">
+  <div x-show="showAddCategoryModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showAddCategoryModal=false">
     <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-sm">
       <div class="flex items-center justify-between mb-5">
         <h3 class="text-lg font-bold text-gray-800" x-text="addCategoryLevel === 'category' ? 'Add Category' : addCategoryLevel === 'sub_category' ? 'Add Sub-Category' : 'Add Sub-Division'"></h3>
@@ -5385,16 +5371,27 @@
 
   <script src="/static/js/app-2.js?v=2"></script>
 
-<!-- FloatingAppPanel — landing page only. canonical: finel-hub/brand/floating-panel-example.tsx -->
-<div x-show="view === 'landing'" class="fixed right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2 items-end">
-  <button @click="view='login'"
-          class="block px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all">
-    Sign in
-  </button>
-  <button @click="demoLogin()"
-          class="block px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap bg-white text-slate-700 border border-gray-200 hover:border-blue-300 hover:text-blue-600 shadow-sm transition-all">
-    Try Demo
-  </button>
+<!-- SidePanel — landing page only. Matches books.finel.ai right-side nav card. -->
+<div x-show="view === 'landing'" x-cloak
+     class="fixed right-0 top-1/2 -translate-y-1/2 z-40">
+  <div class="bg-white rounded-l-2xl shadow-xl border border-gray-200 border-r-0 overflow-hidden w-44">
+    <button @click="demoLogin()"
+            class="w-full px-5 py-3.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold text-left transition-colors">
+      Try Demo
+    </button>
+    <button @click="view='login'"
+            class="w-full px-5 py-3 text-sm font-medium text-slate-700 text-left hover:bg-gray-50 transition-colors border-t border-gray-100">
+      Sign in
+    </button>
+    <a href="https://finel.ai/contact"
+       class="block px-5 py-3 text-sm font-medium text-slate-700 hover:bg-gray-50 transition-colors border-t border-gray-100">
+      Pricing
+    </a>
+    <a href="https://finel.ai/contact"
+       class="block px-5 py-3 text-sm font-medium text-slate-700 hover:bg-gray-50 transition-colors border-t border-gray-100">
+      FAQ
+    </a>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
