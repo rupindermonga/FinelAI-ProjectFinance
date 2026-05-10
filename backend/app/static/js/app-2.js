@@ -19,6 +19,12 @@ function app() {
     // ── Audit log ─────────────────────────────────────────────────
     auditLog: [], auditTotal: 0, auditPage: 1, auditLoading: false,
 
+    // ── AI Accountant ─────────────────────────────────────────────
+    healthData: null, healthLoading: false,
+
+    // ── Cash Flow ─────────────────────────────────────────────────
+    cashFlowData: null, cashFlowLoading: false,
+
     // ── PM state ──────────────────────────────────────────────────
     pmSummary: null,
     // Tasks
@@ -2191,6 +2197,51 @@ function app() {
       const h = this.token ? { Authorization: `Bearer ${this.token}` } : {};
       if (this.currentOrg?.id) h['X-Organization-Id'] = String(this.currentOrg.id);
       return h;
+    },
+
+    // ── AI Construction Accountant ────────────────────────────────
+    async loadHealthCheck() {
+      if (!this.currentProject) return;
+      this.healthLoading = true;
+      try {
+        this.healthData = await this.get(
+          `/api/project/ai/construction-health?project_id=${this.currentProject.id}`
+        );
+      } catch(e) { this.healthData = null; }
+      finally { this.healthLoading = false; }
+    },
+    healthSeverityClass(s) {
+      return { critical:'bg-red-100 text-red-700 border-red-200',
+               warning:'bg-amber-50 text-amber-700 border-amber-200',
+               info:'bg-blue-50 text-blue-700 border-blue-200' }[s] || 'bg-gray-50 text-gray-600 border-gray-200';
+    },
+    healthIconClass(s) {
+      return { critical:'fa-circle-xmark text-red-500',
+               warning:'fa-triangle-exclamation text-amber-500',
+               info:'fa-circle-info text-blue-400' }[s] || 'fa-circle-info text-gray-400';
+    },
+    scoreColor(score) {
+      if (score >= 90) return 'text-green-600';
+      if (score >= 75) return 'text-blue-600';
+      if (score >= 55) return 'text-amber-600';
+      return 'text-red-600';
+    },
+    openDrawPackage(drawId) {
+      window.open(`/api/project/draws/${drawId}/package`, '_blank');
+    },
+
+    // ── Cash Flow ─────────────────────────────────────────────────
+    async loadCashFlowData() {
+      if (!this.currentProject) return;
+      this.cashFlowLoading = true;
+      try {
+        this.cashFlowData = await this.get('/api/project/cash-flow');
+      } catch(e) { this.cashFlowData = null; }
+      finally { this.cashFlowLoading = false; }
+    },
+    cfBarHeight(val, max) {
+      if (!max || max === 0) return '2px';
+      return Math.max(4, Math.round(Math.abs(val) / max * 100)) + 'px';
     },
 
     // ── PM helpers ────────────────────────────────────────────────
