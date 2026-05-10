@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 from ..database import get_db
 from ..models import Invoice, User, Correction
+from .audit import log as audit_log
 from ..dependencies import get_current_user, get_current_org
 from ..schemas import InvoiceOut, InvoiceListResponse
 
@@ -254,6 +255,9 @@ def update_invoice_fields(
 
     db.commit()
     db.refresh(inv)
+    if inv.org_id:
+        audit_log(db, inv.org_id, current_user, "edit_invoice", entity_type="invoice",
+                  entity_id=inv.id, detail=f"Updated {len(body)} field(s) on invoice #{inv.id} ({inv.vendor_name})")
     return {"message": "Updated", "id": inv.id}
 
 
@@ -347,6 +351,9 @@ def update_approval(invoice_id: int, body: dict, db: Session = Depends(get_db), 
         inv.approved_by = None
         inv.approved_at = None
     db.commit()
+    if inv.org_id:
+        audit_log(db, inv.org_id, current_user, "approve_invoice", entity_type="invoice",
+                  entity_id=inv.id, detail=f"Set approval to '{status}' on invoice #{inv.id} ({inv.vendor_name})")
     return {"id": inv.id, "approval_status": inv.approval_status, "approved_by": inv.approved_by, "approved_at": inv.approved_at}
 
 
@@ -376,11 +383,15 @@ def bulk_approve(body: dict, db: Session = Depends(get_db), current_user: User =
         raise HTTPException(status_code=400, detail="draw_id required")
     today = datetime.utcnow().strftime("%Y-%m-%d")
     invs = db.query(Invoice).filter(Invoice.user_id == current_user.id, Invoice.draw_id == draw_id).all()
+    org_id = invs[0].org_id if invs else None
     for inv in invs:
         inv.approval_status = "approved"
         inv.approved_by = current_user.username
         inv.approved_at = today
     db.commit()
+    if org_id:
+        audit_log(db, org_id, current_user, "bulk_approve_invoices", entity_type="draw",
+                  entity_id=draw_id, detail=f"Bulk-approved {len(invs)} invoices in draw #{draw_id}")
     return {"approved": len(invs)}
 
 
@@ -398,8 +409,15 @@ def delete_invoice(
 
     # Delete DB record first so a failed commit doesn't orphan the record
     file_to_delete = inv.source_file
+    org_id = inv.org_id
+    vendor = inv.vendor_name or "unknown vendor"
+    total  = inv.total_due or 0
     db.delete(inv)
     db.commit()
+
+    if org_id:
+        audit_log(db, org_id, current_user, "delete_invoice", entity_type="invoice",
+                  entity_id=invoice_id, detail=f"Deleted invoice #{invoice_id} ({vendor}, ${total:,.2f})")
 
     # Now safe to remove the backing file
     if file_to_delete and os.path.isfile(file_to_delete):

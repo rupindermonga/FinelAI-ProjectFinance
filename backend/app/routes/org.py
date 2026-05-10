@@ -13,6 +13,7 @@ from ..schemas import (
     OrgVendorCreate, OrgVendorOut,
 )
 from ..dependencies import get_current_user, get_current_org, require_org_role
+from .audit import log as audit_log
 
 router = APIRouter(prefix="/api/org", tags=["org"])
 
@@ -188,6 +189,8 @@ def add_member(
     db.add(mem)
     db.commit()
     db.refresh(mem)
+    audit_log(db, org.id, current_user, "add_member", entity_type="organization_member",
+              entity_id=mem.id, detail=f"Added '{target.username}' to org as {role}")
     return _member_out(mem)
 
 
@@ -253,8 +256,11 @@ def remove_member(
         if owner_count <= 1:
             raise HTTPException(status_code=400, detail="Cannot remove the last owner")
 
+    uname = mem.user.username if mem.user else f"user#{mem.user_id}"
     mem.is_active = False
     db.commit()
+    audit_log(db, org.id, current_user, "remove_member", entity_type="organization_member",
+              entity_id=member_id, detail=f"Removed '{uname}' from org")
     return {"message": "Member removed"}
 
 

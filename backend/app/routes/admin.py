@@ -5,9 +5,14 @@ from passlib.context import CryptContext
 from typing import List
 
 from ..database import get_db
-from ..models import GeminiApiKey, User
+from ..models import GeminiApiKey, User, OrganizationMember
 from ..schemas import ApiKeyCreate, ApiKeyUpdate, ApiKeyOut, UserOut
 from ..dependencies import get_current_user
+from .audit import log as audit_log
+
+def _admin_org_id(admin: User, db) -> int | None:
+    m = db.query(OrganizationMember).filter(OrganizationMember.user_id == admin.id, OrganizationMember.is_active == True).first()
+    return m.org_id if m else None
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -157,6 +162,10 @@ def create_user(body: dict, db: Session = Depends(get_db), admin: User = Depends
     from ..seed_project import seed_project_finance
     seed_project_finance(db, user.id)
 
+    org_id = _admin_org_id(admin, db)
+    if org_id:
+        audit_log(db, org_id, admin, "create_user", entity_type="user",
+                  entity_id=user.id, detail=f"Admin created user '{username}' (is_admin={user.is_admin})")
     return {"id": user.id, "username": user.username, "email": user.email, "is_active": user.is_active, "is_admin": user.is_admin}
 
 
@@ -194,6 +203,11 @@ def delete_user(user_id: int, db: Session = Depends(get_db), admin: User = Depen
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     if user.is_admin:
         raise HTTPException(status_code=400, detail="Cannot delete another admin")
+    uname = user.username
+    org_id = _admin_org_id(admin, db)
     db.delete(user)
     db.commit()
-    return {"message": f"User {user.username} deleted"}
+    if org_id:
+        audit_log(db, org_id, admin, "delete_user", entity_type="user",
+                  entity_id=user_id, detail=f"Admin deleted user '{uname}'")
+    return {"message": f"User {uname} deleted"}

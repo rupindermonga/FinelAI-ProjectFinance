@@ -10,6 +10,7 @@ from ..database import get_db
 from ..models import User, OrganizationMember, Organization, PasswordResetToken, OrgInvitation
 from ..schemas import UserCreate, UserLogin, UserOut, Token
 from ..dependencies import get_current_user, SECRET_KEY, ALGORITHM
+from .audit import log as audit_log
 
 
 def _user_orgs(user_id: int, db: Session) -> list:
@@ -117,11 +118,14 @@ def login(body: UserLogin, request: Request = None, db: Session = Depends(get_db
 
     token = create_token(user.id)
     orgs = _user_orgs(user.id, db)
+    org_id = orgs[0]["id"] if orgs else None
+    if org_id:
+        audit_log(db, org_id, user, "login", detail=f"Login from {ip}", request=request)
     return Token(
         access_token=token, token_type="bearer",
         user=UserOut.model_validate(user),
         orgs=orgs,
-        active_org_id=orgs[0]["id"] if orgs else None,
+        active_org_id=org_id,
     )
 
 
@@ -216,8 +220,12 @@ def reset_password(body: dict, db: Session = Depends(get_db)):
     if not rec or rec.expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Invalid or expired reset link")
     rec.used = True
-    rec.user.hashed_password = pwd_context.hash(new_pw)
+    user = rec.user
+    user.hashed_password = pwd_context.hash(new_pw)
     db.commit()
+    orgs = _user_orgs(user.id, db)
+    if orgs:
+        audit_log(db, orgs[0]["id"], user, "password_reset", entity_type="user", entity_id=user.id, detail=f"Password reset via email link for {user.username}")
     return {"message": "Password reset successfully. You can now sign in."}
 
 
@@ -257,6 +265,9 @@ def signup(body: dict, background_tasks: BackgroundTasks, db: Session = Depends(
 
     db.add(OrganizationMember(org_id=org.id, user_id=user.id, role="owner"))
     db.commit(); db.refresh(user)
+
+    audit_log(db, org.id, user, "signup", entity_type="user", entity_id=user.id,
+              detail=f"New org '{org_name}' created by '{username}'")
 
     from ..services.email import send_welcome
     background_tasks.add_task(send_welcome, email, username, org_name)
@@ -322,6 +333,9 @@ def accept_invite(body: dict, db: Session = Depends(get_db)):
                                   role=inv.role, invited_by=inv.invited_by))
     inv.accepted_at = datetime.utcnow()
     db.commit(); db.refresh(user)
+
+    audit_log(db, inv.org_id, user, "accept_invite", entity_type="user", entity_id=user.id,
+              detail=f"'{username}' accepted invitation to org #{inv.org_id} as {inv.role}")
 
     token = create_token(user.id)
     orgs  = _user_orgs(user.id, db)

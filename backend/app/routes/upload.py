@@ -10,6 +10,7 @@ from ..dependencies import get_current_user, get_current_org
 from ..services.extractor import save_upload_file, process_invoice_file
 from ..services.gemini import check_api_key
 from .invoices import processing_store
+from .audit import log as audit_log
 
 router = APIRouter(prefix="/api/upload", tags=["upload"])
 
@@ -141,6 +142,8 @@ async def upload_invoices(
         db.add(invoice)
         db.commit()
         db.refresh(invoice)
+        audit_log(db, org.id, current_user, "upload_invoice", entity_type="invoice",
+                  entity_id=invoice.id, detail=f"Uploaded '{upload.filename}' to project #{invoice.project_id}")
 
         # Queue background extraction
         background_tasks.add_task(

@@ -31,6 +31,7 @@ from ..schemas import (
 )
 from ..dependencies import get_current_user, get_current_org
 from typing import Tuple
+from .audit import log as audit_log
 
 router = APIRouter(prefix="/api/project", tags=["project"])
 
@@ -94,6 +95,8 @@ def create_project(
         from ..seed_project import seed_project_template
         seed_project_template(db, proj.id, project_type)
         db.refresh(proj)
+    audit_log(db, org.id, current_user, "create_project", entity_type="project",
+              entity_id=proj.id, detail=f"Created project '{proj.name}' (budget ${proj.total_budget:,.0f})")
     return proj
 
 
@@ -128,8 +131,12 @@ def delete_project(project_id: int, db: Session = Depends(get_db), current_user:
     proj = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
+    org_id, name = proj.org_id, proj.name
     db.delete(proj)
     db.commit()
+    if org_id:
+        audit_log(db, org_id, current_user, "delete_project", entity_type="project",
+                  entity_id=project_id, detail=f"Deleted project '{name}'")
     return {"message": "Project deleted"}
 
 
@@ -448,6 +455,9 @@ def create_draw(body: DrawCreate, proj: Project = Depends(_req_proj), db: Sessio
     db.add(draw)
     db.commit()
     db.refresh(draw)
+    if proj.org_id:
+        audit_log(db, proj.org_id, None, "create_draw", entity_type="draw",
+                  entity_id=draw.id, detail=f"Created draw #{draw.draw_number} for project '{proj.name}'")
     return _draw_out(draw, db)
 
 @router.put("/draws/{draw_id}")
@@ -469,9 +479,14 @@ def delete_draw(draw_id: int, db: Session = Depends(get_db), current_user: User 
             .filter(Draw.id == draw_id, Project.user_id == current_user.id).first())
     if not draw:
         raise HTTPException(status_code=404)
+    proj = draw.project if hasattr(draw, 'project') else db.query(Project).filter(Project.id == draw.project_id).first()
+    num, org_id = draw.draw_number, (proj.org_id if proj else None)
     db.query(Invoice).filter(Invoice.draw_id == draw_id).update({"draw_id": None})
     db.delete(draw)
     db.commit()
+    if org_id:
+        audit_log(db, org_id, current_user, "delete_draw", entity_type="draw",
+                  entity_id=draw_id, detail=f"Deleted draw #{num}")
     return {"message": "Draw deleted"}
 
 @router.put("/draws/{draw_id}/invoices")
@@ -527,6 +542,10 @@ def bulk_approve_draw(draw_id: int, db: Session = Depends(get_db), current_user:
         inv.lender_status = "approved"
         count += 1
     db.commit()
+    proj = db.query(Project).filter(Project.id == draw.project_id).first()
+    if proj and proj.org_id:
+        audit_log(db, proj.org_id, current_user, "approve_draw", entity_type="draw",
+                  entity_id=draw_id, detail=f"Approved {count} invoices in draw #{draw.draw_number}")
     return {"message": f"Approved {count} invoices", "count": count}
 
 
@@ -592,6 +611,9 @@ def create_claim(body: ClaimCreate, proj: Project = Depends(_req_proj), db: Sess
     db.add(claim)
     db.commit()
     db.refresh(claim)
+    if proj.org_id:
+        audit_log(db, proj.org_id, None, "create_claim", entity_type="claim",
+                  entity_id=claim.id, detail=f"Created {claim.claim_type} claim #{claim.claim_number} for project '{proj.name}'")
     return _claim_out(claim, db)
 
 @router.put("/claims/{claim_id}")
@@ -613,10 +635,15 @@ def delete_claim(claim_id: int, db: Session = Depends(get_db), current_user: Use
              .filter(Claim.id == claim_id, Project.user_id == current_user.id).first())
     if not claim:
         raise HTTPException(status_code=404)
+    proj = db.query(Project).filter(Project.id == claim.project_id).first()
+    ctype, cnum = claim.claim_type, claim.claim_number
     fk_name = _claim_fk_name(claim)
     db.query(Invoice).filter(_claim_fk(claim) == claim_id).update({fk_name: None})
     db.delete(claim)
     db.commit()
+    if proj and proj.org_id:
+        audit_log(db, proj.org_id, current_user, "delete_claim", entity_type="claim",
+                  entity_id=claim_id, detail=f"Deleted {ctype} claim #{cnum}")
     return {"message": "Claim deleted"}
 
 @router.put("/claims/{claim_id}/invoices")
