@@ -840,6 +840,15 @@
               <button @click="view='finance'; loadProjectDashboard(); sidebarOpen=false" :class="view==='finance'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-chart-pie w-4"></i> Finance Summary
               </button>
+              <button @click="view='cost-to-complete'; loadCostToComplete(); sidebarOpen=false" :class="view==='cost-to-complete'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-chart-line w-4"></i> Cost to Complete
+              </button>
+              <button @click="view='pay-readiness'; loadPayReadiness(); sidebarOpen=false" :class="view==='pay-readiness'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-circle-check w-4"></i> Pay Readiness
+              </button>
+              <button @click="view='contract-matching'; loadContractMatching(); sidebarOpen=false" :class="view==='contract-matching'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-link w-4"></i> Contract Matching
+              </button>
               <button @click="view='agedpayables'; loadAgedPayables(); sidebarOpen=false" :class="view==='agedpayables'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-clock-rotate-left w-4"></i> Aged Payables
               </button>
@@ -917,6 +926,14 @@
         <!-- ── ADMIN / ORG ──────────────────────── -->
         <div class="mt-3 space-y-0.5">
           <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400/60">Account</p>
+          <button @click="view='compliance'; loadVendorCompliance(); sidebarOpen=false" :class="view==='compliance'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-shield-check w-4"></i>
+            <span class="flex-1 text-left">CA Compliance</span>
+            <span x-show="(vendorCompliance?.summary?.critical||0)>0" x-text="vendorCompliance?.summary?.critical" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
+          </button>
+          <button @click="view='t5018'; loadT5018(); sidebarOpen=false" :class="view==='t5018'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-file-invoice-dollar w-4"></i> T5018 Report
+          </button>
           <button @click="view='org-settings'; loadOrgMembers(); sidebarOpen=false" :class="view==='org-settings'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-building w-4"></i> Organization
           </button>
@@ -5320,6 +5337,425 @@
           </div>
         </div>
       </div><!-- /health-check -->
+
+
+      <!-- ── COST-TO-COMPLETE COPILOT ───────────────────────────────── -->
+      <div x-show="view==='cost-to-complete'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-chart-line mr-2 text-blue-600"></i>Cost-to-Complete Copilot</h2>
+            <p class="text-sm text-gray-500 mt-0.5">Forecast final cost, contingency burn, and budget variance at completion</p>
+          </div>
+          <div class="flex gap-2">
+            <button @click="downloadQBExport()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"><i class="fa-brands fa-square-js"></i> QuickBooks</button>
+            <button @click="downloadXeroExport()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"><i class="fa-solid fa-cloud-arrow-down"></i> Xero</button>
+            <button @click="loadCostToComplete()" :disabled="ctcLoading" class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 transition"><i class="fa-solid fa-rotate-right"></i></button>
+          </div>
+        </div>
+
+        <div x-show="ctcLoading" class="text-center py-16 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-3xl"></i></div>
+        <div x-show="!ctcLoading && !ctcData" class="text-center py-16 text-gray-400"><i class="fa-solid fa-chart-line text-4xl mb-3 text-gray-200"></i><div>Select a project to see cost-to-complete forecast</div></div>
+
+        <template x-if="ctcData && !ctcLoading">
+          <div>
+            <!-- Summary cards -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div class="bg-white border rounded-xl p-4 text-center">
+                <div class="text-xs text-gray-400 uppercase font-bold mb-1">Budget</div>
+                <div class="text-xl font-bold text-gray-800" x-text="'$'+(ctcData.budget||0).toLocaleString()"></div>
+                <div class="text-xs text-gray-400 mt-1" x-text="ctcData.province+' · '+ctcData.holdback_pct+'% holdback'"></div>
+              </div>
+              <div class="bg-white border rounded-xl p-4 text-center">
+                <div class="text-xs text-gray-400 uppercase font-bold mb-1">Actual Spend</div>
+                <div class="text-xl font-bold text-gray-800" x-text="'$'+(ctcData.actual_spend||0).toLocaleString()"></div>
+                <div class="text-xs text-gray-400 mt-1" x-text="ctcData.spend_pct+'% of budget'"></div>
+              </div>
+              <div class="bg-white border rounded-xl p-4 text-center">
+                <div class="text-xs text-gray-400 uppercase font-bold mb-1">Forecast at Completion</div>
+                <div class="text-xl font-bold" :class="ctcData.eac_variance >= 0 ? 'text-green-600' : 'text-red-600'" x-text="'$'+(ctcData.eac||0).toLocaleString()"></div>
+                <div class="text-xs mt-1" :class="eacVarianceClass(ctcData.eac_variance)" x-text="(ctcData.eac_variance >= 0 ? '+' : '')+ctcData.eac_variance?.toLocaleString()+' vs budget'"></div>
+              </div>
+              <div class="bg-white border rounded-xl p-4 text-center">
+                <div class="text-xs text-gray-400 uppercase font-bold mb-1">Velocity Risk</div>
+                <div class="text-lg font-bold capitalize" :class="velocityClass(ctcData.velocity_risk)" x-text="ctcData.velocity_risk?.replace(/_/g,' ')"></div>
+                <div class="text-xs text-gray-400 mt-1" x-text="'$'+(ctcData.avg_monthly_spend||0).toLocaleString()+'/mo avg'"></div>
+              </div>
+            </div>
+
+            <!-- Open commitments + COs -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+              <div class="bg-white border rounded-xl p-4">
+                <div class="text-xs text-gray-400 uppercase font-bold mb-3">Open Commitments</div>
+                <div class="text-2xl font-bold text-gray-800 mb-1" x-text="'$'+(ctcData.open_commitments||0).toLocaleString()"></div>
+                <div class="text-xs text-gray-500">Remaining on active contracts not yet invoiced</div>
+              </div>
+              <div class="bg-white border rounded-xl p-4">
+                <div class="text-xs text-gray-400 uppercase font-bold mb-2">Change Orders</div>
+                <div class="space-y-1.5">
+                  <div class="flex justify-between text-sm"><span class="text-green-600 font-medium">Approved</span><span x-text="'$'+(ctcData.change_orders?.approved||0).toLocaleString()"></span></div>
+                  <div class="flex justify-between text-sm"><span class="text-amber-600 font-medium">Pending</span><span x-text="'$'+(ctcData.change_orders?.pending||0).toLocaleString()"></span></div>
+                  <div class="flex justify-between text-sm text-gray-400"><span>Rejected</span><span x-text="'$'+(ctcData.change_orders?.rejected||0).toLocaleString()"></span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Contingency -->
+            <div x-show="ctcData.contingency_budget > 0" class="bg-white border rounded-xl p-4 mb-6">
+              <div class="flex items-center justify-between mb-3">
+                <div class="text-xs text-gray-400 uppercase font-bold">Contingency Reserve</div>
+                <div class="text-sm font-bold" :class="ctcData.contingency?.pct_burned > 75 ? 'text-red-600' : 'text-gray-700'" x-text="ctcData.contingency?.pct_burned+'% burned'"></div>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="flex-1 bg-gray-200 rounded-full h-3">
+                  <div class="h-3 rounded-full transition-all" :class="ctcData.contingency?.pct_burned > 75 ? 'bg-red-500' : 'bg-amber-500'" :style="'width:'+Math.min(100,ctcData.contingency?.pct_burned||0)+'%'"></div>
+                </div>
+                <div class="text-sm text-gray-600 whitespace-nowrap">
+                  <span x-text="'$'+(ctcData.contingency?.remaining||0).toLocaleString()"></span> remaining of
+                  <span x-text="'$'+(ctcData.contingency?.budget||0).toLocaleString()"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Category breakdown -->
+            <div class="bg-white border rounded-xl overflow-hidden">
+              <div class="px-4 py-3 border-b bg-gray-50">
+                <h3 class="text-sm font-semibold text-gray-700">Category Forecast</h3>
+              </div>
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b">
+                  <tr>
+                    <th class="text-left px-4 py-2 text-xs font-semibold text-gray-500">Category</th>
+                    <th class="text-right px-4 py-2 text-xs font-semibold text-gray-500">Budget</th>
+                    <th class="text-right px-4 py-2 text-xs font-semibold text-gray-500">Actual</th>
+                    <th class="text-right px-4 py-2 text-xs font-semibold text-gray-500">ETC</th>
+                    <th class="text-right px-4 py-2 text-xs font-semibold text-gray-500">EAC</th>
+                    <th class="text-right px-4 py-2 text-xs font-semibold text-gray-500">Variance</th>
+                    <th class="px-4 py-2 text-xs font-semibold text-gray-500">Progress</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="cat in (ctcData.categories||[])" :key="cat.category">
+                    <tr class="hover:bg-gray-50" :class="cat.is_over_budget?'bg-red-50':''">
+                      <td class="px-4 py-2.5 font-medium text-gray-800" x-text="cat.category"></td>
+                      <td class="px-4 py-2.5 text-right text-xs text-gray-500" x-text="'$'+(cat.budget||0).toLocaleString()"></td>
+                      <td class="px-4 py-2.5 text-right text-xs" x-text="'$'+(cat.actual_spend||0).toLocaleString()"></td>
+                      <td class="px-4 py-2.5 text-right text-xs text-gray-400" x-text="'$'+(cat.etc||0).toLocaleString()"></td>
+                      <td class="px-4 py-2.5 text-right text-xs font-bold" :class="cat.is_over_budget?'text-red-600':'text-gray-700'" x-text="'$'+(cat.eac||0).toLocaleString()"></td>
+                      <td class="px-4 py-2.5 text-right text-xs font-bold" :class="cat.variance >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(cat.variance>=0?'+':'')+cat.variance?.toLocaleString()"></td>
+                      <td class="px-4 py-2.5">
+                        <div class="flex items-center gap-2">
+                          <div class="flex-1 bg-gray-200 rounded-full h-1.5 w-16">
+                            <div class="h-1.5 rounded-full" :class="cat.is_over_budget?'bg-red-500':'bg-blue-500'" :style="'width:'+Math.min(100,cat.pct_complete)+'%'"></div>
+                          </div>
+                          <span class="text-xs text-gray-400 w-8" x-text="cat.pct_complete+'%'"></span>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div><!-- /cost-to-complete -->
+
+
+      <!-- ── VENDOR PAY READINESS ────────────────────────────────────── -->
+      <div x-show="view==='pay-readiness'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-circle-check mr-2 text-blue-600"></i>Vendor Pay Readiness</h2>
+            <p class="text-sm text-gray-500 mt-0.5">Invoice payment pipeline per vendor — from received to paid</p>
+          </div>
+          <button @click="loadPayReadiness()" :disabled="payReadinessLoading" class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 transition"><i class="fa-solid" :class="payReadinessLoading?'fa-spinner fa-spin':'fa-rotate-right'"></i></button>
+        </div>
+
+        <div x-show="payReadinessLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+
+        <template x-if="payReadiness && !payReadinessLoading">
+          <div>
+            <!-- Summary -->
+            <div class="grid grid-cols-4 gap-3 mb-5">
+              <div class="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+                <div class="text-xl font-bold text-red-600" x-text="payReadiness.summary.blocked"></div>
+                <div class="text-xs text-red-500 font-semibold">Blocked</div>
+              </div>
+              <div class="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+                <div class="text-xl font-bold text-green-600" x-text="payReadiness.summary.ready_to_pay"></div>
+                <div class="text-xs text-green-600 font-semibold">Ready to Pay</div>
+              </div>
+              <div class="bg-gray-50 border rounded-xl p-3 text-center">
+                <div class="text-xl font-bold text-gray-500" x-text="payReadiness.summary.paid"></div>
+                <div class="text-xs text-gray-400 font-semibold">Paid</div>
+              </div>
+              <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
+                <div class="text-xl font-bold text-blue-700" x-text="'$'+(payReadiness.summary.total_net_payable||0).toLocaleString()"></div>
+                <div class="text-xs text-blue-500 font-semibold">Net Payable</div>
+              </div>
+            </div>
+
+            <div class="bg-white border rounded-xl overflow-hidden">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b">
+                  <tr>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Vendor</th>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Stage</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Invoiced</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Approved</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Holdback</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Net Payable</th>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Blockers</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="v in (payReadiness.vendors||[])" :key="v.vendor">
+                    <tr class="hover:bg-gray-50">
+                      <td class="px-4 py-3 font-medium text-gray-800" x-text="v.vendor"></td>
+                      <td class="px-4 py-3">
+                        <span class="text-xs px-2 py-0.5 rounded-full font-semibold" :class="stageColor(v.stage)" x-text="stageLabel(v.stage)"></span>
+                      </td>
+                      <td class="px-4 py-3 text-right text-xs text-gray-600" x-text="'$'+(v.total_invoiced||0).toLocaleString()"></td>
+                      <td class="px-4 py-3 text-right text-xs text-gray-600" x-text="'$'+(v.total_approved||0).toLocaleString()"></td>
+                      <td class="px-4 py-3 text-right text-xs text-amber-600" x-text="'$'+(v.total_holdback||0).toLocaleString()"></td>
+                      <td class="px-4 py-3 text-right text-xs font-bold text-green-700" x-text="'$'+(v.net_payable||0).toLocaleString()"></td>
+                      <td class="px-4 py-3">
+                        <template x-for="b in v.blockers" :key="b.message">
+                          <div class="text-xs text-red-600 flex items-center gap-1"><i class="fa-solid fa-circle-xmark"></i><span x-text="b.message"></span></div>
+                        </template>
+                        <span x-show="v.blockers.length===0" class="text-xs text-green-500"><i class="fa-solid fa-check mr-1"></i>Clear</span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div><!-- /pay-readiness -->
+
+
+      <!-- ── CONTRACT-TO-INVOICE MATCHING ───────────────────────────── -->
+      <div x-show="view==='contract-matching'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-link mr-2 text-blue-600"></i>Contract-to-Invoice Matching</h2>
+            <p class="text-sm text-gray-500 mt-0.5">AI matches invoices to committed contracts — flags overbilling and unmatched vendors</p>
+          </div>
+          <button @click="loadContractMatching()" :disabled="contractMatchingLoading" class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 transition"><i class="fa-solid" :class="contractMatchingLoading?'fa-spinner fa-spin':'fa-rotate-right'"></i></button>
+        </div>
+
+        <div x-show="contractMatchingLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+
+        <template x-if="contractMatching && !contractMatchingLoading">
+          <div>
+            <!-- Summary -->
+            <div class="grid grid-cols-4 gap-3 mb-5">
+              <div class="bg-white border rounded-xl p-3 text-center"><div class="text-xl font-bold text-gray-800" x-text="contractMatching.summary.total_contracts"></div><div class="text-xs text-gray-400">Contracts</div></div>
+              <div class="bg-red-50 border border-red-100 rounded-xl p-3 text-center"><div class="text-xl font-bold text-red-600" x-text="contractMatching.summary.over_billed"></div><div class="text-xs text-red-500">Overbilled</div></div>
+              <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 text-center"><div class="text-xl font-bold text-amber-600" x-text="contractMatching.summary.unmatched_vendors"></div><div class="text-xs text-amber-500">Unmatched Vendors</div></div>
+              <div class="bg-white border rounded-xl p-3 text-center"><div class="text-xl font-bold text-gray-700" x-text="'$'+(contractMatching.summary.total_invoiced||0).toLocaleString()"></div><div class="text-xs text-gray-400">Total Invoiced</div></div>
+            </div>
+
+            <!-- Unmatched invoices alert -->
+            <div x-show="contractMatching.unmatched_invoices.length > 0" class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+              <div class="font-semibold text-amber-800 text-sm mb-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Invoices without matching contracts</div>
+              <template x-for="u in contractMatching.unmatched_invoices" :key="u.vendor">
+                <div class="flex items-center justify-between text-sm text-amber-700 py-1 border-t border-amber-100">
+                  <span x-text="u.vendor"></span>
+                  <span class="font-semibold" x-text="'$'+(u.total_invoiced||0).toLocaleString()+' · '+u.invoice_count+' invoices'"></span>
+                </div>
+              </template>
+            </div>
+
+            <!-- Contract matches -->
+            <div class="bg-white border rounded-xl overflow-hidden">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b">
+                  <tr>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Vendor / Contract</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Contract</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">CO Additions</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Invoiced</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Remaining</th>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Match</th>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="c in (contractMatching.contract_matches||[])" :key="c.contract_id">
+                    <tr class="hover:bg-gray-50" :class="c.is_over_billed?'bg-red-50':''">
+                      <td class="px-4 py-2.5 font-medium text-gray-800" x-text="c.vendor"></td>
+                      <td class="px-4 py-2.5 text-right text-xs" x-text="'$'+(c.contract_amount||0).toLocaleString()"></td>
+                      <td class="px-4 py-2.5 text-right text-xs text-green-600" x-show="c.co_additions > 0" x-text="'+$'+(c.co_additions||0).toLocaleString()"></td>
+                      <td class="px-4 py-2.5 text-right text-xs font-medium" :class="c.is_over_billed?'text-red-600':'text-gray-700'" x-text="'$'+(c.invoiced_to_date||0).toLocaleString()+'  ('+c.pct_invoiced+'%)'"></td>
+                      <td class="px-4 py-2.5 text-right text-xs" :class="c.remaining<0?'text-red-600 font-bold':'text-gray-600'" x-text="'$'+(c.remaining||0).toLocaleString()"></td>
+                      <td class="px-4 py-2.5">
+                        <span class="text-xs font-medium" :class="matchConfidenceColor(c.match_confidence)" x-text="c.matched_vendor_key ? (Math.round(c.match_confidence*100)+'% — '+c.matched_invoice_count+' inv') : 'No match'"></span>
+                      </td>
+                      <td class="px-4 py-2.5">
+                        <span x-show="c.is_over_billed" class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">Overbilled</span>
+                        <span x-show="!c.is_over_billed && c.pct_invoiced >= 100" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">Complete</span>
+                        <span x-show="!c.is_over_billed && c.pct_invoiced < 100" class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full" x-text="c.pct_invoiced+'% billed'"></span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div><!-- /contract-matching -->
+
+
+      <!-- ── CA COMPLIANCE DASHBOARD ─────────────────────────────────── -->
+      <div x-show="view==='compliance'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-shield-check mr-2 text-blue-600"></i>Canadian Compliance</h2>
+            <p class="text-sm text-gray-500 mt-0.5">WSIB/WCB, insurance, lien waivers, and T5018 readiness per vendor</p>
+          </div>
+          <button @click="loadVendorCompliance()" :disabled="vendorComplianceLoading" class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 transition"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
+
+        <div x-show="vendorComplianceLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+
+        <template x-if="vendorCompliance && !vendorComplianceLoading">
+          <div>
+            <!-- Summary -->
+            <div class="grid grid-cols-4 gap-3 mb-5">
+              <div class="bg-white border rounded-xl p-3 text-center"><div class="text-xl font-bold text-gray-800" x-text="vendorCompliance.summary.total"></div><div class="text-xs text-gray-400">Total Vendors</div></div>
+              <div class="bg-red-50 border border-red-200 rounded-xl p-3 text-center"><div class="text-xl font-bold text-red-600" x-text="vendorCompliance.summary.critical"></div><div class="text-xs text-red-500">Critical</div></div>
+              <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center"><div class="text-xl font-bold text-amber-600" x-text="vendorCompliance.summary.warning"></div><div class="text-xs text-amber-500">Warning</div></div>
+              <div class="bg-green-50 border border-green-200 rounded-xl p-3 text-center"><div class="text-xl font-bold text-green-600" x-text="vendorCompliance.summary.ok"></div><div class="text-xs text-green-500">OK</div></div>
+            </div>
+
+            <div class="space-y-3">
+              <template x-for="v in (vendorCompliance.vendors||[])" :key="v.id">
+                <div class="bg-white border rounded-xl p-4" :class="v.severity==='critical'?'border-red-200':v.severity==='warning'?'border-amber-200':''">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="font-semibold text-gray-800" x-text="v.name"></div>
+                      <div class="text-xs text-gray-400 mt-0.5" x-text="[v.trade, v.province].filter(Boolean).join(' · ')"></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs px-2 py-0.5 rounded-full font-semibold" :class="v.severity==='critical'?'bg-red-100 text-red-700':v.severity==='warning'?'bg-amber-100 text-amber-700':'bg-green-100 text-green-700'" x-text="v.severity.toUpperCase()"></span>
+                      <button @click="openVendorComplianceModal(v)" class="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-semibold transition"><i class="fa-solid fa-pen mr-1"></i>Update</button>
+                    </div>
+                  </div>
+                  <template x-if="v.issues.length > 0">
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <template x-for="issue in v.issues" :key="issue.field">
+                        <span class="text-xs px-2.5 py-1 rounded-full font-medium" :class="issue.status==='expired'?'bg-red-100 text-red-700':issue.status==='expiring_soon'?'bg-amber-100 text-amber-700':'bg-gray-100 text-gray-600'" x-text="issue.message"></span>
+                      </template>
+                    </div>
+                  </template>
+                  <div x-show="v.issues.length===0" class="mt-2 text-xs text-green-500"><i class="fa-solid fa-check mr-1"></i>All compliance documents on file</div>
+                </div>
+              </template>
+              <div x-show="(vendorCompliance.vendors||[]).length===0" class="text-center py-8 text-gray-400">No vendors in the directory yet. Add vendors in Org Settings → Vendor Directory.</div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Vendor compliance edit modal -->
+        <div x-show="showVendorComplianceModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showVendorComplianceModal=false">
+          <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-5">
+              <h3 class="text-lg font-bold text-gray-800">Compliance — <span x-text="selectedVendorCompliance?.name"></span></h3>
+              <button @click="showVendorComplianceModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="space-y-4">
+              <div class="grid grid-cols-2 gap-3">
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">WSIB Number</label><input x-model="vendorComplianceForm.wsib_number" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">WSIB Expiry</label><input x-model="vendorComplianceForm.wsib_expiry" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">WCB Number</label><input x-model="vendorComplianceForm.wcb_number" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">WCB Expiry</label><input x-model="vendorComplianceForm.wcb_expiry" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">Insurance Expiry</label><input x-model="vendorComplianceForm.insurance_expiry" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">Liability Limit (CAD)</label><input x-model="vendorComplianceForm.liability_limit" type="number" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">CRA Business # (T5018)</label><input x-model="vendorComplianceForm.cra_business_number" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="123456789" /></div>
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">Province</label>
+                  <select x-model="vendorComplianceForm.province" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="ON">Ontario</option><option value="BC">British Columbia</option><option value="AB">Alberta</option><option value="QC">Quebec</option>
+                    <option value="MB">Manitoba</option><option value="SK">Saskatchewan</option><option value="NS">Nova Scotia</option><option value="NB">New Brunswick</option>
+                  </select>
+                </div>
+              </div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Statutory Declaration Date</label><input x-model="vendorComplianceForm.statutory_declaration_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+              <label class="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" x-model="vendorComplianceForm.is_incorporated" class="rounded" />
+                Incorporated company (affects T5018 threshold)
+              </label>
+            </div>
+            <div class="flex gap-2 mt-6">
+              <button @click="showVendorComplianceModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button @click="saveVendorCompliance()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Save</button>
+            </div>
+          </div>
+        </div>
+      </div><!-- /compliance -->
+
+
+      <!-- ── T5018 REPORT ────────────────────────────────────────────── -->
+      <div x-show="view==='t5018'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-file-invoice-dollar mr-2 text-blue-600"></i>T5018 Subcontractor Payment Report</h2>
+            <p class="text-sm text-gray-500 mt-0.5">CRA annual reporting for subcontractor payments (required for construction businesses)</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select x-model="t5018Year" @change="loadT5018()" class="text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400">
+              <template x-for="y in [new Date().getFullYear()-1, new Date().getFullYear()-2, new Date().getFullYear()-3]" :key="y">
+                <option :value="y" x-text="y"></option>
+              </template>
+            </select>
+            <button @click="downloadT5018CSV()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"><i class="fa-solid fa-file-csv mr-1"></i>Download CSV</button>
+            <button @click="loadT5018()" :disabled="t5018Loading" class="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-100 rounded-lg hover:bg-gray-200"><i class="fa-solid fa-rotate-right"></i></button>
+          </div>
+        </div>
+
+        <div x-show="t5018Loading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+
+        <template x-if="t5018Data && !t5018Loading">
+          <div>
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 text-sm text-blue-800">
+              <strong>CRA T5018 Rule:</strong> Report total payments to each subcontractor &ge;$500 in the calendar year. Missing CRA Business Numbers are flagged below — collect these before filing.
+            </div>
+            <div class="grid grid-cols-3 gap-3 mb-5">
+              <div class="bg-white border rounded-xl p-3 text-center"><div class="text-xl font-bold text-gray-800" x-text="t5018Data.total_vendors"></div><div class="text-xs text-gray-400">Vendors to Report</div></div>
+              <div class="bg-white border rounded-xl p-3 text-center"><div class="text-xl font-bold text-gray-700" x-text="'$'+(t5018Data.total_payments||0).toLocaleString()"></div><div class="text-xs text-gray-400">Total Payments</div></div>
+              <div class="bg-red-50 border border-red-100 rounded-xl p-3 text-center"><div class="text-xl font-bold text-red-600" x-text="t5018Data.missing_bn_count"></div><div class="text-xs text-red-500">Missing CRA BN</div></div>
+            </div>
+            <div class="bg-white border rounded-xl overflow-hidden">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b">
+                  <tr>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Vendor</th>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">CRA BN</th>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">HST #</th>
+                    <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Province</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Total Paid</th>
+                    <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">HST Collected</th>
+                    <th class="text-center px-4 py-2.5 text-xs font-semibold text-gray-500">T5018</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  <template x-for="v in (t5018Data.vendors||[])" :key="v.vendor_name">
+                    <tr class="hover:bg-gray-50" :class="v.missing_bn?'bg-amber-50':''">
+                      <td class="px-4 py-2.5 font-medium text-gray-800" x-text="v.vendor_name"></td>
+                      <td class="px-4 py-2.5 text-xs" :class="v.missing_bn?'text-red-600 font-semibold':'text-gray-600 font-mono'" x-text="v.cra_business_number||'MISSING'"></td>
+                      <td class="px-4 py-2.5 text-xs text-gray-500 font-mono" x-text="v.hst_number||'—'"></td>
+                      <td class="px-4 py-2.5 text-xs text-gray-500" x-text="v.province||'—'"></td>
+                      <td class="px-4 py-2.5 text-right text-xs font-bold text-gray-800" x-text="'$'+(v.total_payments||0).toLocaleString()"></td>
+                      <td class="px-4 py-2.5 text-right text-xs text-gray-500" x-text="'$'+(v.hst_collected||0).toLocaleString()"></td>
+                      <td class="px-4 py-2.5 text-center"><span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">Required</span></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div><!-- /t5018 -->
 
 
       <!-- ═══════════════════════════════════════════════════════════

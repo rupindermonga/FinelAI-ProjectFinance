@@ -25,6 +25,24 @@ function app() {
     // ── Cash Flow ─────────────────────────────────────────────────
     cashFlowData: null, cashFlowLoading: false,
 
+    // ── Canadian Compliance ───────────────────────────────────────
+    vendorCompliance: null, vendorComplianceLoading: false,
+    selectedVendorCompliance: null, showVendorComplianceModal: false,
+    vendorComplianceForm: {},
+    t5018Data: null, t5018Loading: false, t5018Year: new Date().getFullYear()-1,
+
+    // ── Cost-to-Complete ──────────────────────────────────────────
+    ctcData: null, ctcLoading: false,
+
+    // ── Pay Readiness ─────────────────────────────────────────────
+    payReadiness: null, payReadinessLoading: false,
+
+    // ── Contract Matching ─────────────────────────────────────────
+    contractMatching: null, contractMatchingLoading: false,
+
+    // ── Prompt Payment ────────────────────────────────────────────
+    promptPayment: null,
+
     // ── PM state ──────────────────────────────────────────────────
     pmSummary: null,
     // Tasks
@@ -2197,6 +2215,98 @@ function app() {
       const h = this.token ? { Authorization: `Bearer ${this.token}` } : {};
       if (this.currentOrg?.id) h['X-Organization-Id'] = String(this.currentOrg.id);
       return h;
+    },
+
+    // ── Canadian Compliance ───────────────────────────────────────
+    async loadVendorCompliance() {
+      this.vendorComplianceLoading = true;
+      try { this.vendorCompliance = await this.get('/api/compliance/vendors'); }
+      catch(e) { this.vendorCompliance = null; }
+      finally { this.vendorComplianceLoading = false; }
+    },
+    openVendorComplianceModal(v) {
+      this.selectedVendorCompliance = v;
+      this.vendorComplianceForm = {
+        wsib_number: v.wsib_number||'', wsib_expiry: v.wsib_expiry||'',
+        wcb_number: v.wcb_number||'', wcb_expiry: v.wcb_expiry||'',
+        insurance_expiry: v.insurance_expiry||'',
+        liability_limit: v.liability_limit||'',
+        cra_business_number: v.cra_business_number||'',
+        province: v.province||'ON',
+        is_incorporated: v.is_incorporated||false,
+        statutory_declaration_date: v.statutory_declaration_date||'',
+      };
+      this.showVendorComplianceModal = true;
+    },
+    async saveVendorCompliance() {
+      await this.put('/api/compliance/vendors/'+this.selectedVendorCompliance.id+'/compliance', this.vendorComplianceForm);
+      this.showVendorComplianceModal = false;
+      await this.loadVendorCompliance();
+    },
+    async loadT5018() {
+      this.t5018Loading = true;
+      try { this.t5018Data = await this.get('/api/compliance/t5018?year='+this.t5018Year); }
+      catch(e) { this.t5018Data = null; }
+      finally { this.t5018Loading = false; }
+    },
+    downloadT5018CSV() {
+      window.open('/api/compliance/t5018?year='+this.t5018Year+'&format=csv', '_blank');
+    },
+    complianceSeverityClass(s) {
+      return { critical:'border-red-200 bg-red-50', warning:'border-amber-200 bg-amber-50', ok:'border-gray-100 bg-white' }[s]||'bg-white';
+    },
+
+    // ── Cost-to-Complete ──────────────────────────────────────────
+    async loadCostToComplete() {
+      if (!this.currentProject) return;
+      this.ctcLoading = true;
+      try { this.ctcData = await this.get('/api/compliance/cost-to-complete?project_id='+this.currentProject.id); }
+      catch(e) { this.ctcData = null; }
+      finally { this.ctcLoading = false; }
+    },
+    velocityClass(r) {
+      return { on_track:'text-green-600', over_budget:'text-amber-600', critical:'text-red-600' }[r]||'text-gray-600';
+    },
+    eacVarianceClass(v) { return v >= 0 ? 'text-green-600' : 'text-red-600'; },
+    downloadQBExport() {
+      const params = new URLSearchParams();
+      if (this.currentProject) params.set('project_id', this.currentProject.id);
+      window.open('/api/compliance/export/quickbooks?'+params, '_blank');
+    },
+    downloadXeroExport() {
+      const params = new URLSearchParams();
+      if (this.currentProject) params.set('project_id', this.currentProject.id);
+      window.open('/api/compliance/export/xero?'+params, '_blank');
+    },
+
+    // ── Pay Readiness ─────────────────────────────────────────────
+    async loadPayReadiness() {
+      if (!this.currentProject) return;
+      this.payReadinessLoading = true;
+      try { this.payReadiness = await this.get('/api/compliance/vendor-pay-readiness?project_id='+this.currentProject.id); }
+      catch(e) { this.payReadiness = null; }
+      finally { this.payReadinessLoading = false; }
+    },
+    stageColor(s) {
+      return { blocked:'bg-red-100 text-red-700', received:'bg-gray-100 text-gray-600',
+               submitted_to_lender:'bg-blue-100 text-blue-700', approved:'bg-amber-100 text-amber-700',
+               ready_to_pay:'bg-green-100 text-green-700', paid:'bg-slate-100 text-slate-500' }[s]||'bg-gray-100';
+    },
+    stageLabel(s) {
+      return { blocked:'Blocked', received:'Received', submitted_to_lender:'With Lender',
+               approved:'Approved', ready_to_pay:'Ready to Pay', paid:'Paid' }[s]||s;
+    },
+
+    // ── Contract Matching ─────────────────────────────────────────
+    async loadContractMatching() {
+      if (!this.currentProject) return;
+      this.contractMatchingLoading = true;
+      try { this.contractMatching = await this.get('/api/compliance/contract-matching?project_id='+this.currentProject.id); }
+      catch(e) { this.contractMatching = null; }
+      finally { this.contractMatchingLoading = false; }
+    },
+    matchConfidenceColor(c) {
+      if (c >= 0.9) return 'text-green-600'; if (c >= 0.7) return 'text-amber-600'; return 'text-red-500';
     },
 
     // ── AI Construction Accountant ────────────────────────────────

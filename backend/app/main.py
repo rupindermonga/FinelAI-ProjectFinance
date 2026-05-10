@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import engine, Base
-from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit, pm, construction_health
+from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit, pm, construction_health, compliance
 
 
 def _run_migrations():
@@ -328,6 +328,34 @@ def _run_migrations():
             )""",
             "CREATE INDEX IF NOT EXISTS ix_pm_tasks_project ON pm_tasks(project_id, org_id)",
             "CREATE INDEX IF NOT EXISTS ix_pm_tasks_assigned ON pm_tasks(assigned_to)",
+            # Canadian Compliance
+            """CREATE TABLE IF NOT EXISTS prompt_payment_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                draw_id INTEGER REFERENCES draws(id),
+                invoice_id INTEGER REFERENCES invoices(id),
+                payment_type TEXT NOT NULL,
+                proper_invoice_date TEXT, certifier_cert_date TEXT,
+                payment_deadline TEXT, paid_date TEXT,
+                is_overdue INTEGER DEFAULT 0,
+                province TEXT DEFAULT 'ON',
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # Compliance fields on org_vendors (safe ALTER IF NOT EXISTS)
+            "ALTER TABLE org_vendors ADD COLUMN wsib_expiry TEXT",
+            "ALTER TABLE org_vendors ADD COLUMN wcb_number TEXT",
+            "ALTER TABLE org_vendors ADD COLUMN wcb_expiry TEXT",
+            "ALTER TABLE org_vendors ADD COLUMN insurance_expiry TEXT",
+            "ALTER TABLE org_vendors ADD COLUMN liability_limit REAL",
+            "ALTER TABLE org_vendors ADD COLUMN cra_business_number TEXT",
+            "ALTER TABLE org_vendors ADD COLUMN province TEXT DEFAULT 'ON'",
+            "ALTER TABLE org_vendors ADD COLUMN is_incorporated INTEGER DEFAULT 0",
+            "ALTER TABLE org_vendors ADD COLUMN statutory_declaration_date TEXT",
+            # Province + contingency on projects
+            "ALTER TABLE projects ADD COLUMN province TEXT DEFAULT 'ON'",
+            "ALTER TABLE projects ADD COLUMN contingency_budget REAL",
             # AI suggestions log (optional — stores Gemini suggestions for audit)
             """CREATE TABLE IF NOT EXISTS ai_suggestions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -466,6 +494,7 @@ app.include_router(org.router)
 app.include_router(audit.router)
 app.include_router(pm.router)
 app.include_router(construction_health.router)
+app.include_router(compliance.router)
 
 # Serve static frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")

@@ -443,6 +443,26 @@ class PhotoLog(Base):
     creator = relationship("User")
 
 
+class PromptPaymentLog(Base):
+    """Tracks Ontario Construction Act / provincial prompt-payment deadlines per draw/payment."""
+    __tablename__ = "prompt_payment_logs"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    org_id          = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id      = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    draw_id         = Column(Integer, ForeignKey("draws.id"), nullable=True)
+    invoice_id      = Column(Integer, ForeignKey("invoices.id"), nullable=True)
+    payment_type    = Column(String, nullable=False)   # owner_to_gc | gc_to_sub
+    proper_invoice_date = Column(String, nullable=True)   # date invoice deemed proper
+    certifier_cert_date = Column(String, nullable=True)   # date consultant certified
+    payment_deadline    = Column(String, nullable=True)   # calculated deadline YYYY-MM-DD
+    paid_date           = Column(String, nullable=True)   # actual payment date
+    is_overdue          = Column(Boolean, default=False)
+    province        = Column(String, default="ON")
+    notes           = Column(Text, nullable=True)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+
 class AuditLog(Base):
     """Org-scoped audit trail for financial actions."""
     __tablename__ = "audit_logs"
@@ -475,6 +495,15 @@ class OrgVendor(Base):
     payment_terms   = Column(String, nullable=True)       # Net 30, Net 60, etc.
     hst_number      = Column(String, nullable=True)       # GST/HST registration
     wsib_number     = Column(String, nullable=True)
+    wsib_expiry     = Column(String, nullable=True)       # YYYY-MM-DD
+    wcb_number      = Column(String, nullable=True)       # WCB (Alberta, BC, MB, SK)
+    wcb_expiry      = Column(String, nullable=True)       # YYYY-MM-DD
+    insurance_expiry        = Column(String, nullable=True)
+    liability_limit         = Column(Float, nullable=True)   # general liability limit CAD
+    cra_business_number     = Column(String, nullable=True)  # 9-digit BN for T5018
+    province        = Column(String, nullable=True)       # ON, BC, AB, QC, etc.
+    is_incorporated = Column(Boolean, default=False)      # True = incorporated; False = individual (T5018 threshold differs)
+    statutory_declaration_date = Column(String, nullable=True)  # last statutory decl received
     notes           = Column(Text, nullable=True)
     is_active       = Column(Boolean, default=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
@@ -499,6 +528,8 @@ class Project(Base):
     total_budget = Column(Float, default=0.0)
     lender_budget = Column(Float, nullable=True)        # approved budget as presented to lender (may differ)
     currency = Column(String, default="CAD")
+    province    = Column(String, default="ON")          # CA province: ON, BC, AB, QC, MB, SK, NS, NB, NL, PE, YT, NT, NU
+    contingency_budget = Column(Float, nullable=True)   # contingency reserve
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
