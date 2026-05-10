@@ -794,81 +794,140 @@
         </div>
       </div>
 
-      <nav class="flex-1 py-4 space-y-1 px-3 overflow-y-auto">
+      <nav class="flex-1 py-3 px-3 overflow-y-auto space-y-0.5">
+
+        <!-- ── OVERVIEW ─────────────────────────── -->
         <button @click="view='dashboard'; sidebarOpen=false" :class="view==='dashboard' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-table-columns w-4"></i> Dashboard
         </button>
-        <button @click="view='columns'; sidebarOpen=false" :class="view==='columns' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-sliders w-4"></i> Manage Columns
-        </button>
-        <button @click="view='categories'; loadCategories(); sidebarOpen=false" :class="view==='categories' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-tags w-4"></i> Categories
-        </button>
-        <button @click="view='budget'; loadProjectDashboard(); sidebarOpen=false" :class="view==='budget' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-scale-balanced w-4"></i> Budget vs Actual
-        </button>
-        <button @click="view='holdback'; loadProjectDashboard(); sidebarOpen=false" :class="view==='holdback' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-hand-holding-dollar w-4"></i> Holdback
-          <span x-show="(projectDash?.holdback?.unreleased_count||0)>0"
-                class="ml-auto text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold"
-                x-text="projectDash.holdback.unreleased_count"></span>
-        </button>
-        <button @click="view='approvals'; loadProjectDashboard(); sidebarOpen=false" :class="view==='approvals' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-clipboard-check w-4"></i> Approvals
-          <span x-show="(projectDash?.approval?.pending||0)>0"
-                class="ml-auto text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold"
-                x-text="projectDash.approval.pending"></span>
-        </button>
-        <button @click="view='cashflow'; loadCashFlow(); sidebarOpen=false" :class="view==='cashflow' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-arrow-trend-up w-4"></i> Cash Flow
-        </button>
-        <button @click="view='subcontractors'; loadSubcontractors(); sidebarOpen=false" :class="view==='subcontractors' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-hard-hat w-4"></i> Subcontractors
-        </button>
-        <button @click="view='milestones'; loadMilestones(); sidebarOpen=false" :class="view==='milestones' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-flag-checkered w-4"></i> Milestones
-        </button>
-        <button @click="view='lienwaivers'; loadLienWaivers(); sidebarOpen=false" :class="view==='lienwaivers' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-file-signature w-4"></i> Lien Waivers
-        </button>
-        <button @click="view='documents'; loadDocuments(); sidebarOpen=false" :class="view==='documents' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-paperclip w-4"></i> Documents
-        </button>
-        <button @click="view='lenderlinks'; loadLenderTokens(); sidebarOpen=false" :class="view==='lenderlinks' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-share-nodes w-4"></i> Lender Links
-        </button>
-        <button @click="view='finance'; loadProjectDashboard(); sidebarOpen=false" :class="view==='finance' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-chart-pie w-4"></i> Project Finance
-        </button>
-        <button @click="view='filetools'; sidebarOpen=false" :class="view==='filetools' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-folder-open w-4"></i> File Tools
-        </button>
-        <button @click="view='portfolio'; loadPortfolio(); sidebarOpen=false" :class="view==='portfolio' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-layer-group w-4"></i> Portfolio
-        </button>
-        <button @click="view='agedpayables'; loadAgedPayables(); sidebarOpen=false" :class="view==='agedpayables' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-clock-rotate-left w-4"></i> Aged Payables
-        </button>
-        <button @click="view='ai'; loadAiInsights(); sidebarOpen=false" :class="view==='ai' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-brain w-4"></i>
-          <span class="flex-1 text-left">AI Insights</span>
-          <span x-show="aiInsights && aiInsights.total_alerts > 0" x-text="aiInsights?.total_alerts" class="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
-        </button>
-        <button @click="view='org-settings'; loadOrgMembers(); sidebarOpen=false" :class="view==='org-settings' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-building w-4"></i> Organization
-        </button>
-        <button @click="view='vendors'; loadOrgVendors(); sidebarOpen=false" :class="view==='vendors' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-address-book w-4"></i> Vendor Directory
-        </button>
-        <button x-show="user?.is_admin" @click="view='superadmin'; loadAllOrgs(); sidebarOpen=false" :class="view==='superadmin' ? 'bg-red-700' : 'hover:bg-red-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition text-red-200">
-          <i class="fa-solid fa-shield-halved w-4"></i> Super Admin
-        </button>
-        <button x-show="user?.is_admin || currentOrg" @click="view='audit-log'; loadAuditLog(); sidebarOpen=false" :class="view==='audit-log' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-shield-halved w-4"></i> Audit Log
-        </button>
-        <button @click="view='settings'; sidebarOpen=false" :class="view==='settings' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
-          <i class="fa-solid fa-gear w-4"></i> Settings
-        </button>
+
+        <!-- ── PROJECT FINANCE ──────────────────── -->
+        <div x-show="canAccessFinance || isVendorFinance" class="mt-3">
+          <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-blue-300/60">Project Finance</p>
+
+          <!-- Vendor Finance: only sees their invoices -->
+          <template x-if="isVendorFinance">
+            <div class="space-y-0.5">
+              <button @click="view='invoices'; sidebarOpen=false" :class="view==='invoices'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-file-invoice w-4"></i> My Invoices
+              </button>
+            </div>
+          </template>
+
+          <!-- Full finance access -->
+          <template x-if="!isVendorFinance && canAccessFinance">
+            <div class="space-y-0.5">
+              <button @click="view='columns'; sidebarOpen=false" :class="view==='columns'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-sliders w-4"></i> Columns
+              </button>
+              <button @click="view='categories'; loadCategories(); sidebarOpen=false" :class="view==='categories'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-tags w-4"></i> Categories
+              </button>
+              <button @click="view='budget'; loadProjectDashboard(); sidebarOpen=false" :class="view==='budget'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-scale-balanced w-4"></i> Budget vs Actual
+              </button>
+              <button @click="view='holdback'; loadProjectDashboard(); sidebarOpen=false" :class="view==='holdback'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-hand-holding-dollar w-4"></i> Holdback
+                <span x-show="(projectDash?.holdback?.unreleased_count||0)>0" class="ml-auto text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold" x-text="projectDash.holdback.unreleased_count"></span>
+              </button>
+              <button @click="view='approvals'; loadProjectDashboard(); sidebarOpen=false" :class="view==='approvals'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-clipboard-check w-4"></i> Approvals
+                <span x-show="(projectDash?.approval?.pending||0)>0" class="ml-auto text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold" x-text="projectDash.approval.pending"></span>
+              </button>
+              <button @click="view='cashflow'; loadCashFlow(); sidebarOpen=false" :class="view==='cashflow'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-arrow-trend-up w-4"></i> Cash Flow
+              </button>
+              <button @click="view='finance'; loadProjectDashboard(); sidebarOpen=false" :class="view==='finance'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-chart-pie w-4"></i> Finance Summary
+              </button>
+              <button @click="view='agedpayables'; loadAgedPayables(); sidebarOpen=false" :class="view==='agedpayables'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-clock-rotate-left w-4"></i> Aged Payables
+              </button>
+              <button @click="view='lienwaivers'; loadLienWaivers(); sidebarOpen=false" :class="view==='lienwaivers'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-file-signature w-4"></i> Lien Waivers
+              </button>
+              <button @click="view='lenderlinks'; loadLenderTokens(); sidebarOpen=false" :class="view==='lenderlinks'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-share-nodes w-4"></i> Lender Links
+              </button>
+              <button @click="view='filetools'; sidebarOpen=false" :class="view==='filetools'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-folder-open w-4"></i> File Tools
+              </button>
+              <button @click="view='portfolio'; loadPortfolio(); sidebarOpen=false" :class="view==='portfolio'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-layer-group w-4"></i> Portfolio
+              </button>
+              <button @click="view='ai'; loadAiInsights(); sidebarOpen=false" :class="view==='ai'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-brain w-4"></i>
+                <span class="flex-1 text-left">AI Insights</span>
+                <span x-show="aiInsights && aiInsights.total_alerts > 0" x-text="aiInsights?.total_alerts" class="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
+              </button>
+            </div>
+          </template>
+        </div>
+
+        <!-- ── PROJECT MANAGEMENT ───────────────── -->
+        <div x-show="canAccessPM" class="mt-3">
+          <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-green-300/60">Project Management</p>
+          <div class="space-y-0.5">
+            <button @click="view='pm-tasks'; loadPMTasks(); loadPMSummary(); sidebarOpen=false" :class="view==='pm-tasks'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-list-check w-4"></i>
+              <span class="flex-1 text-left">Tasks</span>
+              <span x-show="(pmSummary?.tasks?.overdue||0)>0" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold" x-text="pmSummary.tasks.overdue"></span>
+            </button>
+            <button @click="view='pm-daily-logs'; loadDailyLogs(); sidebarOpen=false" :class="view==='pm-daily-logs'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-calendar-day w-4"></i> Daily Logs
+            </button>
+            <button @click="view='pm-rfis'; loadRFIs(); sidebarOpen=false" :class="view==='pm-rfis'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-question-circle w-4"></i>
+              <span class="flex-1 text-left">RFIs</span>
+              <span x-show="(pmSummary?.open_rfis||0)>0" class="text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold" x-text="pmSummary.open_rfis"></span>
+            </button>
+            <button @click="view='pm-punch'; loadPunchList(); sidebarOpen=false" :class="view==='pm-punch'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-circle-exclamation w-4"></i>
+              <span class="flex-1 text-left">Punch List</span>
+              <span x-show="(pmSummary?.open_punch||0)>0" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold" x-text="pmSummary.open_punch"></span>
+            </button>
+            <button @click="view='pm-submittals'; loadSubmittals(); sidebarOpen=false" :class="view==='pm-submittals'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-paper-plane w-4"></i>
+              <span class="flex-1 text-left">Submittals</span>
+              <span x-show="(pmSummary?.pending_submittals||0)>0" class="text-xs bg-blue-400 text-white px-1.5 py-0.5 rounded-full font-bold" x-text="pmSummary.pending_submittals"></span>
+            </button>
+            <button @click="view='pm-meetings'; loadMeetings(); sidebarOpen=false" :class="view==='pm-meetings'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-people-group w-4"></i> Meetings
+            </button>
+            <button @click="view='pm-photos'; loadPhotos(); sidebarOpen=false" :class="view==='pm-photos'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-images w-4"></i> Photo Logs
+            </button>
+            <button x-show="canAccessFinance" @click="view='subcontractors'; loadSubcontractors(); sidebarOpen=false" :class="view==='subcontractors'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-hard-hat w-4"></i> Subcontractors
+            </button>
+            <button @click="view='milestones'; loadMilestones(); sidebarOpen=false" :class="view==='milestones'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-flag-checkered w-4"></i> Milestones
+            </button>
+            <button @click="view='documents'; loadDocuments(); sidebarOpen=false" :class="view==='documents'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-paperclip w-4"></i> Documents
+            </button>
+          </div>
+        </div>
+
+        <!-- ── ADMIN / ORG ──────────────────────── -->
+        <div class="mt-3 space-y-0.5">
+          <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400/60">Account</p>
+          <button @click="view='org-settings'; loadOrgMembers(); sidebarOpen=false" :class="view==='org-settings'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-building w-4"></i> Organization
+          </button>
+          <button @click="view='vendors'; loadOrgVendors(); sidebarOpen=false" :class="view==='vendors'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-address-book w-4"></i> Vendor Directory
+          </button>
+          <button x-show="user?.is_admin" @click="view='superadmin'; loadAllOrgs(); sidebarOpen=false" :class="view==='superadmin'?'bg-red-700':'hover:bg-red-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition text-red-200">
+            <i class="fa-solid fa-shield-halved w-4"></i> Super Admin
+          </button>
+          <button x-show="['owner','admin','finance_admin','pm_admin'].includes(currentOrg?.role) || user?.is_admin" @click="view='audit-log'; loadAuditLog(); sidebarOpen=false" :class="view==='audit-log'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-scroll w-4"></i> Audit Log
+          </button>
+          <button @click="view='settings'; sidebarOpen=false" :class="view==='settings'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-gear w-4"></i> Settings
+          </button>
+        </div>
       </nav>
       <div class="px-5 py-4 border-t border-slate-700">
         <div class="text-xs text-blue-300 mb-1">Signed in as</div>
@@ -4852,6 +4911,608 @@
           </div>
         </div>
       </div><!-- /audit-log -->
+
+
+      <!-- ═══════════════════════════════════════════════════════════
+           PROJECT MANAGEMENT VIEWS
+      ═══════════════════════════════════════════════════════════ -->
+
+      <!-- ── PM TASKS ──────────────────────────────────────────────── -->
+      <div x-show="view==='pm-tasks'" class="p-6 max-w-6xl">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-list-check mr-2 text-green-600"></i>Tasks</h2>
+            <p class="text-sm text-gray-500 mt-0.5" x-text="currentProject?.name"></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select x-model="pmTaskFilter.status" @change="loadPMTasks()" class="text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-green-400">
+              <option value="">All Statuses</option>
+              <option value="not_started">Not Started</option>
+              <option value="in_progress">In Progress</option>
+              <option value="blocked">Blocked</option>
+              <option value="completed">Completed</option>
+            </select>
+            <button x-show="canWritePM" @click="openTaskModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold">
+              <i class="fa-solid fa-plus"></i> New Task
+            </button>
+          </div>
+        </div>
+
+        <!-- PM Summary strip -->
+        <div x-show="pmSummary" class="grid grid-cols-4 gap-3 mb-5">
+          <div class="bg-white border rounded-xl p-3 text-center">
+            <div class="text-xl font-bold text-gray-800" x-text="pmSummary?.tasks?.total||0"></div>
+            <div class="text-xs text-gray-400">Total Tasks</div>
+          </div>
+          <div class="bg-white border rounded-xl p-3 text-center">
+            <div class="text-xl font-bold text-green-600" x-text="pmSummary?.tasks?.completed||0"></div>
+            <div class="text-xs text-gray-400">Completed</div>
+          </div>
+          <div class="bg-white border rounded-xl p-3 text-center">
+            <div class="text-xl font-bold text-red-600" x-text="pmSummary?.tasks?.overdue||0"></div>
+            <div class="text-xs text-gray-400">Overdue</div>
+          </div>
+          <div class="bg-white border rounded-xl p-3 text-center">
+            <div class="text-xl font-bold text-amber-500" x-text="pmSummary?.tasks?.blocked||0"></div>
+            <div class="text-xs text-gray-400">Blocked</div>
+          </div>
+        </div>
+
+        <div x-show="pmTasksLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+
+        <div x-show="!pmTasksLoading" class="bg-white border rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 w-8"></th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Task</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Assigned</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Due</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Status</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Progress</th>
+                <th class="px-4 py-2.5 text-xs font-semibold text-gray-500"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="t in pmTasks" :key="t.id">
+                <tr class="hover:bg-gray-50 cursor-pointer" @click="openTaskDetail(t)">
+                  <td class="px-4 py-3">
+                    <i class="fa-solid fa-flag text-xs" :class="priorityColor(t.priority)"></i>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="font-medium text-gray-800 truncate max-w-xs" x-text="t.title"></div>
+                    <div x-show="t.location" class="text-xs text-gray-400" x-text="'📍 '+t.location"></div>
+                  </td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="t.assigned_to_name||'—'"></td>
+                  <td class="px-4 py-3 text-xs" :class="t.due_date && t.due_date < new Date().toISOString().slice(0,10) && t.status!=='completed' ? 'text-red-600 font-semibold' : 'text-gray-500'" x-text="t.due_date||'—'"></td>
+                  <td class="px-4 py-3">
+                    <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="taskStatusColor(t.status)" x-text="t.status.replace(/_/g,' ')"></span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 bg-gray-200 rounded-full h-1.5 w-20">
+                        <div class="bg-green-500 h-1.5 rounded-full transition-all" :style="'width:'+t.percent_complete+'%'"></div>
+                      </div>
+                      <span class="text-xs text-gray-500 w-8" x-text="t.percent_complete+'%'"></span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3" @click.stop>
+                    <div class="flex gap-1">
+                      <button x-show="canWritePM" @click="openTaskModal(t)" class="text-xs px-2 py-1 rounded bg-gray-50 hover:bg-gray-100 text-gray-600"><i class="fa-solid fa-pen"></i></button>
+                      <button x-show="canWritePM" @click="deleteTask(t.id)" class="text-xs px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-600"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="pmTasks.length===0">
+                <td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">No tasks yet. Click "New Task" to create the first one.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /pm-tasks -->
+
+      <!-- ── PM DAILY LOGS ──────────────────────────────────────────── -->
+      <div x-show="view==='pm-daily-logs'" class="p-6 max-w-4xl">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-calendar-day mr-2 text-green-600"></i>Daily Logs</h2>
+          <button x-show="canWritePM" @click="dailyLogForm.log_date=new Date().toISOString().slice(0,10); showDailyLogModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold">
+            <i class="fa-solid fa-plus"></i> New Log
+          </button>
+        </div>
+        <div x-show="pmDailyLogsLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+        <div x-show="!pmDailyLogsLoading" class="space-y-4">
+          <template x-for="log in pmDailyLogs" :key="log.id">
+            <div class="bg-white border rounded-xl p-5">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-3">
+                  <span class="font-bold text-gray-800" x-text="log.log_date"></span>
+                  <span class="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full" x-text="log.weather||'—'"></span>
+                  <span x-show="log.temperature" class="text-xs text-gray-400" x-text="log.temperature"></span>
+                  <span x-show="log.crew_count" class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full"><i class="fa-solid fa-users mr-1"></i><span x-text="log.crew_count+' crew'"></span></span>
+                </div>
+                <div class="flex gap-1">
+                  <span class="text-xs text-gray-400" x-text="'by '+log.created_by"></span>
+                  <button x-show="canWritePM" @click="deleteDailyLog(log.id)" class="ml-2 text-xs text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </div>
+              <div x-show="log.work_summary" class="text-sm text-gray-700 mb-2"><strong>Work:</strong> <span x-text="log.work_summary"></span></div>
+              <div x-show="log.issues" class="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mb-2"><strong>Issues:</strong> <span x-text="log.issues"></span></div>
+              <div x-show="log.delays" class="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-2"><strong>Delays:</strong> <span x-text="log.delays"></span></div>
+              <div x-show="log.visitors" class="text-sm text-gray-500"><strong>Visitors:</strong> <span x-text="log.visitors"></span></div>
+            </div>
+          </template>
+          <div x-show="pmDailyLogs.length===0" class="text-center text-gray-400 text-sm py-8">No daily logs yet.</div>
+        </div>
+      </div><!-- /pm-daily-logs -->
+
+      <!-- ── PM RFIs ─────────────────────────────────────────────────── -->
+      <div x-show="view==='pm-rfis'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-question-circle mr-2 text-green-600"></i>RFIs <span class="text-sm font-normal text-gray-400 ml-1">(Requests for Information)</span></h2>
+          <button x-show="canWritePM" @click="openRFIModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold"><i class="fa-solid fa-plus"></i> New RFI</button>
+        </div>
+        <div x-show="!pmRFIsLoading" class="bg-white border rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">RFI #</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Subject</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Priority</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Assigned</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Due</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Status</th>
+                <th class="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="r in pmRFIs" :key="r.id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 font-mono text-xs text-gray-600" x-text="r.rfi_number"></td>
+                  <td class="px-4 py-3"><div class="font-medium text-gray-800" x-text="r.subject"></div><div x-show="r.description" class="text-xs text-gray-400 truncate max-w-xs" x-text="r.description"></div></td>
+                  <td class="px-4 py-3"><span class="text-xs font-medium" :class="priorityColor(r.priority)" x-text="r.priority"></span></td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="r.assigned_to||'—'"></td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="r.due_date||'—'"></td>
+                  <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="r.status==='open'?'bg-amber-100 text-amber-700':r.status==='answered'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'" x-text="r.status"></span></td>
+                  <td class="px-4 py-3">
+                    <div class="flex gap-1">
+                      <button x-show="canWritePM" @click="openRFIModal(r)" class="text-xs px-2 py-1 rounded bg-gray-50 hover:bg-gray-100 text-gray-600"><i class="fa-solid fa-pen"></i></button>
+                      <button x-show="canWritePM" @click="deleteRFI(r.id)" class="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="pmRFIs.length===0"><td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">No RFIs yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /pm-rfis -->
+
+      <!-- ── PM PUNCH LIST ──────────────────────────────────────────── -->
+      <div x-show="view==='pm-punch'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-circle-exclamation mr-2 text-green-600"></i>Punch List</h2>
+          <button x-show="canWritePM" @click="openPunchModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold"><i class="fa-solid fa-plus"></i> Add Item</button>
+        </div>
+        <div x-show="!pmPunchLoading" class="bg-white border rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">#</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Item</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Location</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Assigned</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Priority</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Status</th>
+                <th class="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="p in pmPunchItems" :key="p.id">
+                <tr class="hover:bg-gray-50" :class="p.status==='resolved'||p.status==='verified'?'opacity-60':''">
+                  <td class="px-4 py-3 font-mono text-xs text-gray-500" x-text="p.item_number"></td>
+                  <td class="px-4 py-3"><div class="font-medium text-gray-800" x-text="p.title"></div><div x-show="p.description" class="text-xs text-gray-400" x-text="p.description"></div></td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="p.location||'—'"></td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="p.assigned_to||'—'"></td>
+                  <td class="px-4 py-3"><span class="text-xs font-medium" :class="priorityColor(p.priority)" x-text="p.priority"></span></td>
+                  <td class="px-4 py-3"><span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="p.status==='open'?'bg-red-100 text-red-700':p.status==='in_progress'?'bg-amber-100 text-amber-700':p.status==='resolved'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'" x-text="p.status"></span></td>
+                  <td class="px-4 py-3">
+                    <div class="flex gap-1">
+                      <button x-show="canWritePM && p.status!=='resolved'" @click="resolvePunch(p.id)" class="text-xs px-2 py-1 rounded bg-green-50 text-green-700 hover:bg-green-100" title="Mark resolved"><i class="fa-solid fa-check"></i></button>
+                      <button x-show="canWritePM" @click="openPunchModal(p)" class="text-xs px-2 py-1 rounded bg-gray-50 hover:bg-gray-100 text-gray-600"><i class="fa-solid fa-pen"></i></button>
+                      <button x-show="canWritePM" @click="deletePunch(p.id)" class="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="pmPunchItems.length===0"><td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">No punch items yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /pm-punch -->
+
+      <!-- ── PM SUBMITTALS ──────────────────────────────────────────── -->
+      <div x-show="view==='pm-submittals'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-paper-plane mr-2 text-green-600"></i>Submittals</h2>
+          <button x-show="canWritePM" @click="showSubmittalModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold"><i class="fa-solid fa-plus"></i> New Submittal</button>
+        </div>
+        <div x-show="!pmSubmittalsLoading" class="bg-white border rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">#</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Title</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Spec</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Submitted</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Reviewer</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Status</th>
+                <th class="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              <template x-for="s in pmSubmittals" :key="s.id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 font-mono text-xs text-gray-500" x-text="s.submittal_number"></td>
+                  <td class="px-4 py-3 font-medium text-gray-800" x-text="s.title"></td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="s.spec_section||'—'"></td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="s.submitted_date||'—'"></td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="s.reviewer||'—'"></td>
+                  <td class="px-4 py-3">
+                    <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                      :class="s.status==='approved'?'bg-green-100 text-green-700':s.status==='rejected'?'bg-red-100 text-red-700':s.status==='under_review'?'bg-blue-100 text-blue-700':s.status==='submitted'?'bg-amber-100 text-amber-700':'bg-gray-100 text-gray-600'"
+                      x-text="s.status.replace(/_/g,' ')"></span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <button x-show="canWritePM" @click="deleteSubmittal(s.id)" class="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"><i class="fa-solid fa-trash"></i></button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="pmSubmittals.length===0"><td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">No submittals yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /pm-submittals -->
+
+      <!-- ── PM MEETINGS ────────────────────────────────────────────── -->
+      <div x-show="view==='pm-meetings'" class="p-6 max-w-4xl">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-people-group mr-2 text-green-600"></i>Meeting Minutes</h2>
+          <button x-show="canWritePM" @click="openMeetingModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold"><i class="fa-solid fa-plus"></i> New Meeting</button>
+        </div>
+        <div x-show="!pmMeetingsLoading" class="space-y-4">
+          <template x-for="m in pmMeetings" :key="m.id">
+            <div class="bg-white border rounded-xl p-5">
+              <div class="flex items-start justify-between mb-3">
+                <div>
+                  <div class="font-bold text-gray-800" x-text="m.title"></div>
+                  <div class="text-xs text-gray-400 mt-0.5">
+                    <span x-text="m.meeting_date"></span>
+                    <span x-show="m.location"> · <span x-text="m.location"></span></span>
+                  </div>
+                </div>
+                <div class="flex gap-1">
+                  <button x-show="canWritePM" @click="openMeetingModal(m)" class="text-xs px-2 py-1 rounded bg-gray-50 hover:bg-gray-100 text-gray-600"><i class="fa-solid fa-pen"></i></button>
+                  <button x-show="canWritePM" @click="deleteMeeting(m.id)" class="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </div>
+              <div x-show="m.attendees" class="text-xs text-gray-500 mb-2"><strong>Attendees:</strong> <span x-text="m.attendees"></span></div>
+              <div x-show="m.minutes" class="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 mb-2 whitespace-pre-line" x-text="m.minutes"></div>
+              <div x-show="m.action_items" class="text-sm text-blue-700 bg-blue-50 rounded-lg p-3"><strong>Action Items:</strong><div class="whitespace-pre-line mt-1" x-text="m.action_items"></div></div>
+              <div x-show="m.next_meeting" class="text-xs text-gray-400 mt-2"><i class="fa-solid fa-calendar-plus mr-1"></i>Next: <span x-text="m.next_meeting"></span></div>
+            </div>
+          </template>
+          <div x-show="pmMeetings.length===0" class="text-center text-gray-400 text-sm py-8">No meeting records yet.</div>
+        </div>
+      </div><!-- /pm-meetings -->
+
+      <!-- ── PM PHOTOS ──────────────────────────────────────────────── -->
+      <div x-show="view==='pm-photos'" class="p-6 max-w-6xl">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-images mr-2 text-green-600"></i>Photo Logs</h2>
+          <label x-show="canWritePM" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold cursor-pointer">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Upload Photos
+            <input type="file" accept="image/*" multiple class="hidden" @change="uploadPhoto($event.target.files)" />
+          </label>
+        </div>
+        <div x-show="pmPhotosLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+        <div x-show="!pmPhotosLoading" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <template x-for="photo in pmPhotos" :key="photo.id">
+            <div class="bg-white border rounded-xl overflow-hidden group relative">
+              <img :src="photo.url" :alt="photo.caption||'Site photo'" class="w-full h-40 object-cover" loading="lazy" />
+              <div class="p-2">
+                <div x-show="photo.caption" class="text-xs font-medium text-gray-700 truncate" x-text="photo.caption"></div>
+                <div class="text-xs text-gray-400 mt-0.5 flex items-center justify-between">
+                  <span x-text="photo.taken_date||photo.created_at?.slice(0,10)"></span>
+                  <span class="text-xs px-1.5 py-0.5 bg-gray-100 rounded text-gray-500" x-text="photo.category"></span>
+                </div>
+                <div x-show="photo.location" class="text-xs text-gray-400 truncate" x-text="'📍 '+photo.location"></div>
+              </div>
+              <button x-show="canWritePM" @click="deletePhoto(photo.id)"
+                      class="absolute top-2 right-2 bg-red-500 text-white text-xs w-6 h-6 rounded-full items-center justify-center hidden group-hover:flex">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+          </template>
+          <div x-show="pmPhotos.length===0" class="col-span-4 text-center text-gray-400 text-sm py-8">No photos yet. Upload site photos to start the log.</div>
+        </div>
+      </div><!-- /pm-photos -->
+
+
+      <!-- ═══════════════════════════════════════════════════════════
+           PM MODALS
+      ═══════════════════════════════════════════════════════════ -->
+
+      <!-- Task Create/Edit Modal -->
+      <div x-show="showTaskModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showTaskModal=false">
+        <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-gray-800" x-text="editingTask?'Edit Task':'New Task'"></h3>
+            <button @click="showTaskModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Title *</label>
+              <input x-model="taskForm.title" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Task title" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                <select x-model="taskForm.task_type" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                  <option value="task">Task</option>
+                  <option value="milestone">Milestone</option>
+                  <option value="issue">Issue</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Priority</label>
+                <select x-model="taskForm.priority" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                <select x-model="taskForm.status" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                  <option value="not_started">Not Started</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="blocked">Blocked</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Progress %</label>
+                <input x-model="taskForm.percent_complete" type="number" min="0" max="100" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                <input x-model="taskForm.start_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+                <input x-model="taskForm.end_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Due Date</label>
+                <input x-model="taskForm.due_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Location / Area</label>
+              <input x-model="taskForm.location" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="e.g. Level 3 – North wing" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
+              <textarea x-model="taskForm.description" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Details, acceptance criteria..."></textarea>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-6">
+            <button @click="showTaskModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button @click="saveTask()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">Save Task</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Task Detail / Comments Modal -->
+      <div x-show="showTaskDetail" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showTaskDetail=false">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
+          <div class="flex items-center justify-between p-6 border-b">
+            <div>
+              <div class="font-bold text-gray-800 text-lg" x-text="selectedTask?.title"></div>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="taskStatusColor(selectedTask?.status||'')" x-text="selectedTask?.status?.replace(/_/g,' ')"></span>
+                <span class="text-xs text-gray-400" x-text="selectedTask?.priority+' priority'"></span>
+                <span x-show="selectedTask?.assigned_to_name" class="text-xs text-gray-400">· <span x-text="selectedTask?.assigned_to_name"></span></span>
+              </div>
+            </div>
+            <button @click="showTaskDetail=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+          </div>
+          <div class="p-6 overflow-y-auto flex-1">
+            <div x-show="selectedTask?.description" class="text-sm text-gray-700 bg-gray-50 rounded-xl p-4 mb-4 whitespace-pre-line" x-text="selectedTask?.description"></div>
+            <div class="grid grid-cols-2 gap-3 text-xs text-gray-500 mb-4">
+              <div x-show="selectedTask?.due_date"><i class="fa-solid fa-calendar mr-1"></i>Due: <span x-text="selectedTask?.due_date"></span></div>
+              <div x-show="selectedTask?.location"><i class="fa-solid fa-location-dot mr-1"></i><span x-text="selectedTask?.location"></span></div>
+            </div>
+            <!-- Progress bar -->
+            <div class="mb-5">
+              <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                <span>Progress</span><span x-text="selectedTask?.percent_complete+'%'"></span>
+              </div>
+              <div class="bg-gray-200 rounded-full h-2">
+                <div class="bg-green-500 h-2 rounded-full" :style="'width:'+(selectedTask?.percent_complete||0)+'%'"></div>
+              </div>
+            </div>
+            <!-- Comments -->
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Comments (<span x-text="taskComments.length"></span>)</h4>
+            <div class="space-y-3 mb-4">
+              <template x-for="c in taskComments" :key="c.id">
+                <div class="flex gap-3">
+                  <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0" x-text="(c.username||'?')[0].toUpperCase()"></div>
+                  <div>
+                    <span class="text-xs font-semibold text-gray-700" x-text="c.username"></span>
+                    <span class="text-xs text-gray-400 ml-2" x-text="c.created_at?.slice(0,16)?.replace('T',' ')"></span>
+                    <p class="text-sm text-gray-700 mt-0.5" x-text="c.comment"></p>
+                  </div>
+                </div>
+              </template>
+              <div x-show="taskComments.length===0" class="text-xs text-gray-400">No comments yet.</div>
+            </div>
+            <div class="flex gap-2">
+              <input x-model="newComment" type="text" placeholder="Add a comment..." @keydown.enter="postComment()"
+                     class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+              <button @click="postComment()" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">Post</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Daily Log Modal -->
+      <div x-show="showDailyLogModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showDailyLogModal=false">
+        <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-gray-800">Daily Site Log</h3>
+            <button @click="showDailyLogModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+          </div>
+          <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Date</label><input x-model="dailyLogForm.log_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Crew Count</label><input x-model="dailyLogForm.crew_count" type="number" min="0" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Weather</label>
+                <select x-model="dailyLogForm.weather" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                  <option value="sunny">☀️ Sunny</option><option value="cloudy">☁️ Cloudy</option>
+                  <option value="rain">🌧 Rain</option><option value="snow">❄️ Snow</option>
+                  <option value="wind">💨 Windy</option><option value="storm">⛈ Storm</option>
+                </select>
+              </div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Temperature</label><input x-model="dailyLogForm.temperature" type="text" placeholder="e.g. 12°C" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+            </div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Work Completed</label><textarea x-model="dailyLogForm.work_summary" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Summary of work done today..."></textarea></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Issues / Safety</label><textarea x-model="dailyLogForm.issues" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Any issues or safety observations..."></textarea></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Delays</label><textarea x-model="dailyLogForm.delays" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Any delays and reasons..."></textarea></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Visitors</label><input x-model="dailyLogForm.visitors" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Inspector, owner, architect..." /></div>
+          </div>
+          <div class="flex gap-2 mt-6">
+            <button @click="showDailyLogModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button @click="saveDailyLog()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">Save Log</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RFI Modal -->
+      <div x-show="showRFIModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showRFIModal=false">
+        <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-gray-800" x-text="editingRFI?'Edit RFI':'New RFI'"></h3>
+            <button @click="showRFIModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+          </div>
+          <div class="space-y-4">
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Subject *</label><input x-model="rfiForm.subject" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Priority</label>
+                <select x-model="rfiForm.priority" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                  <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
+                </select>
+              </div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Due Date</label><input x-model="rfiForm.due_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+            </div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Description</label><textarea x-model="rfiForm.description" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"></textarea></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Response</label><textarea x-model="rfiForm.response" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Answer / resolution..."></textarea></div>
+          </div>
+          <div class="flex gap-2 mt-6">
+            <button @click="showRFIModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button @click="saveRFI()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">Save RFI</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Punch Item Modal -->
+      <div x-show="showPunchModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showPunchModal=false">
+        <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-gray-800" x-text="editingPunch?'Edit Item':'New Punch Item'"></h3>
+            <button @click="showPunchModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+          </div>
+          <div class="space-y-4">
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Title *</label><input x-model="punchForm.title" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Location</label><input x-model="punchForm.location" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Room / area" /></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Priority</label>
+                <select x-model="punchForm.priority" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                  <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
+                </select>
+              </div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Due Date</label><input x-model="punchForm.due_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+            </div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Description</label><textarea x-model="punchForm.description" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"></textarea></div>
+          </div>
+          <div class="flex gap-2 mt-6">
+            <button @click="showPunchModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button @click="savePunch()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submittal Modal -->
+      <div x-show="showSubmittalModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showSubmittalModal=false">
+        <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-md">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-gray-800">New Submittal</h3>
+            <button @click="showSubmittalModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+          </div>
+          <div class="space-y-4">
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Title *</label><input x-model="submittalForm.title" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Spec Section</label><input x-model="submittalForm.spec_section" type="text" placeholder="e.g. 03 30 00" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                <select x-model="submittalForm.status" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                  <option value="draft">Draft</option><option value="submitted">Submitted</option><option value="under_review">Under Review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="resubmit">Resubmit</option>
+                </select>
+              </div>
+            </div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Submitted Date</label><input x-model="submittalForm.submitted_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Review Notes</label><textarea x-model="submittalForm.review_notes" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"></textarea></div>
+          </div>
+          <div class="flex gap-2 mt-6">
+            <button @click="showSubmittalModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button @click="saveSubmittal()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Meeting Modal -->
+      <div x-show="showMeetingModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showMeetingModal=false">
+        <div class="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-bold text-gray-800" x-text="editingMeeting?'Edit Meeting':'New Meeting'"></h3>
+            <button @click="showMeetingModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+          </div>
+          <div class="space-y-4">
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Title *</label><input x-model="meetingForm.title" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Date</label><input x-model="meetingForm.meeting_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Location</label><input x-model="meetingForm.location" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Site office, Teams, etc." /></div>
+            </div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Attendees</label><input x-model="meetingForm.attendees" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="John, Sarah, Mike..." /></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Agenda</label><textarea x-model="meetingForm.agenda" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"></textarea></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Minutes / Notes</label><textarea x-model="meetingForm.minutes" rows="4" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="Discussion points, decisions made..."></textarea></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Action Items</label><textarea x-model="meetingForm.action_items" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="• Action item - Owner - Due date"></textarea></div>
+            <div><label class="block text-xs font-medium text-gray-600 mb-1">Next Meeting</label><input x-model="meetingForm.next_meeting" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" placeholder="e.g. 2026-05-20 at 9am" /></div>
+          </div>
+          <div class="flex gap-2 mt-6">
+            <button @click="showMeetingModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button @click="saveMeeting()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">Save</button>
+          </div>
+        </div>
+      </div>
 
     </main>
     </div><!-- /app-row (sidebar + main) -->

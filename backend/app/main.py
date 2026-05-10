@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import engine, Base
-from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit
+from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit, pm
 
 
 def _run_migrations():
@@ -227,6 +227,107 @@ def _run_migrations():
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )""",
             "CREATE INDEX IF NOT EXISTS ix_audit_logs_org_created ON audit_logs(org_id, created_at)",
+            # PM tables
+            """CREATE TABLE IF NOT EXISTS pm_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                parent_id INTEGER REFERENCES pm_tasks(id),
+                title TEXT NOT NULL,
+                description TEXT,
+                task_type TEXT DEFAULT 'task',
+                status TEXT DEFAULT 'not_started',
+                priority TEXT DEFAULT 'medium',
+                assigned_to INTEGER REFERENCES users(id),
+                start_date TEXT, end_date TEXT, due_date TEXT,
+                percent_complete INTEGER DEFAULT 0,
+                location TEXT, tags TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pm_task_comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL REFERENCES pm_tasks(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                comment TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pm_daily_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                log_date TEXT NOT NULL,
+                weather TEXT, temperature TEXT, crew_count INTEGER DEFAULT 0,
+                work_summary TEXT, issues TEXT, delays TEXT, visitors TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pm_rfis (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                rfi_number TEXT NOT NULL,
+                subject TEXT NOT NULL, description TEXT,
+                status TEXT DEFAULT 'open', priority TEXT DEFAULT 'medium',
+                assigned_to INTEGER REFERENCES users(id),
+                due_date TEXT, response TEXT,
+                responded_by INTEGER REFERENCES users(id),
+                responded_at DATETIME,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pm_punch_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                item_number TEXT NOT NULL, title TEXT NOT NULL,
+                description TEXT, location TEXT,
+                status TEXT DEFAULT 'open', priority TEXT DEFAULT 'medium',
+                assigned_to INTEGER REFERENCES users(id),
+                due_date TEXT, resolved_at DATETIME, photo_path TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pm_submittals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                submittal_number TEXT NOT NULL, title TEXT NOT NULL,
+                description TEXT, spec_section TEXT,
+                status TEXT DEFAULT 'draft',
+                submitted_by INTEGER REFERENCES users(id),
+                submitted_date TEXT,
+                reviewer INTEGER REFERENCES users(id),
+                review_date TEXT, review_notes TEXT, file_path TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pm_meetings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                meeting_date TEXT NOT NULL, title TEXT NOT NULL,
+                location TEXT, attendees TEXT, agenda TEXT,
+                minutes TEXT, action_items TEXT, next_meeting TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS pm_photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                file_path TEXT NOT NULL, original_filename TEXT,
+                caption TEXT, location TEXT,
+                category TEXT DEFAULT 'general',
+                taken_date TEXT,
+                task_id INTEGER REFERENCES pm_tasks(id),
+                punch_item_id INTEGER REFERENCES pm_punch_items(id),
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_pm_tasks_project ON pm_tasks(project_id, org_id)",
+            "CREATE INDEX IF NOT EXISTS ix_pm_tasks_assigned ON pm_tasks(assigned_to)",
             # AI suggestions log (optional — stores Gemini suggestions for audit)
             """CREATE TABLE IF NOT EXISTS ai_suggestions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -363,6 +464,7 @@ app.include_router(project._lender_router)
 app.include_router(filetools.router)
 app.include_router(org.router)
 app.include_router(audit.router)
+app.include_router(pm.router)
 
 # Serve static frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")

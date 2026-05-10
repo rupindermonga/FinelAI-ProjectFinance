@@ -19,6 +19,45 @@ function app() {
     // ── Audit log ─────────────────────────────────────────────────
     auditLog: [], auditTotal: 0, auditPage: 1, auditLoading: false,
 
+    // ── PM state ──────────────────────────────────────────────────
+    pmSummary: null,
+    // Tasks
+    pmTasks: [], pmTasksLoading: false,
+    pmTaskFilter: { status: '', assigned_to: '' },
+    showTaskModal: false, editingTask: null,
+    taskForm: { title:'', description:'', task_type:'task', status:'not_started',
+                priority:'medium', assigned_to:null, start_date:'', end_date:'',
+                due_date:'', percent_complete:0, location:'', tags:'' },
+    taskComments: [], taskCommentsLoading: false, newComment: '',
+    showTaskDetail: false, selectedTask: null,
+    // Daily logs
+    pmDailyLogs: [], pmDailyLogsLoading: false,
+    showDailyLogModal: false,
+    dailyLogForm: { log_date:'', weather:'sunny', temperature:'', crew_count:0,
+                    work_summary:'', issues:'', delays:'', visitors:'' },
+    // RFIs
+    pmRFIs: [], pmRFIsLoading: false,
+    showRFIModal: false, editingRFI: null,
+    rfiForm: { rfi_number:'', subject:'', description:'', priority:'medium',
+               assigned_to:null, due_date:'', response:'' },
+    // Punch list
+    pmPunchItems: [], pmPunchLoading: false,
+    showPunchModal: false, editingPunch: null,
+    punchForm: { title:'', description:'', location:'', priority:'medium',
+                 assigned_to:null, due_date:'' },
+    // Submittals
+    pmSubmittals: [], pmSubmittalsLoading: false,
+    showSubmittalModal: false,
+    submittalForm: { title:'', spec_section:'', status:'draft',
+                     submitted_date:'', reviewer:null, review_notes:'' },
+    // Meetings
+    pmMeetings: [], pmMeetingsLoading: false,
+    showMeetingModal: false, editingMeeting: null,
+    meetingForm: { title:'', meeting_date:'', location:'', attendees:'',
+                   agenda:'', minutes:'', action_items:'', next_meeting:'' },
+    // Photos
+    pmPhotos: [], pmPhotosLoading: false,
+
     // ── Super Admin UI ────────────────────────────────────────────
     showCreateOrgModal: false,
     createOrgForm: { name: '', owner_username: '', plan: 'starter' },
@@ -2152,6 +2191,259 @@ function app() {
       const h = this.token ? { Authorization: `Bearer ${this.token}` } : {};
       if (this.currentOrg?.id) h['X-Organization-Id'] = String(this.currentOrg.id);
       return h;
+    },
+
+    // ── PM helpers ────────────────────────────────────────────────
+    get canAccessPM() {
+      const pm = ['owner','admin','pm_admin','site_supervisor','vendor_pm','finance_admin','editor','viewer','pm_viewer'];
+      return pm.includes(this.currentOrg?.role);
+    },
+    get canAccessFinance() {
+      const f = ['owner','admin','finance_admin','finance_viewer','editor','viewer'];
+      return f.includes(this.currentOrg?.role);
+    },
+    get isVendorFinance() { return this.currentOrg?.role === 'vendor_finance'; },
+    get isVendorPM()      { return this.currentOrg?.role === 'vendor_pm'; },
+    get canWritePM() {
+      return ['owner','admin','pm_admin','site_supervisor','editor','vendor_pm'].includes(this.currentOrg?.role);
+    },
+
+    _pmParams(extra = {}) {
+      const p = new URLSearchParams({ project_id: this.currentProject?.id || '', ...extra });
+      return p.toString();
+    },
+
+    async loadPMSummary() {
+      if (!this.currentProject) return;
+      try { this.pmSummary = await this.get('/api/pm/summary?' + this._pmParams()); } catch(e) {}
+    },
+
+    // Tasks
+    async loadPMTasks() {
+      if (!this.currentProject) return;
+      this.pmTasksLoading = true;
+      try {
+        const p = { project_id: this.currentProject.id };
+        if (this.pmTaskFilter.status) p.status = this.pmTaskFilter.status;
+        if (this.pmTaskFilter.assigned_to) p.assigned_to = this.pmTaskFilter.assigned_to;
+        this.pmTasks = await this.get('/api/pm/tasks?' + new URLSearchParams(p));
+      } catch(e) { this.pmTasks = []; }
+      finally { this.pmTasksLoading = false; }
+    },
+    openTaskModal(task = null) {
+      this.editingTask = task;
+      if (task) {
+        this.taskForm = { title: task.title, description: task.description||'',
+          task_type: task.task_type, status: task.status, priority: task.priority,
+          assigned_to: task.assigned_to, start_date: task.start_date||'',
+          end_date: task.end_date||'', due_date: task.due_date||'',
+          percent_complete: task.percent_complete, location: task.location||'', tags: task.tags||'' };
+      } else {
+        this.taskForm = { title:'', description:'', task_type:'task', status:'not_started',
+          priority:'medium', assigned_to:null, start_date:'', end_date:'',
+          due_date:'', percent_complete:0, location:'', tags:'' };
+      }
+      this.showTaskModal = true;
+    },
+    async saveTask() {
+      const body = { ...this.taskForm, project_id: this.currentProject?.id };
+      try {
+        if (this.editingTask) await this.put('/api/pm/tasks/' + this.editingTask.id, body);
+        else await this.post('/api/pm/tasks', body);
+        this.showTaskModal = false;
+        await this.loadPMTasks(); await this.loadPMSummary();
+      } catch(e) { alert(e.message); }
+    },
+    async deleteTask(id) {
+      if (!confirm('Delete this task?')) return;
+      await this.delete('/api/pm/tasks/' + id);
+      await this.loadPMTasks(); await this.loadPMSummary();
+    },
+    async openTaskDetail(task) {
+      this.selectedTask = task;
+      this.showTaskDetail = true;
+      this.taskCommentsLoading = true;
+      try { this.taskComments = await this.get('/api/pm/tasks/' + task.id + '/comments'); }
+      catch(e) { this.taskComments = []; }
+      finally { this.taskCommentsLoading = false; }
+    },
+    async postComment() {
+      if (!this.newComment.trim()) return;
+      await this.post('/api/pm/tasks/' + this.selectedTask.id + '/comments', { comment: this.newComment });
+      this.newComment = '';
+      this.taskComments = await this.get('/api/pm/tasks/' + this.selectedTask.id + '/comments');
+    },
+    taskStatusColor(s) {
+      return { not_started:'bg-gray-100 text-gray-600', in_progress:'bg-blue-100 text-blue-700',
+               completed:'bg-green-100 text-green-700', blocked:'bg-red-100 text-red-700',
+               cancelled:'bg-slate-100 text-slate-500' }[s] || 'bg-gray-100 text-gray-600';
+    },
+    priorityColor(p) {
+      return { low:'text-gray-400', medium:'text-amber-500', high:'text-orange-500', critical:'text-red-600' }[p] || 'text-gray-400';
+    },
+
+    // Daily Logs
+    async loadDailyLogs() {
+      if (!this.currentProject) return;
+      this.pmDailyLogsLoading = true;
+      try { this.pmDailyLogs = await this.get('/api/pm/daily-logs?' + this._pmParams()); }
+      catch(e) { this.pmDailyLogs = []; }
+      finally { this.pmDailyLogsLoading = false; }
+    },
+    async saveDailyLog() {
+      const body = { ...this.dailyLogForm, project_id: this.currentProject?.id };
+      if (!body.log_date) body.log_date = new Date().toISOString().slice(0,10);
+      await this.post('/api/pm/daily-logs', body);
+      this.showDailyLogModal = false;
+      this.dailyLogForm = { log_date:'', weather:'sunny', temperature:'', crew_count:0, work_summary:'', issues:'', delays:'', visitors:'' };
+      await this.loadDailyLogs(); await this.loadPMSummary();
+    },
+    async deleteDailyLog(id) {
+      if (!confirm('Delete this log?')) return;
+      await this.delete('/api/pm/daily-logs/' + id);
+      await this.loadDailyLogs();
+    },
+
+    // RFIs
+    async loadRFIs() {
+      if (!this.currentProject) return;
+      this.pmRFIsLoading = true;
+      try { this.pmRFIs = await this.get('/api/pm/rfis?' + this._pmParams()); }
+      catch(e) { this.pmRFIs = []; }
+      finally { this.pmRFIsLoading = false; }
+    },
+    openRFIModal(rfi = null) {
+      this.editingRFI = rfi;
+      this.rfiForm = rfi ? { rfi_number: rfi.rfi_number, subject: rfi.subject,
+        description: rfi.description||'', priority: rfi.priority,
+        assigned_to: rfi.assigned_to, due_date: rfi.due_date||'', response: rfi.response||'' }
+        : { rfi_number:'', subject:'', description:'', priority:'medium', assigned_to:null, due_date:'', response:'' };
+      this.showRFIModal = true;
+    },
+    async saveRFI() {
+      const body = { ...this.rfiForm, project_id: this.currentProject?.id };
+      if (this.editingRFI) await this.put('/api/pm/rfis/' + this.editingRFI.id, body);
+      else await this.post('/api/pm/rfis', body);
+      this.showRFIModal = false;
+      await this.loadRFIs(); await this.loadPMSummary();
+    },
+    async deleteRFI(id) {
+      if (!confirm('Delete this RFI?')) return;
+      await this.delete('/api/pm/rfis/' + id);
+      await this.loadRFIs();
+    },
+
+    // Punch list
+    async loadPunchList() {
+      if (!this.currentProject) return;
+      this.pmPunchLoading = true;
+      try { this.pmPunchItems = await this.get('/api/pm/punch-list?' + this._pmParams()); }
+      catch(e) { this.pmPunchItems = []; }
+      finally { this.pmPunchLoading = false; }
+    },
+    openPunchModal(item = null) {
+      this.editingPunch = item;
+      this.punchForm = item ? { title: item.title, description: item.description||'',
+        location: item.location||'', priority: item.priority,
+        assigned_to: item.assigned_to, due_date: item.due_date||'' }
+        : { title:'', description:'', location:'', priority:'medium', assigned_to:null, due_date:'' };
+      this.showPunchModal = true;
+    },
+    async savePunch() {
+      const body = { ...this.punchForm, project_id: this.currentProject?.id };
+      if (this.editingPunch) await this.put('/api/pm/punch-list/' + this.editingPunch.id, body);
+      else await this.post('/api/pm/punch-list', body);
+      this.showPunchModal = false;
+      await this.loadPunchList(); await this.loadPMSummary();
+    },
+    async resolvePunch(id) {
+      await this.put('/api/pm/punch-list/' + id, { status: 'resolved' });
+      await this.loadPunchList();
+    },
+    async deletePunch(id) {
+      if (!confirm('Delete this item?')) return;
+      await this.delete('/api/pm/punch-list/' + id);
+      await this.loadPunchList();
+    },
+
+    // Submittals
+    async loadSubmittals() {
+      if (!this.currentProject) return;
+      this.pmSubmittalsLoading = true;
+      try { this.pmSubmittals = await this.get('/api/pm/submittals?' + this._pmParams()); }
+      catch(e) { this.pmSubmittals = []; }
+      finally { this.pmSubmittalsLoading = false; }
+    },
+    async saveSubmittal() {
+      const body = { ...this.submittalForm, project_id: this.currentProject?.id };
+      await this.post('/api/pm/submittals', body);
+      this.showSubmittalModal = false;
+      this.submittalForm = { title:'', spec_section:'', status:'draft', submitted_date:'', reviewer:null, review_notes:'' };
+      await this.loadSubmittals(); await this.loadPMSummary();
+    },
+    async deleteSubmittal(id) {
+      if (!confirm('Delete?')) return;
+      await this.delete('/api/pm/submittals/' + id);
+      await this.loadSubmittals();
+    },
+
+    // Meetings
+    async loadMeetings() {
+      if (!this.currentProject) return;
+      this.pmMeetingsLoading = true;
+      try { this.pmMeetings = await this.get('/api/pm/meetings?' + this._pmParams()); }
+      catch(e) { this.pmMeetings = []; }
+      finally { this.pmMeetingsLoading = false; }
+    },
+    openMeetingModal(m = null) {
+      this.editingMeeting = m;
+      this.meetingForm = m ? { title: m.title, meeting_date: m.meeting_date||'',
+        location: m.location||'', attendees: m.attendees||'', agenda: m.agenda||'',
+        minutes: m.minutes||'', action_items: m.action_items||'', next_meeting: m.next_meeting||'' }
+        : { title:'', meeting_date: new Date().toISOString().slice(0,10),
+            location:'', attendees:'', agenda:'', minutes:'', action_items:'', next_meeting:'' };
+      this.showMeetingModal = true;
+    },
+    async saveMeeting() {
+      const body = { ...this.meetingForm, project_id: this.currentProject?.id };
+      if (this.editingMeeting) await this.put('/api/pm/meetings/' + this.editingMeeting.id, body);
+      else await this.post('/api/pm/meetings', body);
+      this.showMeetingModal = false;
+      await this.loadMeetings();
+    },
+    async deleteMeeting(id) {
+      if (!confirm('Delete this meeting record?')) return;
+      await this.delete('/api/pm/meetings/' + id);
+      await this.loadMeetings();
+    },
+
+    // Photos
+    async loadPhotos() {
+      if (!this.currentProject) return;
+      this.pmPhotosLoading = true;
+      try { this.pmPhotos = await this.get('/api/pm/photos?' + this._pmParams()); }
+      catch(e) { this.pmPhotos = []; }
+      finally { this.pmPhotosLoading = false; }
+    },
+    async uploadPhoto(files) {
+      if (!files || !files.length) return;
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('project_id', this.currentProject?.id);
+        fd.append('category', 'progress');
+        fd.append('taken_date', new Date().toISOString().slice(0,10));
+        const r = await fetch('/api/pm/photos?' + new URLSearchParams({ project_id: this.currentProject?.id, category:'progress', taken_date: new Date().toISOString().slice(0,10) }), {
+          method: 'POST', headers: this._headers(), body: fd,
+        });
+        if (!r.ok) { const e = await r.json(); alert(e.detail || 'Upload failed'); }
+      }
+      await this.loadPhotos(); await this.loadPMSummary();
+    },
+    async deletePhoto(id) {
+      if (!confirm('Delete this photo?')) return;
+      await this.delete('/api/pm/photos/' + id);
+      await this.loadPhotos();
     },
 
     // ── Audit log ─────────────────────────────────────────────────

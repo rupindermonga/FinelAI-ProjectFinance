@@ -197,13 +197,27 @@ class Organization(Base):
 
 
 class OrganizationMember(Base):
-    """Maps a User to an Organization with a role."""
+    """Maps a User to an Organization with a role.
+
+    Roles:
+      owner          — full access to Finance + PM, billing, delete org
+      admin          — full Finance + PM, no billing/delete  (legacy: admin)
+      finance_admin  — full Finance, read-only PM
+      pm_admin       — full PM, read-only Finance
+      finance_viewer — read-only Finance, no PM
+      pm_viewer      — read-only PM, no Finance
+      site_supervisor— PM edit (tasks/logs), no Finance
+      editor         — full Finance edit (legacy)
+      viewer         — read-only Finance (legacy)
+      vendor_finance — submit own invoices + view own invoice status only
+      vendor_pm      — update assigned tasks + daily logs
+    """
     __tablename__ = "organization_members"
 
     id          = Column(Integer, primary_key=True, index=True)
     org_id      = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
     user_id     = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    role        = Column(String, default="editor")    # owner | admin | editor | viewer
+    role        = Column(String, default="editor")
     is_active   = Column(Boolean, default=True)
     invited_by  = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at  = Column(DateTime, default=datetime.utcnow)
@@ -244,6 +258,189 @@ class OrgInvitation(Base):
 
     organization = relationship("Organization")
     inviter      = relationship("User")
+
+
+# ─── Project Management Models ───────────────────────────────────────────────
+
+class Task(Base):
+    """Project Management task / work item."""
+    __tablename__ = "pm_tasks"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    org_id          = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id      = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    parent_id       = Column(Integer, ForeignKey("pm_tasks.id"), nullable=True)
+    title           = Column(String, nullable=False)
+    description     = Column(Text, nullable=True)
+    task_type       = Column(String, default="task")     # task | milestone | issue
+    status          = Column(String, default="not_started")  # not_started | in_progress | completed | blocked | cancelled
+    priority        = Column(String, default="medium")   # low | medium | high | critical
+    assigned_to     = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    start_date      = Column(String, nullable=True)
+    end_date        = Column(String, nullable=True)
+    due_date        = Column(String, nullable=True)
+    percent_complete = Column(Integer, default=0)
+    location        = Column(String, nullable=True)      # e.g. "Level 3 - North wing"
+    tags            = Column(String, nullable=True)      # comma-separated
+    created_by      = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+    updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    assignee  = relationship("User", foreign_keys=[assigned_to])
+    creator   = relationship("User", foreign_keys=[created_by])
+    subtasks  = relationship("Task", backref=__import__('sqlalchemy.orm', fromlist=['backref']).backref("parent", remote_side=[id]))
+    comments  = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan")
+
+
+class TaskComment(Base):
+    __tablename__ = "pm_task_comments"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    task_id    = Column(Integer, ForeignKey("pm_tasks.id"), nullable=False, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    comment    = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    task = relationship("Task", back_populates="comments")
+    user = relationship("User")
+
+
+class DailyLog(Base):
+    """Daily site log / progress report."""
+    __tablename__ = "pm_daily_logs"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    org_id      = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id  = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    log_date    = Column(String, nullable=False, index=True)
+    weather     = Column(String, nullable=True)          # sunny | cloudy | rain | snow | wind
+    temperature = Column(String, nullable=True)          # e.g. "12°C"
+    crew_count  = Column(Integer, default=0)
+    work_summary = Column(Text, nullable=True)
+    issues      = Column(Text, nullable=True)
+    delays      = Column(Text, nullable=True)
+    visitors    = Column(Text, nullable=True)
+    created_by  = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    creator = relationship("User")
+
+
+class RFI(Base):
+    """Request for Information."""
+    __tablename__ = "pm_rfis"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    org_id       = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id   = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    rfi_number   = Column(String, nullable=False)
+    subject      = Column(String, nullable=False)
+    description  = Column(Text, nullable=True)
+    status       = Column(String, default="open")        # open | answered | closed
+    priority     = Column(String, default="medium")
+    assigned_to  = Column(Integer, ForeignKey("users.id"), nullable=True)
+    due_date     = Column(String, nullable=True)
+    response     = Column(Text, nullable=True)
+    responded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    responded_at = Column(DateTime, nullable=True)
+    created_by   = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at   = Column(DateTime, default=datetime.utcnow)
+
+    creator    = relationship("User", foreign_keys=[created_by])
+    assignee   = relationship("User", foreign_keys=[assigned_to])
+    responder  = relationship("User", foreign_keys=[responded_by])
+
+
+class PunchItem(Base):
+    """Punch list / deficiency item."""
+    __tablename__ = "pm_punch_items"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    org_id      = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id  = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    item_number = Column(String, nullable=False)
+    title       = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    location    = Column(String, nullable=True)
+    status      = Column(String, default="open")         # open | in_progress | resolved | verified
+    priority    = Column(String, default="medium")
+    assigned_to = Column(Integer, ForeignKey("users.id"), nullable=True)
+    due_date    = Column(String, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    photo_path  = Column(String, nullable=True)
+    created_by  = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    creator  = relationship("User", foreign_keys=[created_by])
+    assignee = relationship("User", foreign_keys=[assigned_to])
+
+
+class Submittal(Base):
+    """Shop drawing / material submittal."""
+    __tablename__ = "pm_submittals"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    org_id          = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id      = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    submittal_number = Column(String, nullable=False)
+    title           = Column(String, nullable=False)
+    description     = Column(Text, nullable=True)
+    spec_section    = Column(String, nullable=True)
+    status          = Column(String, default="draft")    # draft | submitted | under_review | approved | rejected | resubmit
+    submitted_by    = Column(Integer, ForeignKey("users.id"), nullable=True)
+    submitted_date  = Column(String, nullable=True)
+    reviewer        = Column(Integer, ForeignKey("users.id"), nullable=True)
+    review_date     = Column(String, nullable=True)
+    review_notes    = Column(Text, nullable=True)
+    file_path       = Column(String, nullable=True)
+    created_by      = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+    creator   = relationship("User", foreign_keys=[created_by])
+    submitter = relationship("User", foreign_keys=[submitted_by])
+    reviewer_ = relationship("User", foreign_keys=[reviewer])
+
+
+class MeetingMinutes(Base):
+    """Meeting minutes with action items."""
+    __tablename__ = "pm_meetings"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    org_id       = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id   = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    meeting_date = Column(String, nullable=False, index=True)
+    title        = Column(String, nullable=False)
+    location     = Column(String, nullable=True)
+    attendees    = Column(Text, nullable=True)            # JSON array of names
+    agenda       = Column(Text, nullable=True)
+    minutes      = Column(Text, nullable=True)
+    action_items = Column(Text, nullable=True)            # JSON array of {item, owner, due}
+    next_meeting = Column(String, nullable=True)
+    created_by   = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at   = Column(DateTime, default=datetime.utcnow)
+
+    creator = relationship("User")
+
+
+class PhotoLog(Base):
+    """Site photo with metadata."""
+    __tablename__ = "pm_photos"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    org_id      = Column(Integer, ForeignKey("organizations.id"), nullable=False, index=True)
+    project_id  = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    file_path   = Column(String, nullable=False)
+    original_filename = Column(String, nullable=True)
+    caption     = Column(String, nullable=True)
+    location    = Column(String, nullable=True)
+    category    = Column(String, nullable=True)          # progress | issue | safety | material | general
+    taken_date  = Column(String, nullable=True)
+    task_id     = Column(Integer, ForeignKey("pm_tasks.id"), nullable=True)
+    punch_item_id = Column(Integer, ForeignKey("pm_punch_items.id"), nullable=True)
+    created_by  = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    creator = relationship("User")
 
 
 class AuditLog(Base):

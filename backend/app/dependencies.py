@@ -132,3 +132,25 @@ def require_org_role(*roles: str):
             )
         return org, mem
     return _checker
+
+
+# ── Module access helpers ─────────────────────────────────────────────────────
+
+FINANCE_READ_ROLES  = {"owner","admin","finance_admin","finance_viewer","editor","viewer"}
+FINANCE_WRITE_ROLES = {"owner","admin","finance_admin","editor"}
+PM_READ_ROLES       = {"owner","admin","pm_admin","pm_viewer","site_supervisor","vendor_pm","finance_admin","editor","viewer"}
+PM_WRITE_ROLES      = {"owner","admin","pm_admin","site_supervisor","vendor_pm","editor"}
+VENDOR_FINANCE_ROLES = {"vendor_finance"}
+VENDOR_PM_ROLES      = {"vendor_pm"}
+
+def can_access_finance(role: str) -> bool:
+    return role in FINANCE_READ_ROLES
+
+def can_write_finance(role: str) -> bool:
+    return role in FINANCE_WRITE_ROLES
+
+def can_access_pm(role: str) -> bool:
+    return role in PM_READ_ROLES
+
+def is_vendor(role: str) -> bool:
+    return role in VENDOR_FINANCE_ROLES | VENDOR_PM_ROLES
