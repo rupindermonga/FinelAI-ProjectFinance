@@ -48,7 +48,8 @@ def export_qb_iif(project_id: int, db: Session = Depends(get_db),
     require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     invoices = db.execute(text("""
-        SELECT i.invoice_number, i.vendor_name, i.invoice_date, i.total,
+        SELECT i.invoice_number, i.vendor_name, i.invoice_date,
+               COALESCE(i.total_due, i.received_total, 0) AS total,
                i.subtotal, i.tax_gst, i.tax_hst, i.tax_pst, i.tax_qst,
                i.payment_status, i.notes,
                cc.name as category_name
@@ -118,7 +119,8 @@ def export_sage50(project_id: int, db: Session = Depends(get_db),
     require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     invoices = db.execute(text("""
-        SELECT i.invoice_number, i.vendor_name, i.invoice_date, i.total,
+        SELECT i.invoice_number, i.vendor_name, i.invoice_date,
+               COALESCE(i.total_due, i.received_total, 0) AS total,
                i.subtotal, i.tax_gst, i.tax_hst, i.tax_pst, i.tax_qst,
                i.payment_status, i.notes, i.due_date,
                cc.name as category_name

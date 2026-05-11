@@ -190,8 +190,8 @@ def create_eft_batch(body: dict, db: Session = Depends(get_db),
         total += amt
         db.add(EFTBatchPayment(
             batch_id=batch.id, org_id=current_user.org_id,
-            amount=amt,
-            **{k: v for k, v in p.items() if hasattr(EFTBatchPayment, k) and k not in ("id", "batch_id")}
+            **{k: v for k, v in p.items() if hasattr(EFTBatchPayment, k) and k not in ("id", "batch_id", "amount")},
+            amount=amt
         ))
     batch.total_amount = total
     batch.payment_count = len(payments_data)
