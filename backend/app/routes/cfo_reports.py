@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..dependencies import get_current_user, get_current_org, FINANCE_READ_ROLES, get_gemini_key
+from ..dependencies import get_current_user, get_current_org, FINANCE_READ_ROLES, call_gemini_api
 from ..models import (
     Project, Invoice, Draw, ChangeOrder, CommittedCost, CostCategory,
-    InvoiceAllocation, OrgVendor, LenderCovenant, Payment, GeminiApiKey,
+    InvoiceAllocation, OrgVendor, LenderCovenant, Payment,
 )
 
 router = APIRouter(prefix="/api/reports", tags=["cfo-reports"])
@@ -359,7 +359,6 @@ async def ai_lender_memo(project_id: int, body: dict = None,
                          org_ctx=Depends(get_current_org), db: Session = Depends(get_db),
                          user=Depends(get_current_user)):
     """Generate a professional lender draw recommendation memo using AI."""
-    import google.generativeai as genai
     org = _get_org(org_ctx, db)
     proj = db.query(Project).filter(Project.id == project_id, Project.org_id == org.id).first()
     if not proj: raise HTTPException(404)
@@ -399,13 +398,6 @@ Project End Date: {proj.end_date or 'TBD'}
     draw_number = body.get("draw_number", len(draws) + 1) if body else len(draws) + 1
     extra_context = body.get("notes", "") if body else ""
 
-    keys = db.query(GeminiApiKey).filter(GeminiApiKey.is_active == True).order_by(GeminiApiKey.priority).all()
-    api_key = get_gemini_key()
-    for k in keys:
-        if k.key_value: api_key = k.key_value; break
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
-
     prompt = f"""You are a senior construction lending analyst at a Canadian bank. Write a concise, professional draw recommendation memo for the credit committee.
 
 Project Data:
@@ -425,9 +417,15 @@ Write a memo with these sections (use clear headers):
 Be professional, direct, and use exact dollar figures. Flag any concerns clearly. Maximum 400 words. Canadian dollar amounts."""
 
     try:
-        resp = model.generate_content(prompt)
+        result = await call_gemini_api(
+            {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1024},
+            }
+        )
+        memo_text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
         return {
-            "memo": resp.text.strip(),
+            "memo": memo_text,
             "project_name": proj.name,
             "draw_number": draw_number,
             "generated_at": datetime.utcnow().isoformat(),

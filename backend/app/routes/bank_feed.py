@@ -13,13 +13,12 @@ import os
 from datetime import datetime
 from typing import Optional
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from ..database import SessionLocal
-from ..dependencies import get_current_user, require_org_member, FINANCE_WRITE_ROLES, FINANCE_READ_ROLES, get_gemini_key
+from ..dependencies import get_current_user, require_org_member, FINANCE_WRITE_ROLES, FINANCE_READ_ROLES, call_gemini_api
 from ..models import BankFeedConnection, BankFeedTransaction, User
 
 router = APIRouter(prefix="/api/bank-feed", tags=["bank-feed"])
@@ -364,10 +363,6 @@ async def ai_match_all(
     """
     require_org_member(db, current_user.org_id, current_user.id, FINANCE_WRITE_ROLES)
 
-    api_key = get_gemini_key()
-    if not api_key:
-        raise HTTPException(status_code=503, detail="GEMINI_API_KEY not configured")
-
     org_id = current_user.org_id
 
     # ── Fetch data ────────────────────────────────────────────────────────────
@@ -473,27 +468,13 @@ Example element:
 
     # ── Call Gemini ───────────────────────────────────────────────────────────
 
-    gemini_url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-1.5-flash:generateContent?key={api_key}"
+    raw = await call_gemini_api(
+        {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 8192},
+        },
+        timeout=90,
     )
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 8192},
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
-            resp = await client.post(gemini_url, json=payload)
-        resp.raise_for_status()
-        raw = resp.json()
-    except httpx.HTTPStatusError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Gemini API error: {exc.response.status_code} — {exc.response.text[:200]}",
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Gemini request failed: {str(exc)}")
 
     # ── Parse response ────────────────────────────────────────────────────────
 

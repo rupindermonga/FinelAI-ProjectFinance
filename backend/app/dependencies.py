@@ -29,20 +29,111 @@ ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 
 _gemini_key_index = 0
+_gemini_key_failures: dict = {}   # key -> unix timestamp of last 429
+_GEMINI_COOLDOWN_SEC = 65         # how long a free key stays in cooldown after a 429
+
+
+def _free_gemini_keys() -> list[str]:
+    multi = os.getenv("GEMINI_API_KEYS", "")
+    if multi:
+        return [k.strip() for k in multi.split(",") if k.strip()]
+    single = os.getenv("GEMINI_API_KEY", "").strip()
+    return [single] if single else []
+
+
+def _paid_gemini_key() -> str:
+    return os.getenv("GEMINI_PAID_KEY", "").strip()
+
 
 def get_gemini_key() -> str:
-    """Return the next Gemini API key in round-robin order across all configured keys."""
+    """Return the next available free key (round-robin, skipping keys in cooldown).
+    Falls back to the paid key only when all free keys are in cooldown.
+    Raises HTTPException(503) if no keys are available at all."""
     global _gemini_key_index
-    multi = os.getenv("GEMINI_API_KEYS", "")
-    keys = [k.strip() for k in multi.split(",") if k.strip()] if multi else []
-    if not keys:
-        single = os.getenv("GEMINI_API_KEY", "").strip()
-        if single:
-            return single
-        raise HTTPException(status_code=503, detail="No Gemini API key configured")
-    key = keys[_gemini_key_index % len(keys)]
-    _gemini_key_index += 1
-    return key
+    import time
+    now = time.time()
+    free = _free_gemini_keys()
+
+    if free:
+        # Try up to len(free) candidates in round-robin order, skipping cooled-down ones
+        for _ in range(len(free)):
+            key = free[_gemini_key_index % len(free)]
+            _gemini_key_index += 1
+            if now - _gemini_key_failures.get(key, 0) >= _GEMINI_COOLDOWN_SEC:
+                return key
+
+    # All free keys in cooldown — use paid key if available
+    paid = _paid_gemini_key()
+    if paid:
+        return paid
+
+    raise HTTPException(status_code=503, detail="All Gemini API keys are rate-limited. Try again shortly.")
+
+
+def mark_gemini_key_failed(key: str) -> None:
+    """Call this when a Gemini request returns 429 so the key enters cooldown."""
+    import time
+    _gemini_key_failures[key] = time.time()
+
+
+async def call_gemini_api(payload: dict, timeout: int = 60) -> dict:
+    """
+    Central Gemini API caller with automatic key rotation and paid-key fallback.
+    - Tries free keys round-robin, skipping any in cooldown.
+    - On 429 from a free key: marks it failed, immediately retries with next key.
+    - When all free keys exhausted: falls back to GEMINI_PAID_KEY.
+    - Returns parsed JSON response dict.
+    - Raises HTTPException on unrecoverable errors.
+    """
+    import httpx, time
+
+    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    base_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key="
+    free = _free_gemini_keys()
+    paid = _paid_gemini_key()
+
+    if not free and not paid:
+        raise HTTPException(503, "No Gemini API key configured. Set GEMINI_API_KEYS in Doppler.")
+
+    now = time.time()
+    attempted: set[str] = set()
+
+    # --- Attempt each free key ---
+    for _ in range(len(free) + 1):   # +1 to allow one full sweep
+        key = get_gemini_key()        # honours cooldown + round-robin
+        if key == paid:
+            break                     # fell through to paid — handle below
+        if key in attempted:
+            continue
+        attempted.add(key)
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(base_url + key, json=payload)
+
+            if resp.status_code == 429:
+                mark_gemini_key_failed(key)
+                continue             # try next free key
+
+            resp.raise_for_status()
+            return resp.json()
+
+        except httpx.TimeoutException:
+            mark_gemini_key_failed(key)
+            continue
+
+    # --- Paid key fallback ---
+    if paid:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(base_url + paid, json=payload)
+
+        if resp.status_code == 429:
+            raise HTTPException(429, "All Gemini keys exhausted including paid key. Try again later.")
+
+        resp.raise_for_status()
+        return resp.json()
+
+    raise HTTPException(503, "All Gemini API keys are rate-limited. Try again shortly.")
 
 
 def require_project_access(db: Session, project_id: int, org_id: int):

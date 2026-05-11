@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from ..database import SessionLocal
-from ..dependencies import get_current_user, require_org_member, require_project_access, FINANCE_READ_ROLES, get_gemini_key
+from ..dependencies import get_current_user, require_org_member, require_project_access, FINANCE_READ_ROLES, call_gemini_api
 from ..models import (
     QSReport, QSTradeItem,
     MezzTranche, TakeoutConversion,
@@ -136,9 +136,7 @@ async def ai_parse_qs_report(
     require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
 
-    api_key = get_gemini_key()
-
-    import httpx, base64
+    import base64
     content = await file.read()
     b64 = base64.b64encode(content).decode()
 
@@ -172,21 +170,19 @@ Extract the following structured data from the PDF and return valid JSON only:
 Return ONLY valid JSON with no markdown fences."""
 
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
-                json={
-                    "contents": [{
-                        "parts": [
-                            {"text": prompt},
-                            {"inline_data": {"mime_type": "application/pdf", "data": b64}}
-                        ]
-                    }],
-                    "generationConfig": {"temperature": 0.1}
-                }
-            )
-        resp.raise_for_status()
-        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        result = await call_gemini_api(
+            {
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {"inline_data": {"mime_type": "application/pdf", "data": b64}}
+                    ]
+                }],
+                "generationConfig": {"temperature": 0.1},
+            },
+            timeout=60,
+        )
+        raw = result["candidates"][0]["content"]["parts"][0]["text"].strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):

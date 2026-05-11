@@ -7,11 +7,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from ..database import SessionLocal
-from ..dependencies import get_current_user, require_org_member, get_current_org, FINANCE_READ_ROLES, get_gemini_key
+from ..dependencies import get_current_user, require_org_member, get_current_org, FINANCE_READ_ROLES, call_gemini_api
 from ..models import (
     Project, Draw, Invoice, CostCategory, ChangeOrder, CommittedCost,
     OrgVendor, Task, RFI, PunchItem, LenderCovenant, InterestReserve, InterestReserveDraw,
-    BidPackage, Organization, OrganizationMember, GeminiApiKey,
+    BidPackage, Organization, OrganizationMember,
 )
 
 router = APIRouter(prefix="/api/project", tags=["ai-risk"])
@@ -188,7 +188,7 @@ async def parse_coi(project_id: int, vendor_id: int, file: UploadFile = File(...
                     db: Session = Depends(get_db), user=Depends(get_current_user)):
     """Use Gemini Vision to extract insurance fields from an ACORD certificate PDF/image."""
     import json
-    import google.generativeai as genai
+    import base64
 
     proj = _get_project(project_id, user, db)
     require_org_member(db, proj.org_id, user.id, FINANCE_READ_ROLES)
@@ -196,22 +196,9 @@ async def parse_coi(project_id: int, vendor_id: int, file: UploadFile = File(...
     if not vendor:
         raise HTTPException(404, "Vendor not found")
 
-    keys = db.query(GeminiApiKey).filter(GeminiApiKey.is_active == True).order_by(GeminiApiKey.priority).all()
-    api_key = get_gemini_key()
-    for k in keys:
-        if k.key_value:
-            api_key = k.key_value
-            break
-    if not api_key:
-        raise HTTPException(503, "No Gemini API key configured")
-
     contents = await file.read()
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
-
-    import google.generativeai as genai2
-    from google.generativeai import types as genai_types
-    part = genai_types.Part.from_bytes(data=contents, mime_type=file.content_type or "application/pdf")
+    b64 = base64.b64encode(contents).decode()
+    mime_type = file.content_type or "application/pdf"
 
     prompt = """Extract insurance certificate data from this ACORD certificate.
 Return ONLY a JSON object with these fields (use null if not found):
@@ -236,8 +223,19 @@ Return ONLY a JSON object with these fields (use null if not found):
 Return only valid JSON, no markdown."""
 
     try:
-        resp = model.generate_content([prompt, part])
-        text = resp.text.strip()
+        result = await call_gemini_api(
+            {
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {"inline_data": {"mime_type": mime_type, "data": b64}},
+                    ]
+                }],
+                "generationConfig": {"temperature": 0.1},
+            },
+            timeout=60,
+        )
+        text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
         if text.startswith("```"):
             text = "\n".join(text.split("\n")[1:])
             text = text.rsplit("```", 1)[0].strip()

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from ..database import SessionLocal, get_db
-from ..dependencies import get_current_user, require_org_member, get_current_org, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, get_gemini_key
+from ..dependencies import get_current_user, require_org_member, get_current_org, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, call_gemini_api
 from ..models import (
     ClientHubPost, ClientMessage, Project, Invoice, Draw,
     UnionAgreement, CloseoutItem, CostCategory, InvoiceAllocation, ChangeOrder
@@ -395,7 +395,6 @@ async def generate_ai_client_update(project_id: int, body: dict = None,
     into a clean, professional weekly client update email.
     """
     p = _proj(project_id, user, db)
-    api_key = get_gemini_key()
 
     from sqlalchemy import text
     week_ago = (date.today() - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -463,17 +462,14 @@ Start with "Subject: Weekly Construction Update — [Project name] — Week of [
 PROJECT DATA:
 {context}"""
 
-    import httpx
-    async with httpx.AsyncClient(timeout=45) as client:
-        resp = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1024}
-            }
-        )
-    resp.raise_for_status()
-    update_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    result = await call_gemini_api(
+        {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1024},
+        },
+        timeout=45,
+    )
+    update_text = result["candidates"][0]["content"]["parts"][0]["text"]
 
     return {
         "update": update_text,

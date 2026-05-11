@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from ..database import SessionLocal
-from ..dependencies import get_current_user, require_org_member, FINANCE_READ_ROLES, get_gemini_key
+from ..dependencies import get_current_user, require_org_member, FINANCE_READ_ROLES, call_gemini_api
 from ..models import APIKey, Webhook, WebhookDelivery, EFTBatch, EFTBatchPayment, User
 
 router = APIRouter(prefix="/api", tags=["platform"])
@@ -51,8 +51,6 @@ async def doc_qa(project_id: int, body: dict,
     question = body.get("question", "").strip()
     if not question:
         raise HTTPException(400, "question is required")
-
-    api_key = get_gemini_key()
 
     # Gather project context from DB (latest 150 records across key tables)
     context_parts = []
@@ -132,17 +130,14 @@ QUESTION: {question}
 
 Provide a clear, direct answer with specific references to the source documents."""
 
-    import httpx
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048}
-            }
-        )
-    resp.raise_for_status()
-    answer = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    result = await call_gemini_api(
+        {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048},
+        },
+        timeout=60,
+    )
+    answer = result["candidates"][0]["content"]["parts"][0]["text"]
     sources_used = []
     if rfis: sources_used.append(f"{len(rfis)} RFIs")
     if subs: sources_used.append(f"{len(subs)} Submittals")
