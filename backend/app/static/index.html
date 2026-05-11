@@ -1144,6 +1144,15 @@
             <span class="flex-1 text-left">ERP Integrations</span>
             <span x-show="erpCredentials.filter(c=>c.is_active).length>0" x-text="erpCredentials.filter(c=>c.is_active).length" class="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
           </button>
+          <button @click="view='bank-import'; sidebarOpen=false" :class="view==='bank-import'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-building-columns w-4"></i> Bank Import
+          </button>
+          <button @click="view='fx-rates'; loadFXRates(); sidebarOpen=false" :class="view==='fx-rates'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-dollar-sign w-4"></i> FX / Currency
+          </button>
+          <button @click="view='stress-test'; sidebarOpen=false" :class="view==='stress-test'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-chart-line w-4"></i> Stress Testing
+          </button>
           <button x-show="['owner','admin','finance_admin'].includes(currentOrg?.role) || user?.is_admin" @click="view='api-keys'; loadAPIKeys(); sidebarOpen=false" :class="view==='api-keys'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-key w-4"></i> API Keys
           </button>
@@ -1176,7 +1185,26 @@
     </aside>
 
     <!-- Main content -->
-    <main class="flex-1 overflow-auto bg-gray-50 lg:pb-0">
+    <!-- ── MOBILE BOTTOM NAV BAR (hidden on desktop) ──────────────────────── -->
+    <nav class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900 border-t border-slate-700 flex items-center justify-around py-1 safe-area-bottom" style="padding-bottom: max(0.25rem, env(safe-area-inset-bottom))">
+      <button @click="view='dashboard'; loadProjectDashboard()" :class="view==='dashboard'?'text-blue-400':'text-slate-400'" class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg">
+        <i class="fa-solid fa-house text-lg"></i><span class="text-[9px] font-medium">Finance</span>
+      </button>
+      <button @click="view='pm-tasks'; loadPMTasks()" :class="['pm-tasks','pm-daily-logs','pm-rfis','pm-submittals','pm-punch','pm-meetings','pm-photos','safety','toolbox-talks','labour','permits'].includes(view)?'text-green-400':'text-slate-400'" class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg">
+        <i class="fa-solid fa-hard-hat text-lg"></i><span class="text-[9px] font-medium">Field</span>
+      </button>
+      <button @click="view='mobile-timecard'; mobileTimecardOpen=true" :class="view==='mobile-timecard'?'text-amber-400':'text-slate-400'" class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg">
+        <i class="fa-solid fa-clock text-lg"></i><span class="text-[9px] font-medium">Clock In</span>
+      </button>
+      <button @click="view='pm-daily-logs'; loadDailyLogs()" :class="view==='pm-daily-logs'?'text-green-400':'text-slate-400'" class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg">
+        <i class="fa-solid fa-calendar-day text-lg"></i><span class="text-[9px] font-medium">Site Log</span>
+      </button>
+      <button @click="sidebarOpen=!sidebarOpen" :class="sidebarOpen?'text-blue-400':'text-slate-400'" class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg">
+        <i class="fa-solid fa-bars text-lg"></i><span class="text-[9px] font-medium">More</span>
+      </button>
+    </nav>
+
+    <main class="flex-1 overflow-auto bg-gray-50 lg:pb-0 pb-16">
 
       <!-- ── DASHBOARD ─────────────────────────────────────────────── -->
       <div x-show="view==='dashboard'" class="p-6">
@@ -6357,6 +6385,16 @@
             <p class="text-xs text-gray-400 mb-3">Full invoice data in Excel format for any ERP manual import</p>
             <button @click="exportInvoices()" class="w-full py-2 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold">Download Excel Export</button>
           </div>
+          <div class="bg-white border rounded-xl p-5 border-l-4 border-l-indigo-500">
+            <div class="font-semibold text-gray-800 mb-1"><i class="fa-brands fa-windows w-5 text-indigo-600"></i> QB Desktop IIF</div>
+            <p class="text-xs text-gray-400 mb-3">QuickBooks Desktop IIF format — import via QB Desktop → File → Utilities → Import → IIF Files</p>
+            <button @click="downloadQBIIF()" :disabled="!currentProject" class="w-full py-2 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 transition font-semibold disabled:opacity-50">Download QB Desktop IIF</button>
+          </div>
+          <div class="bg-white border rounded-xl p-5 border-l-4 border-l-teal-500">
+            <div class="font-semibold text-gray-800 mb-1"><i class="fa-solid fa-leaf w-5 text-teal-600"></i> Sage 50 Canada</div>
+            <p class="text-xs text-gray-400 mb-3">Sage 50 CA (Simply Accounting) purchase journal import CSV — compatible with Sage 50 Canadian Edition 2020+</p>
+            <button @click="downloadSage50()" :disabled="!currentProject" class="w-full py-2 bg-teal-600 text-white text-xs rounded-lg hover:bg-teal-700 transition font-semibold disabled:opacity-50">Download Sage 50 CSV</button>
+          </div>
         </div>
         <div class="mt-4 text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
           <i class="fa-solid fa-circle-info mr-1"></i>
@@ -11285,6 +11323,39 @@
   </div>
 </div>
 
+<!-- ── MOBILE QUICK CLOCK-IN VIEW ──────────────────────────────────────────── -->
+<div x-show="view==='mobile-timecard'" x-cloak class="p-4 max-w-lg mx-auto">
+  <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-clock text-amber-600"></i> Quick Clock In/Out</h2>
+  <div class="bg-white rounded-2xl border shadow-md p-5 mb-4">
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div><label class="text-xs font-medium text-gray-500 mb-1 block">Worker Name *</label><input x-model="mobileTC.worker_name" type="text" placeholder="Your name" class="w-full border rounded-xl px-3 py-3 text-sm" /></div>
+      <div><label class="text-xs font-medium text-gray-500 mb-1 block">Trade</label><input x-model="mobileTC.trade" type="text" placeholder="Carpenter, Electrician..." class="w-full border rounded-xl px-3 py-3 text-sm" /></div>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div><label class="text-xs font-medium text-gray-500 mb-1 block">Date</label><input x-model="mobileTC.work_date" type="date" class="w-full border rounded-xl px-3 py-3 text-sm" /></div>
+      <div><label class="text-xs font-medium text-gray-500 mb-1 block">Regular Hours</label><input x-model.number="mobileTC.regular_hours" type="number" step="0.5" min="0" max="24" class="w-full border rounded-xl px-3 py-3 text-sm" /></div>
+    </div>
+    <div class="mb-3"><label class="text-xs font-medium text-gray-500 mb-1 block">Work Description</label><input x-model="mobileTC.work_description" type="text" placeholder="Framing, concrete pour, etc." class="w-full border rounded-xl px-3 py-3 text-sm" /></div>
+    <!-- GPS Location -->
+    <div class="mb-4">
+      <button @click="captureGPSLocation()" :disabled="gpsLoading" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-semibold hover:bg-emerald-100 disabled:opacity-50">
+        <i x-show="!gpsLoading" class="fa-solid fa-location-dot"></i>
+        <i x-show="gpsLoading" class="fa-solid fa-spinner fa-spin"></i>
+        <span x-text="gpsLoading?'Getting location…':gpsLocation?'✓ Location: '+gpsLocation:'📍 Capture GPS Location'"></span>
+      </button>
+    </div>
+    <button @click="submitMobileTimecard()" :disabled="!mobileTC.worker_name||mobileTCLoading" class="w-full py-3.5 bg-amber-500 text-white rounded-xl font-bold text-base hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-2">
+      <i x-show="!mobileTCLoading" class="fa-solid fa-check-circle"></i>
+      <i x-show="mobileTCLoading" class="fa-solid fa-spinner fa-spin"></i>
+      <span x-text="mobileTCLoading?'Saving…':'Submit Timecard'"></span>
+    </button>
+  </div>
+  <div x-show="mobileTCSuccess" class="bg-green-50 border border-green-200 rounded-xl p-4 text-center text-green-700 font-semibold">
+    <i class="fa-solid fa-circle-check text-2xl mb-2 block"></i>
+    Timecard saved! <span x-text="mobileTC.regular_hours+' hrs — '+mobileTC.worker_name"></span>
+  </div>
+</div>
+
 <!-- ═══════════════ PHASE 10 VIEW PANELS ═══════════════════════════════════ -->
 
 <!-- ── QS / INSPECTOR REPORTS ────────────────────────────────────────────── -->
@@ -11919,6 +11990,132 @@
     <div class="flex gap-2 mt-5"><button @click="showLoanClosingModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button><button @click="saveLoanClosingItem()" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700">Add</button></div>
   </div>
 </div>
+
+<!-- ═══════════════ PHASE 11 VIEW PANELS ═══════════════════════════════════ -->
+
+<!-- ── BANK STATEMENT IMPORTER ────────────────────────────────────────────── -->
+<div x-show="view==='bank-import'" x-cloak class="p-6 max-w-4xl">
+  <h2 class="text-xl font-bold text-gray-800 mb-2"><i class="fa-solid fa-building-columns mr-2 text-slate-600"></i>Bank Statement Import</h2>
+  <p class="text-sm text-gray-500 mb-6">Upload your bank CSV (RBC, TD, Scotiabank, BMO) — auto-detect format, parse transactions, match to unpaid invoices.</p>
+  <div class="bg-white rounded-xl border p-5 shadow-sm mb-6">
+    <div class="mb-4">
+      <label class="text-xs font-medium text-gray-600 mb-2 block">Upload Bank Statement CSV</label>
+      <input type="file" accept=".csv" @change="bankFile=$event.target.files[0]" class="w-full border rounded-xl px-3 py-2.5 text-sm" />
+    </div>
+    <div class="flex items-center gap-3">
+      <button @click="parseBankStatement()" :disabled="!bankFile||bankParsing" class="px-5 py-2 bg-slate-700 text-white rounded-xl text-sm font-semibold hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2">
+        <i x-show="!bankParsing" class="fa-solid fa-upload"></i>
+        <i x-show="bankParsing" class="fa-solid fa-spinner fa-spin"></i>
+        <span x-text="bankParsing?'Parsing…':'Parse Statement'"></span>
+      </button>
+      <div x-show="bankDetected" class="text-sm text-gray-600">Detected: <b class="uppercase" x-text="bankDetected"></b> — <b x-text="bankTransactions.length"></b> transactions</div>
+    </div>
+  </div>
+  <div x-show="bankMatches.length > 0">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold text-gray-700">Transaction Matching Results</h3>
+      <span class="text-sm text-gray-500"><b class="text-green-600" x-text="bankMatches.filter(m=>m.confidence==='high').length"></b> auto-matched / <b x-text="bankMatches.length"></b> total</span>
+    </div>
+    <div class="space-y-2 max-h-96 overflow-y-auto">
+      <template x-for="m in bankMatches" :key="JSON.stringify(m.transaction)">
+        <div class="flex items-center gap-3 bg-white rounded-lg border px-4 py-3">
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-gray-700 truncate" x-text="m.transaction.description"></div>
+            <div class="text-xs text-gray-400" x-text="m.transaction.date+' — $'+Math.abs(m.transaction.amount).toLocaleString()"></div>
+          </div>
+          <div class="flex-shrink-0 text-right">
+            <div x-show="m.suggested_match" class="text-xs text-green-700 font-semibold" x-text="'→ '+m.suggested_match?.vendor_name+' $'+(m.suggested_match?.total||0).toLocaleString()"></div>
+            <div x-show="!m.suggested_match" class="text-xs text-gray-400">No match found</div>
+            <span :class="m.confidence==='high'?'bg-green-100 text-green-700':m.confidence==='medium'?'bg-amber-100 text-amber-700':'bg-gray-100 text-gray-500'" class="text-xs px-1.5 py-0.5 rounded-full font-semibold" x-text="m.confidence"></span>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+  <div x-show="!bankMatches.length && !bankParsing" class="text-center py-12 text-gray-300">
+    <i class="fa-solid fa-file-csv text-4xl mb-3"></i>
+    <p>Upload a bank statement CSV to begin matching transactions to invoices</p>
+    <p class="text-xs mt-2">Supported banks: RBC, TD, Scotiabank, BMO, and generic CSV format</p>
+  </div>
+</div>
+
+<!-- ── FX / MULTI-CURRENCY ────────────────────────────────────────────────── -->
+<div x-show="view==='fx-rates'" x-cloak class="p-6 max-w-2xl">
+  <h2 class="text-xl font-bold text-gray-800 mb-2"><i class="fa-solid fa-dollar-sign mr-2 text-green-600"></i>FX / Multi-Currency</h2>
+  <p class="text-sm text-gray-500 mb-6">Live exchange rates to CAD. Use for USD-denominated materials, equipment, or subcontract invoices.</p>
+  <div class="bg-white rounded-xl border shadow-sm p-5 mb-6">
+    <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Live Rates to CAD</div>
+    <div x-show="fxLoading" class="text-center py-4 text-gray-400"><i class="fa-solid fa-spinner fa-spin"></i> Loading rates…</div>
+    <div x-show="fxRates" class="grid grid-cols-3 gap-3">
+      <template x-for="[curr, rate] in Object.entries(fxRates?.rates||{})" :key="curr">
+        <div class="bg-gray-50 rounded-xl p-3 text-center">
+          <div class="text-xs font-bold text-gray-500" x-text="curr"></div>
+          <div class="text-xl font-bold text-green-700 mt-1" x-text="rate.toFixed(4)"></div>
+          <div class="text-xs text-gray-400">per CAD</div>
+        </div>
+      </template>
+    </div>
+    <div class="text-xs text-gray-400 mt-3" x-show="fxRates">Source: open.er-api.com (updated hourly)</div>
+  </div>
+  <!-- Quick Converter -->
+  <div class="bg-white rounded-xl border shadow-sm p-5">
+    <div class="text-sm font-semibold text-gray-700 mb-3">Quick Converter</div>
+    <div class="flex items-center gap-3">
+      <input x-model.number="fxAmount" type="number" step="100" placeholder="Amount" class="flex-1 border rounded-xl px-3 py-2.5 text-sm" />
+      <select x-model="fxFromCurrency" class="border rounded-xl px-3 py-2.5 text-sm">
+        <option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="AUD">AUD</option>
+      </select>
+      <span class="text-gray-400">→ CAD</span>
+      <button @click="convertFX()" class="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700">Convert</button>
+    </div>
+    <div x-show="fxResult" class="mt-3 text-2xl font-bold text-green-700 text-center">
+      = $<span x-text="(fxResult?.cad_amount||0).toLocaleString('en-CA', {minimumFractionDigits:2, maximumFractionDigits:2})"></span> CAD
+      <div class="text-xs text-gray-400 font-normal mt-1" x-text="'Rate: 1 '+fxFromCurrency+' = '+(fxResult?.rate||0).toFixed(4)+' CAD'"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STRESS TESTING ──────────────────────────────────────────────────────── -->
+<div x-show="view==='stress-test'" x-cloak class="p-6 max-w-4xl">
+  <h2 class="text-xl font-bold text-gray-800 mb-2"><i class="fa-solid fa-chart-line mr-2 text-red-600"></i>Stress Testing &amp; Scenario Modeling</h2>
+  <p class="text-sm text-gray-500 mb-6">Model interest reserve burn under rate increase and schedule slippage scenarios.</p>
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6 bg-white rounded-xl border p-5">
+    <div><label class="text-xs font-medium text-gray-500 mb-1 block">Reserve Amount ($)</label><input x-model.number="stressParams.reserve_amount" type="number" step="10000" class="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+    <div><label class="text-xs font-medium text-gray-500 mb-1 block">Drawn to Date ($)</label><input x-model.number="stressParams.drawn_to_date" type="number" step="10000" class="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+    <div><label class="text-xs font-medium text-gray-500 mb-1 block">Loan Balance ($)</label><input x-model.number="stressParams.loan_balance" type="number" step="100000" class="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+    <div><label class="text-xs font-medium text-gray-500 mb-1 block">Base Rate (%)</label><input x-model.number="stressParams.interest_rate" type="number" step="0.25" class="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+    <div><label class="text-xs font-medium text-gray-500 mb-1 block">Months Remaining</label><input x-model.number="stressParams.months_remaining" type="number" class="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+    <div><label class="text-xs font-medium text-gray-500 mb-1 block">Pre-Sales % (current)</label><input x-model.number="stressParams.current_pre_sales_pct" type="number" step="1" max="100" class="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+    <div class="col-span-2 md:col-span-3">
+      <button @click="runStressTest()" :disabled="stressLoading" class="px-6 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+        <i x-show="!stressLoading" class="fa-solid fa-bolt"></i>
+        <i x-show="stressLoading" class="fa-solid fa-spinner fa-spin"></i>
+        <span x-text="stressLoading?'Running…':'Run Stress Test'"></span>
+      </button>
+    </div>
+  </div>
+  <div x-show="stressResults">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="text-lg font-bold text-gray-800">Results</div>
+      <span :class="stressResults?.rag==='green'?'bg-green-100 text-green-700':stressResults?.rag==='amber'?'bg-amber-100 text-amber-700':'bg-red-100 text-red-700'" class="px-3 py-1 rounded-full text-sm font-bold capitalize" x-text="stressResults?.rag==='green'?'✓ Reserve Sufficient':'⚠ Reserve At Risk'"></span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <template x-for="[key, scenario] in Object.entries(stressResults?.interest_reserve_scenarios||{})" :key="key">
+        <div :class="scenario.exhausted?'border-red-300 bg-red-50':'border-green-200 bg-green-50'" class="rounded-xl border p-4">
+          <div class="text-xs font-bold text-gray-500 mb-2" x-text="key.replace(/_/g,' ').toUpperCase()"></div>
+          <div class="text-lg font-bold" :class="scenario.exhausted?'text-red-700':'text-green-700'" x-text="scenario.exhausted?'BREACH':'SUFFICIENT'"></div>
+          <div class="text-xs text-gray-500 mt-1">Monthly: $<span x-text="(scenario.monthly_interest||0).toLocaleString()"></span></div>
+          <div class="text-xs text-gray-500">Total projected: $<span x-text="(scenario.total_projected||0).toLocaleString()"></span></div>
+          <div x-show="scenario.months_to_exhaustion" class="text-xs font-semibold mt-1" :class="scenario.exhausted?'text-red-600':'text-green-600'" x-text="'Exhausted in '+scenario.months_to_exhaustion+' months'"></div>
+          <div x-show="!scenario.exhausted" class="text-xs text-green-600 font-semibold mt-1" x-text="'Surplus: $'+(scenario.surplus_deficit||0).toLocaleString()"></div>
+        </div>
+      </template>
+    </div>
+    <div class="mt-4 bg-gray-50 rounded-xl p-3 text-sm text-gray-600" x-text="stressResults?.summary"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ END PHASE 11 VIEW PANELS ═══════════════════════════════ -->
 
 <!-- Client Payment Modal -->
 <div x-show="showCPModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showCPModal=false">

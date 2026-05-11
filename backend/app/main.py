@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import engine, Base
-from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit, pm, construction_health, compliance, lender_plus, lender_risk, permits, safety, labour, bid, ai_risk, co_approval, selections, equipment, notifications, lien_release, spec_review, prequalification, client_hub, syndicate, erp_integration, cfo_reports, subcontract, canadian_legal, quality, crm, assemblies, advanced_reports, lender_advanced, adjudication, gst_rebates, platform_api
+from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit, pm, construction_health, compliance, lender_plus, lender_risk, permits, safety, labour, bid, ai_risk, co_approval, selections, equipment, notifications, lien_release, spec_review, prequalification, client_hub, syndicate, erp_integration, cfo_reports, subcontract, canadian_legal, quality, crm, assemblies, advanced_reports, lender_advanced, adjudication, gst_rebates, platform_api, phase11
 
 
 def _run_migrations():
@@ -1465,6 +1465,7 @@ app.include_router(lender_advanced.router)
 app.include_router(adjudication.router)
 app.include_router(gst_rebates.router)
 app.include_router(platform_api.router)
+app.include_router(phase11.router)
 
 # Serve static frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")

@@ -347,6 +347,21 @@ function app() {
     showCloseoutModal: false,
     closeoutForm: { category:'documents', item_name:'', responsible_party:'', due_date:'', status:'pending', notes:'' },
 
+    // ── Phase 11: Bank Import ─────────────────────────────────────
+    bankFile: null, bankParsing: false, bankDetected: null,
+    bankTransactions: [], bankMatches: [],
+    // ── Phase 11: FX / Currency ───────────────────────────────────
+    fxRates: null, fxLoading: false,
+    fxAmount: 1000, fxFromCurrency: 'USD', fxResult: null,
+    // ── Phase 11: Stress Testing ──────────────────────────────────
+    stressParams: { reserve_amount:'', drawn_to_date:'', loan_balance:'', interest_rate:5.5, months_remaining:12, current_pre_sales_pct:0 },
+    stressResults: null, stressLoading: false,
+    // ── Mobile / GPS ──────────────────────────────────────────────
+    gpsLoading: false, gpsLocation: null, gpsCoords: null,
+    mobileTimecardOpen: false,
+    mobileTC: { worker_name:'', trade:'', work_date:new Date().toISOString().slice(0,10), regular_hours:8, work_description:'' },
+    mobileTCLoading: false, mobileTCSuccess: false,
+
     // ── Phase 10: QS Reports ──────────────────────────────────────
     qsReports: [], showQSModal: false, qsEditId: null,
     qsForm: { report_date:'', qs_firm:'', overall_pct_complete:'', cost_to_complete:'', recommendation:'approve', schedule_status:'on_track', schedule_delay_weeks:'', deficiency_count:0, deficiency_notes:'', notes:'' },
@@ -4360,6 +4375,118 @@ ${d.participant_shares?.map(p=>`<tr><td>${p.lender}</td><td>${p.pct}%</td><td>$$
     async deleteSelection(id) {
       if (!confirm('Delete this selection item?')) return;
       try { await this.delete(`/api/project/${this.currentProject.id}/selections/${id}`); await this.loadSelections(); } catch(e) {}
+    },
+
+    // ═══════════════ PHASE 11 FUNCTIONS ════════════════════════════════════════
+
+    // ── QB Desktop IIF + Sage 50 CA Exports ──────────────────────────────────
+    downloadQBIIF() {
+      if (!this.currentProject) return alert('Select a project first');
+      window.open(`/api/reports/export/qb-iif/${this.currentProject.id}?_t=${this.token}`, '_blank');
+    },
+    downloadSage50() {
+      if (!this.currentProject) return alert('Select a project first');
+      window.open(`/api/reports/export/sage50/${this.currentProject.id}?_t=${this.token}`, '_blank');
+    },
+
+    // ── Bank Statement Import ─────────────────────────────────────────────────
+    async parseBankStatement() {
+      if (!this.bankFile) return;
+      this.bankParsing = true; this.bankDetected = null; this.bankMatches = [];
+      try {
+        const fd = new FormData(); fd.append('file', this.bankFile);
+        const resp = await fetch('/api/bank-import/parse', { method:'POST', headers:{ Authorization:`Bearer ${this.token}` }, body:fd });
+        if (!resp.ok) throw new Error(await resp.text());
+        const data = await resp.json();
+        this.bankDetected = data.bank_detected;
+        this.bankTransactions = data.transactions || [];
+        // Auto-match
+        if (this.bankTransactions.length > 0) {
+          const matchResp = await this.post('/api/bank-import/match', {
+            transactions: this.bankTransactions,
+            project_id: this.currentProject?.id || null,
+          });
+          this.bankMatches = matchResp.matches || [];
+        }
+      } catch(e) { alert('Parse failed: '+e.message); }
+      this.bankParsing = false;
+    },
+
+    // ── FX / Multi-Currency ───────────────────────────────────────────────────
+    async loadFXRates() {
+      this.fxLoading = true;
+      try { this.fxRates = await this.get('/api/fx/rates'); } catch(e) { this.fxRates = null; }
+      this.fxLoading = false;
+    },
+    async convertFX() {
+      try {
+        this.fxResult = await this.post('/api/fx/convert', { amount: this.fxAmount, from_currency: this.fxFromCurrency });
+      } catch(e) { alert('Conversion failed'); }
+    },
+
+    // ── Stress Testing ────────────────────────────────────────────────────────
+    async runStressTest() {
+      if (!this.currentProject) return alert('Select a project first');
+      this.stressLoading = true; this.stressResults = null;
+      try {
+        this.stressResults = await this.post(`/api/project/${this.currentProject.id}/stress-test`, this.stressParams);
+      } catch(e) { alert('Stress test failed: '+e.message); }
+      this.stressLoading = false;
+    },
+
+    // ── AI CO Narrative (called from CO detail) ───────────────────────────────
+    async generateCONarrative(coId) {
+      if (!this.currentProject) return;
+      const delayEvent = prompt('Describe the change event (e.g. "Owner issued ASI-14 adding 200 SF of additional concrete"):');
+      if (!delayEvent) return;
+      const timeDays = parseInt(prompt('Time impact (calendar days):', '0') || '0');
+      const costAmount = parseFloat(prompt('Cost impact ($):', '0') || '0');
+      try {
+        const result = await this.post(`/api/project/${this.currentProject.id}/change-orders/${coId}/ai-narrative`, {
+          delay_event: delayEvent, time_days: timeDays, cost_amount: costAmount
+        });
+        // Show in a modal or alert
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(`<pre style="font-family:Georgia,serif;max-width:800px;margin:2rem auto;padding:2rem;line-height:1.6;white-space:pre-wrap">${result.narrative}</pre>`);
+          win.document.close();
+        }
+      } catch(e) { alert('AI narrative failed: '+e.message); }
+    },
+
+    // ═══════════════ PHASE 11 MOBILE + GPS FUNCTIONS ══════════════════════════
+
+    async captureGPSLocation() {
+      if (!navigator.geolocation) { alert('Geolocation not supported on this device'); return; }
+      this.gpsLoading = true; this.gpsLocation = null;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          this.gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+          this.gpsLocation = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)} (±${Math.round(pos.coords.accuracy)}m)`;
+          this.gpsLoading = false;
+        },
+        (err) => { alert('Location error: '+err.message); this.gpsLoading = false; },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    },
+    async submitMobileTimecard() {
+      if (!this.currentProject || !this.mobileTC.worker_name) return;
+      this.mobileTCLoading = true; this.mobileTCSuccess = false;
+      const payload = {
+        ...this.mobileTC,
+        location: this.gpsLocation || null,
+        latitude: this.gpsCoords?.lat || null,
+        longitude: this.gpsCoords?.lng || null,
+        overtime_hours: 0, double_time_hours: 0,
+      };
+      try {
+        await this.post(`/api/project/${this.currentProject.id}/timecards`, payload);
+        this.mobileTCSuccess = true;
+        this.mobileTC = { worker_name:this.mobileTC.worker_name, trade:this.mobileTC.trade, work_date:new Date().toISOString().slice(0,10), regular_hours:8, work_description:'' };
+        this.gpsLocation = null; this.gpsCoords = null;
+        setTimeout(() => { this.mobileTCSuccess = false; }, 4000);
+      } catch(e) { alert(e.message||'Save failed'); }
+      this.mobileTCLoading = false;
     },
 
     // ═══════════════ PHASE 10 FUNCTIONS ══════════════════════════════════════
