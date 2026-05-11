@@ -122,9 +122,8 @@ def export_sage50(project_id: int, db: Session = Depends(get_db),
                COALESCE(i.total_due, i.received_total, 0) AS total,
                i.subtotal, i.tax_gst, i.tax_hst, i.tax_pst, i.tax_qst,
                i.payment_status, '' AS notes, i.due_date,
-               cc.name as category_name
+               '' AS category_name
         FROM invoices i
-        LEFT JOIN cost_categories cc ON i.category_id = cc.id
         WHERE i.project_id = :pid AND i.org_id = :oid
         ORDER BY i.invoice_date
     """), {"pid": project_id, "oid": current_user.org_id}).fetchall()
