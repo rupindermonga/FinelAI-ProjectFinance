@@ -90,8 +90,8 @@ demo_tok = demo_r.json().get("access_token") if demo_r.status_code == 200 else N
 # Register two isolated test users
 u1 = f"qa_u1_{rnd()}"
 u2 = f"qa_u2_{rnd()}"
-email1 = f"{u1}@qa.test"
-email2 = f"{u2}@qa.test"
+email1 = f"{u1}@example.com"
+email2 = f"{u2}@example.com"
 r1, _ = post("/api/auth/register", {"username": u1, "email": email1, "password": "QaTest@2026!"})
 r2, _ = post("/api/auth/register", {"username": u2, "email": email2, "password": "QaTest@2026!"})
 tok1 = login(u1, "QaTest@2026!") if r1.status_code == 200 else None
@@ -143,6 +143,8 @@ for i in range(10):
     statuses.append(r.status_code)
 check("Rate limiter triggers 429 within 10 attempts", 429 in statuses,
       f"Got statuses: {set(statuses)}", warn=True)
+
+proj1_id = None  # initialized here so cleanup section never hits NameError
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 2. TENANT ISOLATION (IDOR)
@@ -283,18 +285,19 @@ print("\n── 5. PUBLIC ENDPOINT SECURITY ────────────
 
 # Public portals must not expose other orgs' data
 public_endpoints = [
-    "/lender/FAKE_TOKEN_12345",
-    "/owner/FAKE_TOKEN_12345",
-    "/bid/FAKE_TOKEN_12345",
-    "/co-approval/FAKE_TOKEN_12345",
-    "/subcontract/FAKE_TOKEN_12345",
-    "/proposal/FAKE_TOKEN_12345",
-    "/prequal/FAKE_TOKEN_12345",
+    ("/lender/FAKE_TOKEN_12345", "lender"),
+    ("/owner/FAKE_TOKEN_12345", "owner"),
+    ("/bid/FAKE_TOKEN_12345", "bid"),
+    ("/co-approval/FAKE_TOKEN_12345", "co-approval"),
+    ("/subcontract/FAKE_TOKEN_12345", "subcontract"),
+    ("/proposal/FAKE_TOKEN_12345", "proposal"),
+    ("/prequal/FAKE_TOKEN_12345", "prequal"),
 ]
-for ep in public_endpoints:
-    r = requests.get(f"{BASE}{ep}", timeout=10, allow_redirects=False)
-    # Should return 200 (SPA) but the token lookup returns 404 in API
-    check(f"Public portal {ep.split('/')[1]} accessible", r.status_code in (200, 302))
+for ep, name in public_endpoints:
+    r = requests.get(f"{BASE}{ep}", timeout=10, allow_redirects=True)
+    # These are SPA routes — expect 200 HTML, not 404
+    check(f"Public portal /{name}/ accessible (200)", r.status_code == 200,
+          f"Got {r.status_code}")
 
 # API versions of public tokens with fake tokens
 r = requests.get(f"{BASE}/api/bid/portal/FAKE_TOKEN_99999", timeout=10)
