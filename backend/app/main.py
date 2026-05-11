@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import engine, Base
-from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit, pm, construction_health, compliance, lender_plus, lender_risk, permits, safety, labour, bid, ai_risk, co_approval, selections, equipment, notifications, lien_release, spec_review, prequalification, client_hub, syndicate, erp_integration
+from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit, pm, construction_health, compliance, lender_plus, lender_risk, permits, safety, labour, bid, ai_risk, co_approval, selections, equipment, notifications, lien_release, spec_review, prequalification, client_hub, syndicate, erp_integration, cfo_reports, subcontract, canadian_legal, quality
 
 
 def _run_migrations():
@@ -845,6 +845,134 @@ def _run_migrations():
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )""",
             "CREATE INDEX IF NOT EXISTS ix_erp_credentials_org ON erp_credentials(org_id)",
+            # Subcontract Agreements
+            """CREATE TABLE IF NOT EXISTS subcontract_agreements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                bid_response_id INTEGER REFERENCES bid_responses(id),
+                vendor_id INTEGER REFERENCES org_vendors(id),
+                vendor_name TEXT NOT NULL, trade TEXT, contract_number TEXT,
+                scope_of_work TEXT, inclusions TEXT, exclusions TEXT,
+                contract_amount REAL NOT NULL, holdback_pct REAL DEFAULT 10,
+                payment_terms TEXT, start_date TEXT, end_date TEXT,
+                insurance_required INTEGER DEFAULT 1, bond_required INTEGER DEFAULT 0,
+                warranty_period TEXT, dispute_resolution TEXT DEFAULT 'CCDC',
+                governing_law TEXT, status TEXT DEFAULT 'draft',
+                sign_token TEXT UNIQUE, signed_at DATETIME,
+                signed_by_name TEXT, signed_by_ip TEXT, notes TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_subcontracts_project ON subcontract_agreements(project_id)",
+            "CREATE INDEX IF NOT EXISTS ix_subcontracts_token ON subcontract_agreements(sign_token)",
+            # Canadian Legal
+            """CREATE TABLE IF NOT EXISTS non_payment_notices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                draw_id INTEGER REFERENCES draws(id),
+                invoice_id INTEGER REFERENCES invoices(id),
+                payment_type TEXT NOT NULL,
+                proper_invoice_date TEXT, certifier_cert_date TEXT,
+                payment_deadline TEXT, notice_date TEXT,
+                disputed_amount REAL, non_disputed_amount REAL,
+                reasons TEXT, vendor_name TEXT, vendor_address TEXT,
+                province TEXT DEFAULT 'ON', status TEXT DEFAULT 'draft',
+                notes TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS substantial_performance_certs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                contract_amount REAL, certified_amount REAL, holdback_amount REAL,
+                certification_date TEXT, publication_date TEXT,
+                lien_expiry_date TEXT, holdback_release_date TEXT,
+                consultant_name TEXT, consultant_firm TEXT,
+                owner_name TEXT, contractor_name TEXT,
+                province TEXT DEFAULT 'ON', status TEXT DEFAULT 'draft',
+                notes TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # Sources & Uses
+            """CREATE TABLE IF NOT EXISTS sources_uses_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                entry_type TEXT NOT NULL, category TEXT NOT NULL,
+                description TEXT NOT NULL,
+                budgeted_amount REAL DEFAULT 0, actual_amount REAL,
+                variance REAL, as_of_date TEXT, notes TEXT,
+                display_order INTEGER DEFAULT 100,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_sources_uses_project ON sources_uses_entries(project_id)",
+            # Estimating
+            """CREATE TABLE IF NOT EXISTS estimates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                name TEXT NOT NULL, description TEXT,
+                status TEXT DEFAULT 'draft', version INTEGER DEFAULT 1, notes TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS estimate_line_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                estimate_id INTEGER NOT NULL REFERENCES estimates(id) ON DELETE CASCADE,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                division TEXT, description TEXT NOT NULL,
+                quantity REAL, unit TEXT, unit_cost REAL, total_cost REAL,
+                cost_category_id INTEGER REFERENCES cost_categories(id),
+                labour_pct REAL, material_pct REAL,
+                subcontracted INTEGER DEFAULT 0,
+                notes TEXT, display_order INTEGER DEFAULT 100,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_estimates_project ON estimates(project_id)",
+            # Quality Inspections
+            """CREATE TABLE IF NOT EXISTS quality_inspections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                inspection_date TEXT NOT NULL,
+                inspector_name TEXT, area_location TEXT,
+                inspection_type TEXT NOT NULL,
+                status TEXT DEFAULT 'scheduled',
+                pass_count INTEGER DEFAULT 0, fail_count INTEGER DEFAULT 0,
+                notes TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS quality_inspection_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                inspection_id INTEGER NOT NULL REFERENCES quality_inspections(id) ON DELETE CASCADE,
+                item_description TEXT NOT NULL,
+                result TEXT DEFAULT 'pending',
+                notes TEXT, display_order INTEGER DEFAULT 100,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_quality_inspections_project ON quality_inspections(project_id)",
+            # Visitor Log
+            """CREATE TABLE IF NOT EXISTS visitor_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                visit_date TEXT NOT NULL, visitor_name TEXT NOT NULL,
+                visitor_company TEXT, visitor_type TEXT DEFAULT 'other',
+                purpose TEXT, host_name TEXT,
+                time_in TEXT, time_out TEXT, badge_number TEXT,
+                safety_orientation INTEGER DEFAULT 0, notes TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id),
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_visitor_logs_project ON visitor_logs(project_id, visit_date)",
             # Vendor Scores
             """CREATE TABLE IF NOT EXISTS vendor_scores (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1012,6 +1140,11 @@ app.include_router(client_hub._union_router)
 app.include_router(client_hub._closeout_router)
 app.include_router(syndicate.router)
 app.include_router(erp_integration.router)
+app.include_router(cfo_reports.router)
+app.include_router(subcontract.router)
+app.include_router(subcontract._public_router)
+app.include_router(canadian_legal.router)
+app.include_router(quality.router)
 
 # Serve static frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -1048,7 +1181,7 @@ async def report_view():
 @app.get("/", include_in_schema=False)
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_spa(full_path: str = ""):
-    _blocked = {"api/", "static/", "docs", "redoc", "openapi.json", "lender/", "report", "bid/", "co-approval/", "selections/", "prequal/"}
+    _blocked = {"api/", "static/", "docs", "redoc", "openapi.json", "lender/", "report", "bid/", "co-approval/", "selections/", "prequal/", "subcontract/"}
     if any(full_path.startswith(b) or full_path == b for b in _blocked):
         from fastapi import HTTPException
         raise HTTPException(status_code=404)

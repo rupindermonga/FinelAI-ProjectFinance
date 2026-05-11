@@ -894,6 +894,18 @@
               <button @click="view='syndicate'; loadSyndicates(); sidebarOpen=false" :class="view==='syndicate'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-building-columns w-4"></i> Loan Syndication
               </button>
+              <button @click="view='sources-uses'; loadSourcesUses(); sidebarOpen=false" :class="view==='sources-uses'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-scale-unbalanced w-4"></i> Sources &amp; Uses
+              </button>
+              <button @click="view='subcontracts'; loadSubcontracts(); sidebarOpen=false" :class="view==='subcontracts'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-file-signature w-4"></i> Subcontracts
+              </button>
+              <button @click="view='estimating'; loadEstimates(); sidebarOpen=false" :class="view==='estimating'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-calculator w-4"></i> Estimating
+              </button>
+              <button @click="view='cfo-reports'; sidebarOpen=false" :class="view==='cfo-reports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+                <i class="fa-solid fa-chart-line w-4"></i> CFO Reports
+              </button>
               <button @click="view='prequal'; loadPrequals(); sidebarOpen=false" :class="view==='prequal'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-user-check w-4"></i>
                 <span class="flex-1 text-left">Sub Prequalification</span>
@@ -995,6 +1007,14 @@
             <button @click="view='ai-schedule'; generatedSchedule=null; sidebarOpen=false" :class="view==='ai-schedule'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-calendar-days w-4"></i> AI Schedule Gen
             </button>
+            <button @click="view='quality-inspections'; loadQualityInspections(); sidebarOpen=false" :class="view==='quality-inspections'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-clipboard-check w-4"></i>
+              <span class="flex-1 text-left">Quality Inspections</span>
+              <span x-show="qualityInspections.filter(i=>i.status==='failed').length>0" x-text="qualityInspections.filter(i=>i.status==='failed').length" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
+            </button>
+            <button @click="view='visitors'; loadVisitors(); sidebarOpen=false" :class="view==='visitors'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <i class="fa-solid fa-id-badge w-4"></i> Visitor Log
+            </button>
             <button @click="view='union'; loadUnions(); sidebarOpen=false" :class="view==='union'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-people-group w-4"></i> Union Compliance
             </button>
@@ -1030,6 +1050,9 @@
             <i class="fa-solid fa-triangle-exclamation w-4"></i>
             <span class="flex-1 text-left">AI Risk Score</span>
             <span x-show="aiRiskData?.rag==='red'" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold">!</span>
+          </button>
+          <button @click="view='canadian-legal'; sidebarOpen=false" :class="view==='canadian-legal'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <i class="fa-solid fa-landmark w-4"></i> Canadian Legal
           </button>
           <button @click="view='accounting-exports'; sidebarOpen=false" :class="view==='accounting-exports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-file-export w-4"></i> ERP Exports
@@ -7038,6 +7061,458 @@
         <div x-show="!generatedSchedule && !aiSchedLoading" class="text-center text-gray-400 py-12">Upload a drawing (image or PDF) to generate an AI-powered construction schedule.</div>
       </div><!-- /ai-schedule -->
 
+      <!-- ── CFO REPORTS ─────────────────────────────────────────────── -->
+      <div x-show="view==='cfo-reports'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-chart-line mr-2 text-blue-600"></i>CFO Reports</h2>
+        </div>
+        <!-- Report tabs -->
+        <div class="flex flex-wrap gap-2 mb-5">
+          <template x-for="report in [{id:'backlog',label:'Backlog'},{id:'margin-fade',label:'Margin Fade'},{id:'retainage-aging',label:'Retainage Aging'},{id:'co-exposure',label:'CO Exposure'},{id:'ap-aging',label:'AP Aging'},{id:'draw-sla',label:'Draw SLA'},{id:'committed-vs-buyout',label:'Committed vs Buyout'},{id:'vendor-risk',label:'Vendor Risk'},{id:'ai-lender-memo',label:'AI Lender Memo'}]" :key="report.id">
+            <button @click="cfoReportView===report.id ? null : loadCFOReport(report.id)" :class="cfoReportView===report.id?'bg-blue-600 text-white':'bg-white border text-gray-700 hover:bg-blue-50'" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition" x-text="report.label"></button>
+          </template>
+        </div>
+        <div x-show="cfoLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+        <!-- AI Lender Memo -->
+        <div x-show="cfoReportView==='ai-lender-memo'" x-cloak class="space-y-4">
+          <div class="bg-blue-50 border border-blue-100 rounded-xl p-5">
+            <h3 class="font-semibold text-blue-800 mb-3"><i class="fa-solid fa-robot mr-2"></i>AI Draw Recommendation Memo</h3>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Draw Amount Requested ($)</label><input x-model="lenderMemoForm.draw_amount" type="number" step="1000" placeholder="Optional" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Notes / Context for AI</label><input x-model="lenderMemoForm.notes" type="text" placeholder="Any additional context..." class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+            </div>
+            <button @click="generateLenderMemo()" :disabled="aiLenderMemoLoading" class="w-full py-2.5 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50">
+              <span x-text="aiLenderMemoLoading?'Generating memo…':'Generate Draw Recommendation Memo'"></span>
+            </button>
+          </div>
+          <div x-show="aiLenderMemoData" x-cloak class="bg-white border rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="font-semibold text-gray-800" x-text="'Draw Memo — '+aiLenderMemoData?.project_name"></div>
+              <button @click="copyLenderMemo()" class="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg">Copy</button>
+            </div>
+            <pre class="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed" x-text="aiLenderMemoData?.memo"></pre>
+          </div>
+        </div>
+        <!-- Generic report table -->
+        <div x-show="cfoData && !cfoLoading && cfoReportView!=='ai-lender-memo'" x-cloak class="bg-white border rounded-xl overflow-hidden">
+          <!-- Backlog -->
+          <div x-show="cfoReportView==='backlog'">
+            <div class="px-5 py-3 border-b bg-gray-50 flex gap-6 text-xs text-gray-500">
+              <span>Projects: <strong x-text="cfoData?.summary?.project_count"></strong></span>
+              <span>Total Contract: <strong x-text="'$'+(cfoData?.summary?.total_contract||0).toLocaleString('en-CA',{maximumFractionDigits:0})"></strong></span>
+              <span>Total Backlog: <strong class="text-blue-600" x-text="'$'+(cfoData?.summary?.total_backlog||0).toLocaleString('en-CA',{maximumFractionDigits:0})"></strong></span>
+            </div>
+            <table class="w-full text-sm"><thead class="bg-gray-50 border-b"><tr><th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Project</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Contract</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Invoiced</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Backlog</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">% Done</th></tr></thead>
+            <tbody class="divide-y">
+              <template x-for="p in cfoData?.projects||[]" :key="p.project_id">
+                <tr class="hover:bg-gray-50" :class="p.is_overdue?'bg-red-50':''">
+                  <td class="px-4 py-3"><div class="font-medium" x-text="p.project_name"></div><div class="text-xs text-gray-400" x-text="p.province+(p.is_overdue?' · ⚠ Past end date':'')"></div></td>
+                  <td class="px-4 py-3 text-right text-xs" x-text="'$'+p.revised_contract.toLocaleString('en-CA',{maximumFractionDigits:0})"></td>
+                  <td class="px-4 py-3 text-right text-xs" x-text="'$'+p.invoiced.toLocaleString('en-CA',{maximumFractionDigits:0})"></td>
+                  <td class="px-4 py-3 text-right text-xs font-bold text-blue-600" x-text="'$'+p.backlog.toLocaleString('en-CA',{maximumFractionDigits:0})"></td>
+                  <td class="px-4 py-3 text-right text-xs" x-text="p.pct_complete+'%'"></td>
+                </tr>
+              </template>
+            </tbody></table>
+          </div>
+          <!-- AP Aging -->
+          <div x-show="cfoReportView==='ap-aging'">
+            <div class="px-5 py-3 border-b bg-gray-50 flex gap-6 text-xs text-gray-500">
+              <span>Total AP: <strong x-text="'$'+(cfoData?.summary?.total_ap||0).toLocaleString('en-CA',{maximumFractionDigits:0})"></strong></span>
+              <span class="text-red-600">Overdue: <strong x-text="'$'+(cfoData?.summary?.overdue||0).toLocaleString('en-CA',{maximumFractionDigits:0})"></strong></span>
+            </div>
+            <table class="w-full text-sm"><thead class="bg-gray-50 border-b"><tr><th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Vendor</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Current</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">1-30d</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">31-60d</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">61-90d</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">90d+</th><th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Total</th></tr></thead>
+            <tbody class="divide-y">
+              <template x-for="r in cfoData?.rows||[]" :key="r.vendor">
+                <tr class="hover:bg-gray-50" :class="r['90_plus']>0?'bg-red-50':''">
+                  <td class="px-4 py-2.5 font-medium" x-text="r.vendor"></td>
+                  <td class="px-4 py-2.5 text-right text-xs" x-text="r.current?'$'+r.current.toLocaleString('en-CA',{maximumFractionDigits:0}):'—'"></td>
+                  <td class="px-4 py-2.5 text-right text-xs" :class="r['1_30']>0?'text-amber-600':''"><span x-text="r['1_30']?'$'+r['1_30'].toLocaleString('en-CA',{maximumFractionDigits:0}):'—'"></span></td>
+                  <td class="px-4 py-2.5 text-right text-xs" :class="r['31_60']>0?'text-orange-600':''"><span x-text="r['31_60']?'$'+r['31_60'].toLocaleString('en-CA',{maximumFractionDigits:0}):'—'"></span></td>
+                  <td class="px-4 py-2.5 text-right text-xs" :class="r['61_90']>0?'text-red-600':''"><span x-text="r['61_90']?'$'+r['61_90'].toLocaleString('en-CA',{maximumFractionDigits:0}):'—'"></span></td>
+                  <td class="px-4 py-2.5 text-right text-xs font-bold" :class="r['90_plus']>0?'text-red-700':''"><span x-text="r['90_plus']?'$'+r['90_plus'].toLocaleString('en-CA',{maximumFractionDigits:0}):'—'"></span></td>
+                  <td class="px-4 py-2.5 text-right text-xs font-bold" x-text="'$'+r.total.toLocaleString('en-CA',{maximumFractionDigits:0})"></td>
+                </tr>
+              </template>
+            </tbody></table>
+          </div>
+          <!-- Generic JSON display for other reports -->
+          <div x-show="!['backlog','ap-aging'].includes(cfoReportView)" class="p-5">
+            <pre class="text-xs text-gray-600 overflow-x-auto" x-text="JSON.stringify(cfoData, null, 2)"></pre>
+          </div>
+        </div>
+        <div x-show="!cfoData && !cfoLoading && cfoReportView!=='ai-lender-memo'" class="text-center text-gray-400 py-12">Select a report above to load data.</div>
+      </div><!-- /cfo-reports -->
+
+      <!-- ── SOURCES & USES ──────────────────────────────────────────── -->
+      <div x-show="view==='sources-uses'" class="p-6 max-w-4xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-scale-unbalanced mr-2 text-blue-600"></i>Sources &amp; Uses</h2>
+            <p class="text-sm text-gray-500" x-text="currentProject?.name"></p>
+          </div>
+          <button @click="suForm={entry_type:'source',category:'equity',description:'',budgeted_amount:'',actual_amount:'',notes:''}; suEditId=null; showSUModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition font-semibold"><i class="fa-solid fa-plus"></i> Add Entry</button>
+        </div>
+        <div x-show="sourcesUsesLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+        <div x-show="sourcesUses && !sourcesUsesLoading" x-cloak>
+          <!-- Balance check -->
+          <div class="mb-4 p-3 rounded-xl text-sm font-semibold" :class="sourcesUses?.summary?.sources_uses_balanced?'bg-green-50 text-green-700':'bg-amber-50 text-amber-700'">
+            <i class="fa-solid mr-2" :class="sourcesUses?.summary?.sources_uses_balanced?'fa-circle-check':'fa-triangle-exclamation'"></i>
+            <span x-text="sourcesUses?.summary?.sources_uses_balanced?'Sources and Uses are balanced':'Imbalance: $'+Math.abs(sourcesUses?.summary?.variance||0).toLocaleString('en-CA',{maximumFractionDigits:0})+(sourcesUses?.summary?.variance>0?' surplus':' shortfall')"></span>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Sources -->
+            <div class="bg-white border rounded-xl overflow-hidden">
+              <div class="px-4 py-3 bg-green-50 border-b font-semibold text-green-800">Sources <span class="float-right" x-text="'$'+(sourcesUses?.summary?.total_sources_budgeted||0).toLocaleString('en-CA',{maximumFractionDigits:0})"></span></div>
+              <table class="w-full text-sm"><tbody class="divide-y">
+                <template x-for="e in sourcesUses?.sources||[]" :key="e.id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2.5"><div x-text="e.description"></div><div class="text-xs text-gray-400 capitalize" x-text="e.category.replace('_',' ')"></div></td>
+                    <td class="px-4 py-2.5 text-right text-xs font-semibold" x-text="'$'+e.budgeted_amount.toLocaleString('en-CA',{maximumFractionDigits:0})"></td>
+                    <td class="px-4 py-2.5 text-right"><button @click="deleteSUEntry(e.id)" class="text-xs text-red-400 hover:text-red-600">×</button></td>
+                  </tr>
+                </template>
+                <tr x-show="!(sourcesUses?.sources?.length)"><td colspan="3" class="px-4 py-4 text-center text-gray-400 text-xs">No sources added.</td></tr>
+              </tbody></table>
+            </div>
+            <!-- Uses -->
+            <div class="bg-white border rounded-xl overflow-hidden">
+              <div class="px-4 py-3 bg-red-50 border-b font-semibold text-red-800">Uses <span class="float-right" x-text="'$'+(sourcesUses?.summary?.total_uses_budgeted||0).toLocaleString('en-CA',{maximumFractionDigits:0})"></span></div>
+              <table class="w-full text-sm"><tbody class="divide-y">
+                <template x-for="e in sourcesUses?.uses||[]" :key="e.id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2.5"><div x-text="e.description"></div><div class="text-xs text-gray-400 capitalize" x-text="e.category.replace('_',' ')"></div></td>
+                    <td class="px-4 py-2.5 text-right text-xs font-semibold" x-text="'$'+e.budgeted_amount.toLocaleString('en-CA',{maximumFractionDigits:0})"></td>
+                    <td class="px-4 py-2.5 text-right"><button @click="deleteSUEntry(e.id)" class="text-xs text-red-400 hover:text-red-600">×</button></td>
+                  </tr>
+                </template>
+                <tr x-show="!(sourcesUses?.uses?.length)"><td colspan="3" class="px-4 py-4 text-center text-gray-400 text-xs">No uses added.</td></tr>
+              </tbody></table>
+            </div>
+          </div>
+        </div>
+        <div x-show="!sourcesUses && !sourcesUsesLoading" class="text-center text-gray-400 py-12">Click refresh to load Sources &amp; Uses.</div>
+      </div><!-- /sources-uses -->
+
+      <!-- ── SUBCONTRACTS ─────────────────────────────────────────────── -->
+      <div x-show="view==='subcontracts'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-file-signature mr-2 text-blue-600"></i>Subcontracts</h2>
+            <p class="text-sm text-gray-500" x-text="currentProject?.name"></p>
+          </div>
+          <button @click="subcontractForm={vendor_name:'',trade:'',contract_amount:'',holdback_pct:10,payment_terms:'Net 30 — progress draws',start_date:'',end_date:'',scope_of_work:'',inclusions:'',exclusions:'',insurance_required:true,bond_required:false,warranty_period:'1 year from Substantial Performance',notes:''}; subcontractEditId=null; showSubcontractModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition font-semibold"><i class="fa-solid fa-plus"></i> New Subcontract</button>
+        </div>
+        <div x-show="subcontractsLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+        <div x-show="!subcontractsLoading" class="bg-white border rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b"><tr>
+              <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Contract #</th>
+              <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Vendor</th>
+              <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Trade</th>
+              <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Amount</th>
+              <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Holdback</th>
+              <th class="text-center px-4 py-2.5 text-xs font-semibold text-gray-500">Status</th>
+              <th class="px-4 py-2.5"></th>
+            </tr></thead>
+            <tbody class="divide-y">
+              <template x-for="s in subcontracts" :key="s.id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-3 text-xs font-mono text-blue-700" x-text="s.contract_number"></td>
+                  <td class="px-4 py-3 font-medium" x-text="s.vendor_name"></td>
+                  <td class="px-4 py-3 text-xs text-gray-500" x-text="s.trade||'—'"></td>
+                  <td class="px-4 py-3 text-right text-xs font-bold" x-text="'$'+s.contract_amount.toLocaleString('en-CA',{maximumFractionDigits:0})"></td>
+                  <td class="px-4 py-3 text-right text-xs text-amber-600" x-text="s.holdback_pct+'%'"></td>
+                  <td class="px-4 py-3 text-center">
+                    <span class="text-xs px-2 py-0.5 rounded-full font-semibold"
+                      :class="s.status==='executed'?'bg-green-100 text-green-700':s.status==='issued'?'bg-blue-100 text-blue-700':s.status==='terminated'?'bg-red-100 text-red-700':'bg-gray-100 text-gray-600'"
+                      x-text="s.status.toUpperCase()"></span>
+                    <span x-show="s.signed_by_name" class="ml-1 text-xs text-green-600" x-text="'✓ '+s.signed_by_name"></span>
+                  </td>
+                  <td class="px-4 py-3 flex gap-1.5 justify-end">
+                    <button @click="previewSubcontract(s)" class="text-xs text-blue-500 hover:text-blue-700">Preview</button>
+                    <button x-show="s.sign_url" @click="copySubcontractLink(s.sign_url)" class="text-xs text-purple-500 hover:text-purple-700">Sign Link</button>
+                    <button @click="deleteSubcontract(s.id)" class="text-xs text-red-400 hover:text-red-600">Del</button>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="subcontracts.length===0"><td colspan="7" class="px-4 py-8 text-center text-gray-400 text-sm">No subcontracts. Create from bid or manually.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /subcontracts -->
+
+      <!-- ── ESTIMATING ──────────────────────────────────────────────── -->
+      <div x-show="view==='estimating'" class="p-6 max-w-5xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-calculator mr-2 text-blue-600"></i>Estimating</h2>
+            <p class="text-sm text-gray-500" x-text="activeEstimate?activeEstimate.name:(currentProject?.name||'')"></p>
+          </div>
+          <div class="flex gap-2">
+            <button x-show="activeEstimate" @click="activeEstimate=null; estimateItems=[]" class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded-lg hover:bg-gray-200 transition font-semibold"><i class="fa-solid fa-arrow-left mr-1"></i>Back</button>
+            <button x-show="activeEstimate" @click="convertEstimateToBudget()" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>→ Budget</button>
+            <button x-show="!activeEstimate" @click="estimateForm={name:'',description:''}; showEstimateModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition font-semibold"><i class="fa-solid fa-plus"></i> New Estimate</button>
+            <button x-show="activeEstimate" @click="estItemForm={division:'',description:'',quantity:'',unit:'',unit_cost:'',total_cost:'',subcontracted:false,notes:''}; estItemEditId=null; showEstimateItemModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition font-semibold"><i class="fa-solid fa-plus"></i> Add Item</button>
+          </div>
+        </div>
+        <!-- Estimate list -->
+        <div x-show="!activeEstimate && !estimatesLoading" class="space-y-3">
+          <template x-for="est in estimates" :key="est.id">
+            <div class="bg-white border rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-blue-300 transition" @click="openEstimate(est)">
+              <div>
+                <div class="font-semibold text-gray-800" x-text="est.name"></div>
+                <div class="text-xs text-gray-400 mt-0.5" x-text="est.line_item_count+' items · Total: $'+est.total.toLocaleString('en-CA',{maximumFractionDigits:0})"></div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-xs px-2 py-0.5 rounded-full font-semibold" :class="est.status==='approved'?'bg-green-100 text-green-700':'bg-amber-100 text-amber-700'" x-text="est.status.toUpperCase()"></span>
+                <span class="text-lg text-gray-300"><i class="fa-solid fa-chevron-right"></i></span>
+              </div>
+            </div>
+          </template>
+          <div x-show="estimates.length===0" class="text-center text-gray-400 text-sm py-8">No estimates. Create one to start pricing your project scope.</div>
+        </div>
+        <!-- Estimate items detail -->
+        <div x-show="activeEstimate && !estimatesLoading">
+          <!-- Division summary -->
+          <div x-show="Object.keys(estimateDivisions).length>0" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            <template x-for="[div, amt] in Object.entries(estimateDivisions)" :key="div">
+              <div class="bg-white border rounded-lg p-3">
+                <div class="text-xs text-gray-500 truncate" x-text="div"></div>
+                <div class="font-bold text-gray-800" x-text="'$'+amt.toLocaleString('en-CA',{maximumFractionDigits:0})"></div>
+              </div>
+            </template>
+          </div>
+          <div class="bg-white border rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 border-b"><tr>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Division</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Description</th>
+                <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Qty</th>
+                <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Unit</th>
+                <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Unit Cost</th>
+                <th class="text-right px-4 py-2.5 text-xs font-semibold text-gray-500">Total</th>
+                <th class="px-4 py-2.5"></th>
+              </tr></thead>
+              <tbody class="divide-y">
+                <template x-for="item in estimateItems" :key="item.id">
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2.5 text-xs text-gray-400" x-text="item.division||'General'"></td>
+                    <td class="px-4 py-2.5 text-sm font-medium" x-text="item.description"></td>
+                    <td class="px-4 py-2.5 text-right text-xs" x-text="item.quantity||'—'"></td>
+                    <td class="px-4 py-2.5 text-xs text-gray-400" x-text="item.unit||''"></td>
+                    <td class="px-4 py-2.5 text-right text-xs" x-text="item.unit_cost?'$'+item.unit_cost.toLocaleString('en-CA',{minimumFractionDigits:2}):'—'"></td>
+                    <td class="px-4 py-2.5 text-right text-xs font-bold" x-text="item.total_cost?'$'+item.total_cost.toLocaleString('en-CA',{maximumFractionDigits:0}):'—'"></td>
+                    <td class="px-4 py-2.5"><button @click="deleteEstimateItem(item.id)" class="text-xs text-red-400 hover:text-red-600">Del</button></td>
+                  </tr>
+                </template>
+                <tr class="bg-gray-50 font-bold"><td colspan="5" class="px-4 py-2.5 text-xs text-gray-700">TOTAL</td>
+                  <td class="px-4 py-2.5 text-right text-xs" x-text="'$'+(estimateItems.reduce((s,i)=>s+(i.total_cost||0),0)).toLocaleString('en-CA',{maximumFractionDigits:0})"></td><td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /estimating -->
+
+      <!-- ── CANADIAN LEGAL ──────────────────────────────────────────── -->
+      <div x-show="view==='canadian-legal'" class="p-6 max-w-4xl">
+        <div class="mb-4">
+          <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-landmark mr-2 text-blue-600"></i>Canadian Legal Workflows</h2>
+          <p class="text-sm text-gray-500">Proper Invoice Validation · Notice of Non-Payment · Certificate of Substantial Performance</p>
+        </div>
+        <!-- Sub-tabs -->
+        <div class="flex gap-2 mb-5">
+          <button @click="legalTab='proper-invoice'" :class="legalTab==='proper-invoice'?'bg-blue-600 text-white':'bg-white border text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs font-semibold">Proper Invoice</button>
+          <button @click="legalTab='nnp'; loadNNPList()" :class="legalTab==='nnp'?'bg-blue-600 text-white':'bg-white border text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs font-semibold">Notice of Non-Payment</button>
+          <button @click="legalTab='sp'; loadSPCerts()" :class="legalTab==='sp'?'bg-blue-600 text-white':'bg-white border text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs font-semibold">Substantial Performance</button>
+        </div>
+        <!-- Proper Invoice Validator -->
+        <div x-show="legalTab==='proper-invoice'" x-data="{legalTab:'proper-invoice'}" x-cloak>
+          <div class="bg-white border rounded-xl p-5 mb-4">
+            <h3 class="font-semibold text-gray-700 mb-3">Validate Proper Invoice (Ontario Construction Act)</h3>
+            <div class="flex gap-2">
+              <input x-model="invoiceToValidate" type="number" placeholder="Invoice ID" class="border rounded-lg px-3 py-2 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              <button @click="validateProperInvoice()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Validate</button>
+            </div>
+            <div x-show="invoiceValidationResult" x-cloak class="mt-4">
+              <div class="mb-3 p-3 rounded-lg font-semibold text-sm" :class="invoiceValidationResult?.is_proper?'bg-green-50 text-green-700':'bg-amber-50 text-amber-700'" x-text="invoiceValidationResult?.message"></div>
+              <div class="space-y-1.5">
+                <template x-for="check in invoiceValidationResult?.checks||[]" :key="check.field">
+                  <div class="flex items-start gap-3 text-sm">
+                    <i class="fa-solid mt-0.5 flex-shrink-0" :class="check.passed?'fa-circle-check text-green-500':'fa-circle-xmark text-red-500'"></i>
+                    <div>
+                      <span class="font-medium" x-text="check.field"></span>
+                      <span x-show="!check.passed" class="ml-2 text-xs text-gray-400" x-text="check.requirement"></span>
+                      <span x-show="check.value" class="ml-2 text-xs text-gray-400" x-text="'('+check.value+')'"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Notice of Non-Payment list -->
+        <div x-show="legalTab==='nnp'" x-cloak>
+          <div class="flex justify-end mb-3"><button @click="nnpForm={payment_type:'gc_to_sub',vendor_name:'',proper_invoice_date:'',certifier_cert_date:'',disputed_amount:'',non_disputed_amount:'',reasons:'',notice_date:'',notes:''}; nnpEditId=null; showNNPModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition font-semibold"><i class="fa-solid fa-plus"></i> New NNP</button></div>
+          <div class="space-y-3">
+            <template x-for="nnp in nnpList" :key="nnp.id">
+              <div class="bg-white border rounded-xl p-4 flex items-start justify-between">
+                <div>
+                  <div class="font-semibold text-gray-800" x-text="nnp.vendor_name||'—'"></div>
+                  <div class="text-xs text-gray-400 mt-1">
+                    <span x-text="nnp.payment_type.replace('_',' ').toUpperCase()"></span> ·
+                    <span x-show="nnp.payment_deadline" class="text-red-600"> Deadline: <span x-text="nnp.payment_deadline"></span></span>
+                    <span x-show="nnp.disputed_amount"> · Disputed: $<span x-text="(nnp.disputed_amount||0).toLocaleString('en-CA',{maximumFractionDigits:0})"></span></span>
+                  </div>
+                  <div x-show="nnp.reasons" class="text-xs text-gray-500 mt-1 truncate max-w-md" x-text="nnp.reasons"></div>
+                </div>
+                <div class="flex gap-2 ml-4">
+                  <span class="text-xs px-2 py-0.5 rounded-full font-semibold" :class="nnp.status==='served'?'bg-amber-100 text-amber-700':nnp.status==='withdrawn'?'bg-gray-100 text-gray-500':'bg-blue-100 text-blue-700'" x-text="nnp.status.toUpperCase()"></span>
+                  <button @click="printNNP(nnp.id)" class="text-xs text-blue-500 hover:text-blue-700">Print</button>
+                </div>
+              </div>
+            </template>
+            <div x-show="nnpList.length===0" class="text-center text-gray-400 text-sm py-6">No notices of non-payment.</div>
+          </div>
+        </div>
+        <!-- Substantial Performance -->
+        <div x-show="legalTab==='sp'" x-cloak>
+          <div class="flex justify-end mb-3"><button @click="spForm={contract_amount:'',certified_amount:'',holdback_amount:'',certification_date:'',publication_date:'',consultant_name:'',consultant_firm:'',owner_name:'',contractor_name:'',notes:''}; spEditId=null; showSPModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition font-semibold"><i class="fa-solid fa-plus"></i> New SP Certificate</button></div>
+          <div class="space-y-3">
+            <template x-for="sp in spCerts" :key="sp.id">
+              <div class="bg-white border rounded-xl p-5">
+                <div class="flex items-start justify-between mb-3">
+                  <div>
+                    <div class="font-semibold text-gray-800" x-text="'SP Certificate — '+sp.certification_date"></div>
+                    <div class="text-xs text-gray-400 mt-0.5" x-text="sp.consultant_name+(sp.consultant_firm?' ('+sp.consultant_firm+')':'')"></div>
+                  </div>
+                  <span class="text-xs px-2 py-0.5 rounded-full font-semibold" :class="sp.status==='published'?'bg-amber-100 text-amber-700':sp.status==='holdback_released'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-600'" x-text="sp.status.replace('_',' ').toUpperCase()"></span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-xs">
+                  <div><div class="font-bold text-gray-700" x-text="sp.certified_amount?'$'+sp.certified_amount.toLocaleString('en-CA',{maximumFractionDigits:0}):'—'"></div><div class="text-gray-400">Certified Amount</div></div>
+                  <div><div class="font-bold text-gray-700" x-text="sp.holdback_amount?'$'+sp.holdback_amount.toLocaleString('en-CA',{maximumFractionDigits:0}):'—'"></div><div class="text-gray-400">Holdback</div></div>
+                  <div><div class="font-bold text-gray-700" x-text="sp.lien_expiry_date||'—'"></div><div class="text-gray-400">Lien Expiry</div></div>
+                  <div><div class="font-bold text-gray-700" x-text="sp.holdback_release_date||'—'"></div><div class="text-gray-400">Holdback Release</div></div>
+                </div>
+              </div>
+            </template>
+            <div x-show="spCerts.length===0" class="text-center text-gray-400 text-sm py-6">No SP certificates. Add one when substantial performance is declared.</div>
+          </div>
+        </div>
+      </div><!-- /canadian-legal -->
+
+      <!-- ── QUALITY INSPECTIONS ─────────────────────────────────────── -->
+      <div x-show="view==='quality-inspections'" class="p-6 max-w-4xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-clipboard-check mr-2 text-green-600"></i>Quality Inspections</h2>
+            <p class="text-sm text-gray-500" x-text="currentProject?.name"></p>
+          </div>
+          <button @click="qiForm={inspection_date:'',inspector_name:'',area_location:'',inspection_type:'rough_framing',notes:''}; showQIModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition font-semibold"><i class="fa-solid fa-plus"></i> New Inspection</button>
+        </div>
+        <div x-show="qualityLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+        <div x-show="!qualityLoading" class="space-y-3">
+          <template x-for="insp in qualityInspections" :key="insp.id">
+            <div class="bg-white border rounded-xl p-4 cursor-pointer hover:border-green-300 transition" @click="openInspection(insp)">
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="font-semibold text-gray-800" x-text="insp.inspection_type.replace(/_/g,' ').toUpperCase()+' — '+insp.inspection_date"></div>
+                  <div class="text-xs text-gray-400 mt-0.5">
+                    <span x-show="insp.inspector_name" x-text="insp.inspector_name"></span>
+                    <span x-show="insp.area_location" class="ml-2" x-text="'📍 '+insp.area_location"></span>
+                  </div>
+                  <div class="text-xs mt-1" x-show="insp.item_count>0">
+                    <span class="text-green-600" x-text="insp.pass_count+' pass'"></span>
+                    <span class="ml-2 text-red-600" x-show="insp.fail_count>0" x-text="insp.fail_count+' fail'"></span>
+                    <span class="ml-2 text-gray-400" x-text="insp.item_count+' items total'"></span>
+                  </div>
+                </div>
+                <span class="text-xs px-2 py-0.5 rounded-full font-semibold"
+                  :class="insp.status==='passed'?'bg-green-100 text-green-700':insp.status==='failed'?'bg-red-100 text-red-700':insp.status==='conditional'?'bg-amber-100 text-amber-700':'bg-gray-100 text-gray-600'"
+                  x-text="insp.status.replace('_',' ').toUpperCase()"></span>
+              </div>
+            </div>
+          </template>
+          <div x-show="qualityInspections.length===0" class="text-center text-gray-400 text-sm py-8">No quality inspections. Create one to start a checklist.</div>
+        </div>
+      </div><!-- /quality-inspections -->
+
+      <!-- ── QUALITY INSPECTION DETAIL ───────────────────────────────── -->
+      <div x-show="view==='quality-detail'" class="p-6 max-w-3xl">
+        <div class="flex items-center gap-3 mb-4">
+          <button @click="view='quality-inspections'" class="text-blue-600 hover:text-blue-800 text-sm"><i class="fa-solid fa-arrow-left mr-1"></i>Back</button>
+          <h2 class="text-xl font-bold text-gray-800" x-text="activeInspection?.inspection_type?.replace(/_/g,' ')?.toUpperCase()+' — '+activeInspection?.inspection_date"></h2>
+        </div>
+        <!-- Progress bar -->
+        <div x-show="activeInspection?.item_count>0" class="bg-white border rounded-xl p-4 mb-4">
+          <div class="flex justify-between text-xs mb-1.5">
+            <span class="text-green-600 font-semibold" x-text="(activeInspection?.pass_count||0)+' passed'"></span>
+            <span class="text-red-600 font-semibold" x-show="(activeInspection?.fail_count||0)>0" x-text="(activeInspection?.fail_count||0)+' failed'"></span>
+            <span class="text-gray-400" x-text="activeInspection?.item_count+' total items'"></span>
+          </div>
+          <div class="bg-gray-100 rounded-full h-2.5">
+            <div class="h-2.5 rounded-full" :class="(activeInspection?.fail_count||0)>0?'bg-red-500':'bg-green-500'"
+                 :style="'width:'+Math.round(((activeInspection?.pass_count||0)+(activeInspection?.fail_count||0))/Math.max(activeInspection?.item_count,1)*100)+'%'"></div>
+          </div>
+        </div>
+        <!-- Checklist items -->
+        <div class="bg-white border rounded-xl overflow-hidden">
+          <template x-for="item in inspectionItems" :key="item.id">
+            <div class="flex items-center gap-3 px-4 py-3 border-b last:border-b-0">
+              <div class="flex gap-1.5">
+                <button @click="updateInspectionItem(item,'pass')" :class="item.result==='pass'?'bg-green-500 text-white':'bg-gray-100 text-gray-500 hover:bg-green-100'" class="w-8 h-8 rounded-full text-xs font-bold transition">✓</button>
+                <button @click="updateInspectionItem(item,'fail')" :class="item.result==='fail'?'bg-red-500 text-white':'bg-gray-100 text-gray-500 hover:bg-red-100'" class="w-8 h-8 rounded-full text-xs font-bold transition">✗</button>
+                <button @click="updateInspectionItem(item,'n_a')" :class="item.result==='n_a'?'bg-gray-500 text-white':'bg-gray-100 text-gray-500 hover:bg-gray-200'" class="w-8 h-8 rounded-full text-xs font-bold transition">N/A</button>
+              </div>
+              <span class="text-sm flex-1" :class="item.result==='pass'?'text-green-700':item.result==='fail'?'text-red-700 font-semibold':item.result==='n_a'?'text-gray-400 line-through':'text-gray-800'" x-text="item.item_description"></span>
+            </div>
+          </template>
+          <div x-show="inspectionItems.length===0" class="text-center text-gray-400 text-sm py-6">No checklist items.</div>
+        </div>
+      </div><!-- /quality-detail -->
+
+      <!-- ── VISITOR LOG ─────────────────────────────────────────────── -->
+      <div x-show="view==='visitors'" class="p-6 max-w-4xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-id-badge mr-2 text-gray-700"></i>Visitor Log</h2>
+            <p class="text-sm text-gray-500" x-text="currentProject?.name"></p>
+          </div>
+          <button @click="visitorForm={visit_date:'',visitor_name:'',visitor_company:'',visitor_type:'other',purpose:'',host_name:'',time_in:'',time_out:'',badge_number:'',safety_orientation:false,notes:''}; visitorEditId=null; showVisitorModal=true" class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 text-white text-xs rounded-lg hover:bg-gray-900 transition font-semibold"><i class="fa-solid fa-plus"></i> Log Visitor</button>
+        </div>
+        <div x-show="visitorsLoading" class="text-center py-12 text-gray-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i></div>
+        <div x-show="!visitorsLoading" class="bg-white border rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b"><tr>
+              <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Date</th>
+              <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Visitor</th>
+              <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Company</th>
+              <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Type</th>
+              <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Purpose</th>
+              <th class="text-left px-4 py-2.5 text-xs font-semibold text-gray-500">Time In/Out</th>
+              <th class="text-center px-4 py-2.5 text-xs font-semibold text-gray-500">Safety</th>
+              <th class="px-4 py-2.5"></th>
+            </tr></thead>
+            <tbody class="divide-y">
+              <template x-for="v in visitors" :key="v.id">
+                <tr class="hover:bg-gray-50">
+                  <td class="px-4 py-2.5 text-xs" x-text="v.visit_date"></td>
+                  <td class="px-4 py-2.5 font-medium" x-text="v.visitor_name"></td>
+                  <td class="px-4 py-2.5 text-xs text-gray-500" x-text="v.visitor_company||'—'"></td>
+                  <td class="px-4 py-2.5 text-xs capitalize" x-text="v.visitor_type"></td>
+                  <td class="px-4 py-2.5 text-xs text-gray-500" x-text="v.purpose||'—'"></td>
+                  <td class="px-4 py-2.5 text-xs text-gray-400" x-text="v.time_in&&v.time_out?v.time_in+'→'+v.time_out:(v.time_in||'—')"></td>
+                  <td class="px-4 py-2.5 text-center" x-text="v.safety_orientation?'✓':'—'"></td>
+                  <td class="px-4 py-2.5"><button @click="deleteVisitor(v.id)" class="text-xs text-red-400 hover:text-red-600">Del</button></td>
+                </tr>
+              </template>
+              <tr x-show="visitors.length===0"><td colspan="8" class="px-4 py-8 text-center text-gray-400 text-sm">No visitor records.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /visitors -->
+
       <!-- ── AI CONSTRUCTION ACCOUNTANT ────────────────────────────── -->
       <div x-show="view==='health-check'" class="p-6 max-w-4xl">
         <div class="flex items-center justify-between mb-6">
@@ -9844,6 +10319,250 @@
     <div class="flex gap-2 mt-5">
       <button @click="showERPSetupModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
       <button @click="saveERPCredential()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Save Credentials</button>
+    </div>
+  </div>
+</div>
+
+<!-- Subcontract Modal -->
+<div x-show="showSubcontractModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showSubcontractModal=false">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-file-signature mr-2 text-blue-600"></i>New Subcontract Agreement</h3>
+      <button @click="showSubcontractModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Vendor / Sub Name *</label><input x-model="subcontractForm.vendor_name" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Trade</label><input x-model="subcontractForm.trade" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Contract Amount ($) *</label><input x-model="subcontractForm.contract_amount" type="number" step="1000" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Holdback %</label><input x-model="subcontractForm.holdback_pct" type="number" step="0.5" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Payment Terms</label><input x-model="subcontractForm.payment_terms" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Start Date</label><input x-model="subcontractForm.start_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">End Date</label><input x-model="subcontractForm.end_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Scope of Work</label><textarea x-model="subcontractForm.scope_of_work" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Inclusions</label><textarea x-model="subcontractForm.inclusions" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Exclusions</label><textarea x-model="subcontractForm.exclusions" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="subcontractForm.insurance_required" class="rounded" /><span>Insurance Required</span></label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="subcontractForm.bond_required" class="rounded" /><span>Bond Required</span></label>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button @click="showSubcontractModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button @click="saveSubcontract()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Create Subcontract</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sources & Uses Modal -->
+<div x-show="showSUModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showSUModal=false">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-scale-unbalanced mr-2 text-blue-600"></i>Add Sources &amp; Uses Entry</h3>
+      <button @click="showSUModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Type</label>
+          <select x-model="suForm.entry_type" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <option value="source">Source (Funding In)</option><option value="use">Use (Cost Out)</option>
+          </select>
+        </div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Category</label>
+          <select x-model="suForm.category" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <option value="equity">Equity</option><option value="senior_debt">Senior Debt</option><option value="mezzanine">Mezzanine</option><option value="grant">Grant</option><option value="deposit">Deposits</option><option value="presales">Presales</option>
+            <option value="land">Land</option><option value="hard_cost">Hard Costs</option><option value="soft_cost">Soft Costs</option><option value="financing_costs">Financing Costs</option><option value="contingency">Contingency</option>
+            <option value="other_source">Other Source</option><option value="other_use">Other Use</option>
+          </select>
+        </div>
+      </div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Description *</label><input x-model="suForm.description" type="text" placeholder="e.g. BMO Construction Loan" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Budgeted Amount ($)</label><input x-model="suForm.budgeted_amount" type="number" step="10000" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Actual Amount ($)</label><input x-model="suForm.actual_amount" type="number" step="10000" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button @click="showSUModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button @click="saveSUEntry()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Add Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- Estimate Create Modal -->
+<div x-show="showEstimateModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showEstimateModal=false">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-calculator mr-2 text-blue-600"></i>New Estimate</h3>
+      <button @click="showEstimateModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Estimate Name *</label><input x-model="estimateForm.name" type="text" placeholder="Revised Budget V2, GMP Estimate..." class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Description</label><textarea x-model="estimateForm.description" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button @click="showEstimateModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button @click="createEstimate()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Estimate Line Item Modal -->
+<div x-show="showEstimateItemModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showEstimateItemModal=false">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-list mr-2 text-blue-600"></i>Add Line Item</h3>
+      <button @click="showEstimateItemModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Division (CSI)</label><input x-model="estItemForm.division" type="text" placeholder="03 - Concrete" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Unit</label><input x-model="estItemForm.unit" type="text" placeholder="SF, LF, EA, CY, LS..." class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Description *</label><input x-model="estItemForm.description" type="text" placeholder="Cast-in-place concrete footings..." class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Quantity</label><input x-model="estItemForm.quantity" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Unit Cost ($)</label><input x-model="estItemForm.unit_cost" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Total ($)</label><input x-model="estItemForm.total_cost" type="number" step="1" placeholder="Auto-calc" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="estItemForm.subcontracted" class="rounded" /><span>Subcontracted (not self-perform)</span></label>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button @click="showEstimateItemModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button @click="saveEstimateItem()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Add Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quality Inspection Create Modal -->
+<div x-show="showQIModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showQIModal=false">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-clipboard-check mr-2 text-green-600"></i>New Quality Inspection</h3>
+      <button @click="showQIModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Date *</label><input x-model="qiForm.inspection_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Type *</label>
+          <select x-model="qiForm.inspection_type" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+            <option value="rough_framing">Rough Framing</option><option value="concrete">Concrete</option><option value="waterproofing">Waterproofing</option><option value="electrical">Electrical Rough-In</option><option value="plumbing">Plumbing</option><option value="insulation">Insulation</option><option value="drywall">Drywall</option><option value="finishes">Finishes</option><option value="commissioning">Commissioning</option><option value="final">Final Inspection</option>
+          </select>
+        </div>
+      </div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Inspector Name</label><input x-model="qiForm.inspector_name" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Area / Location</label><input x-model="qiForm.area_location" type="text" placeholder="Level 2, Unit 201, North Wing..." class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" /></div>
+      <p class="text-xs text-gray-400">A standard checklist for the selected inspection type will be auto-loaded.</p>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button @click="showQIModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button @click="createQualityInspection()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">Create Inspection</button>
+    </div>
+  </div>
+</div>
+
+<!-- Visitor Log Modal -->
+<div x-show="showVisitorModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showVisitorModal=false">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-id-badge mr-2 text-gray-700"></i>Log Visitor</h3>
+      <button @click="showVisitorModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Visitor Name *</label><input x-model="visitorForm.visitor_name" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Company</label><input x-model="visitorForm.visitor_company" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" /></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Visit Date</label><input x-model="visitorForm.visit_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Type</label>
+          <select x-model="visitorForm.visitor_type" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400">
+            <option value="owner">Owner</option><option value="lender">Lender</option><option value="inspector">Inspector</option><option value="architect">Architect/Consultant</option><option value="consultant">Consultant</option><option value="supplier">Supplier</option><option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Purpose of Visit</label><input x-model="visitorForm.purpose" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" /></div>
+      <div class="grid grid-cols-3 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Time In</label><input x-model="visitorForm.time_in" type="time" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Time Out</label><input x-model="visitorForm.time_out" type="time" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Host Name</label><input x-model="visitorForm.host_name" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400" /></div>
+      </div>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="visitorForm.safety_orientation" class="rounded" /><span>Safety Orientation Completed</span></label>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button @click="showVisitorModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button @click="saveVisitor()" class="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-semibold hover:bg-gray-900">Log Visit</button>
+    </div>
+  </div>
+</div>
+
+<!-- NNP Modal -->
+<div x-show="showNNPModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showNNPModal=false">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation mr-2 text-amber-500"></i>Notice of Non-Payment</h3>
+      <button @click="showNNPModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Payment Type</label>
+          <select x-model="nnpForm.payment_type" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+            <option value="owner_to_gc">Owner → GC</option><option value="gc_to_sub">GC → Sub</option>
+          </select>
+        </div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Vendor / Payee Name</label><input x-model="nnpForm.vendor_name" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" /></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Proper Invoice Date</label><input x-model="nnpForm.proper_invoice_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Certifier Cert Date</label><input x-model="nnpForm.certifier_cert_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" /></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Disputed Amount ($)</label><input x-model="nnpForm.disputed_amount" type="number" step="100" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Non-Disputed Amount ($)</label><input x-model="nnpForm.non_disputed_amount" type="number" step="100" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" /></div>
+      </div>
+      <div><label class="block text-xs font-medium text-gray-600 mb-1">Reasons for Non-Payment *</label><textarea x-model="nnpForm.reasons" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" placeholder="Describe the reason(s) for withholding payment..."></textarea></div>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button @click="showNNPModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button @click="saveNNP()" class="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700">Save NNP</button>
+    </div>
+  </div>
+</div>
+
+<!-- SP Certificate Modal -->
+<div x-show="showSPModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showSPModal=false">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-certificate mr-2 text-blue-600"></i>Certificate of Substantial Performance</h3>
+      <button @click="showSPModal=false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Certified Amount ($)</label><input x-model="spForm.certified_amount" type="number" step="1000" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Holdback Amount ($)</label><input x-model="spForm.holdback_amount" type="number" step="1000" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Certification Date</label><input x-model="spForm.certification_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Publication Date (Daily Commercial)</label><input x-model="spForm.publication_date" type="date" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Consultant Name</label><input x-model="spForm.consultant_name" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Consultant Firm</label><input x-model="spForm.consultant_firm" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Owner Name</label><input x-model="spForm.owner_name" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+        <div><label class="block text-xs font-medium text-gray-600 mb-1">Contractor Name</label><input x-model="spForm.contractor_name" type="text" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" /></div>
+      </div>
+      <p class="text-xs text-gray-400">Lien expiry and holdback release dates are auto-calculated from the publication date based on provincial rules.</p>
+    </div>
+    <div class="flex gap-2 mt-5">
+      <button @click="showSPModal=false" class="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+      <button @click="saveSPCert()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700">Save Certificate</button>
     </div>
   </div>
 </div>

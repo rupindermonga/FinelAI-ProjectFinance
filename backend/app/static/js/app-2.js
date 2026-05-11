@@ -225,6 +225,50 @@ function app() {
     // ── AI Schedule Generation ─────────────────────────────────────
     generatedSchedule: null, aiSchedLoading: false,
 
+    // ── CFO Reports ────────────────────────────────────────────────
+    cfoReportView: 'backlog',
+    cfoData: null, cfoLoading: false,
+    aiLenderMemoData: null, aiLenderMemoLoading: false,
+    lenderMemoForm: { draw_amount:'', draw_number:'', notes:'' },
+
+    // ── Subcontracts ───────────────────────────────────────────────
+    subcontracts: [], subcontractsLoading: false,
+    showSubcontractModal: false, subcontractEditId: null,
+    subcontractForm: { vendor_name:'', trade:'', contract_amount:'', holdback_pct:10, payment_terms:'Net 30 — progress draws', start_date:'', end_date:'', scope_of_work:'', inclusions:'', exclusions:'', insurance_required:true, bond_required:false, warranty_period:'1 year from Substantial Performance', notes:'' },
+
+    // ── Sources & Uses ─────────────────────────────────────────────
+    sourcesUses: null, sourcesUsesLoading: false,
+    showSUModal: false, suEditId: null,
+    suForm: { entry_type:'source', category:'equity', description:'', budgeted_amount:'', actual_amount:'', as_of_date:'', notes:'' },
+
+    // ── Estimating ─────────────────────────────────────────────────
+    estimates: [], estimatesLoading: false,
+    activeEstimate: null, estimateItems: [], estimateDivisions: {},
+    showEstimateModal: false, showEstimateItemModal: false,
+    estimateForm: { name:'', description:'' },
+    estItemForm: { division:'', description:'', quantity:'', unit:'', unit_cost:'', total_cost:'', subcontracted:false, notes:'' },
+    estItemEditId: null,
+
+    // ── Canadian Legal ─────────────────────────────────────────────
+    legalTab: 'proper-invoice',
+    nnpList: [], spCerts: [],
+    showNNPModal: false, nnpEditId: null,
+    nnpForm: { payment_type:'gc_to_sub', vendor_name:'', proper_invoice_date:'', certifier_cert_date:'', disputed_amount:'', non_disputed_amount:'', reasons:'', notice_date:'', notes:'' },
+    showSPModal: false, spEditId: null,
+    spForm: { contract_amount:'', certified_amount:'', holdback_amount:'', certification_date:'', publication_date:'', consultant_name:'', consultant_firm:'', owner_name:'', contractor_name:'', notes:'' },
+    invoiceValidationResult: null, invoiceToValidate: '',
+
+    // ── Quality Inspections ────────────────────────────────────────
+    qualityInspections: [], qualityLoading: false,
+    activeInspection: null, inspectionItems: [],
+    showQIModal: false,
+    qiForm: { inspection_date:'', inspector_name:'', area_location:'', inspection_type:'rough_framing', notes:'' },
+
+    // ── Visitor Log ────────────────────────────────────────────────
+    visitors: [], visitorsLoading: false,
+    showVisitorModal: false, visitorEditId: null,
+    visitorForm: { visit_date:'', visitor_name:'', visitor_company:'', visitor_type:'other', purpose:'', host_name:'', time_in:'', time_out:'', badge_number:'', safety_orientation:false, notes:'' },
+
     // ── Sub Prequalification ───────────────────────────────────────
     prequals: [], prequalsLoading: false,
 
@@ -3439,6 +3483,225 @@ function app() {
     },
     async deleteCloseoutItem(id) {
       try { await this.delete(`/api/project/${this.currentProject.id}/closeout/${id}`); await this.loadCloseout(); } catch(e) {}
+    },
+
+    // ── CFO Reports ──────────────────────────────────────────────────
+    async loadCFOReport(report) {
+      this.cfoReportView = report; this.cfoLoading = true; this.cfoData = null;
+      const pid = this.currentProject?.id;
+      const qs = pid ? `?project_id=${pid}` : '';
+      try { this.cfoData = await this.get(`/api/reports/${report}${qs}`); } catch(e) { this.cfoData = null; }
+      finally { this.cfoLoading = false; }
+    },
+    async generateLenderMemo() {
+      if (!this.currentProject) return;
+      this.aiLenderMemoLoading = true; this.aiLenderMemoData = null;
+      try { this.aiLenderMemoData = await this.post(`/api/reports/ai-lender-memo/${this.currentProject.id}`, this.lenderMemoForm); }
+      catch(e) { alert(e.message||'Memo generation failed'); }
+      finally { this.aiLenderMemoLoading = false; }
+    },
+    copyLenderMemo() {
+      if (this.aiLenderMemoData?.memo) {
+        navigator.clipboard.writeText(this.aiLenderMemoData.memo).then(() => alert('Memo copied to clipboard!'));
+      }
+    },
+
+    // ── Subcontracts ─────────────────────────────────────────────────
+    async loadSubcontracts() {
+      if (!this.currentProject) return;
+      this.subcontractsLoading = true;
+      try { this.subcontracts = await this.get(`/api/project/${this.currentProject.id}/subcontracts`); } catch(e) { this.subcontracts = []; }
+      finally { this.subcontractsLoading = false; }
+    },
+    async saveSubcontract() {
+      if (!this.currentProject || !this.subcontractForm.vendor_name.trim()) return;
+      const pid = this.currentProject.id;
+      try {
+        if (this.subcontractEditId) await this.put(`/api/project/${pid}/subcontracts/${this.subcontractEditId}`, this.subcontractForm);
+        else await this.post(`/api/project/${pid}/subcontracts`, this.subcontractForm);
+        this.showSubcontractModal = false; this.subcontractEditId = null;
+        await this.loadSubcontracts();
+      } catch(e) { alert(e.message||'Save failed'); }
+    },
+    async deleteSubcontract(id) {
+      if (!confirm('Delete this subcontract?')) return;
+      try { await this.delete(`/api/project/${this.currentProject.id}/subcontracts/${id}`); await this.loadSubcontracts(); } catch(e) {}
+    },
+    async previewSubcontract(sc) {
+      try {
+        const r = await this.get(`/api/project/${this.currentProject.id}/subcontracts/${sc.id}/html`);
+        const blob = new Blob([r.html], {type:'text/html'}); window.open(URL.createObjectURL(blob), '_blank');
+      } catch(e) { alert('Preview failed'); }
+    },
+    copySubcontractLink(url) {
+      if (url) navigator.clipboard.writeText(window.location.origin + url).then(() => alert('Signature link copied!')).catch(() => prompt('Copy link:', window.location.origin + url));
+    },
+
+    // ── Sources & Uses ────────────────────────────────────────────────
+    async loadSourcesUses() {
+      if (!this.currentProject) return;
+      this.sourcesUsesLoading = true;
+      try { this.sourcesUses = await this.get(`/api/project/${this.currentProject.id}/sources-uses`); } catch(e) { this.sourcesUses = null; }
+      finally { this.sourcesUsesLoading = false; }
+    },
+    async saveSUEntry() {
+      if (!this.currentProject || !this.suForm.description.trim()) return;
+      const pid = this.currentProject.id;
+      try {
+        if (this.suEditId) await this.put(`/api/project/${pid}/sources-uses/${this.suEditId}`, this.suForm);
+        else await this.post(`/api/project/${pid}/sources-uses`, this.suForm);
+        this.showSUModal = false; this.suEditId = null;
+        await this.loadSourcesUses();
+      } catch(e) { alert(e.message||'Save failed'); }
+    },
+    async deleteSUEntry(id) {
+      try { await this.delete(`/api/project/${this.currentProject.id}/sources-uses/${id}`); await this.loadSourcesUses(); } catch(e) {}
+    },
+
+    // ── Estimating ────────────────────────────────────────────────────
+    async loadEstimates() {
+      if (!this.currentProject) return;
+      this.estimatesLoading = true;
+      try { this.estimates = await this.get(`/api/project/${this.currentProject.id}/estimates`); } catch(e) { this.estimates = []; }
+      finally { this.estimatesLoading = false; }
+    },
+    async createEstimate() {
+      if (!this.currentProject || !this.estimateForm.name.trim()) return;
+      try {
+        const r = await this.post(`/api/project/${this.currentProject.id}/estimates`, this.estimateForm);
+        this.showEstimateModal = false;
+        await this.loadEstimates();
+        const est = this.estimates.find(e => e.id === r.id);
+        if (est) await this.openEstimate(est);
+      } catch(e) { alert(e.message||'Save failed'); }
+    },
+    async openEstimate(est) {
+      this.activeEstimate = est;
+      try {
+        const data = await this.get(`/api/project/${this.currentProject.id}/estimates/${est.id}/items`);
+        this.estimateItems = data.items; this.estimateDivisions = data.by_division;
+      } catch(e) { this.estimateItems = []; }
+    },
+    async saveEstimateItem() {
+      if (!this.activeEstimate || !this.estItemForm.description.trim()) return;
+      const pid = this.currentProject.id; const eid = this.activeEstimate.id;
+      try {
+        if (this.estItemEditId) await this.put(`/api/project/${pid}/estimates/${eid}/items/${this.estItemEditId}`, this.estItemForm);
+        else await this.post(`/api/project/${pid}/estimates/${eid}/items`, this.estItemForm);
+        this.showEstimateItemModal = false; this.estItemEditId = null;
+        await this.openEstimate(this.activeEstimate);
+        await this.loadEstimates();
+      } catch(e) { alert(e.message||'Save failed'); }
+    },
+    async deleteEstimateItem(id) {
+      try { await this.delete(`/api/project/${this.currentProject.id}/estimates/${this.activeEstimate.id}/items/${id}`); await this.openEstimate(this.activeEstimate); } catch(e) {}
+    },
+    async convertEstimateToBudget() {
+      if (!this.activeEstimate) return;
+      if (!confirm('This will update your project cost categories and total budget from this estimate. Continue?')) return;
+      try {
+        const r = await this.post(`/api/project/${this.currentProject.id}/estimates/${this.activeEstimate.id}/convert-to-budget`, {});
+        alert(`✓ ${r.created_categories} categories created, ${r.updated_categories} updated. Project budget set to $${r.total_budget.toLocaleString('en-CA',{maximumFractionDigits:0})}`);
+        await this.loadProjectDashboard();
+      } catch(e) { alert(e.message||'Conversion failed'); }
+    },
+
+    // ── Canadian Legal ─────────────────────────────────────────────────
+    async loadNNPList() {
+      if (!this.currentProject) return;
+      try { this.nnpList = await this.get(`/api/project/${this.currentProject.id}/non-payment-notices`); } catch(e) { this.nnpList = []; }
+    },
+    async loadSPCerts() {
+      if (!this.currentProject) return;
+      try { this.spCerts = await this.get(`/api/project/${this.currentProject.id}/substantial-performance`); } catch(e) { this.spCerts = []; }
+    },
+    async saveNNP() {
+      if (!this.currentProject) return;
+      const pid = this.currentProject.id;
+      try {
+        if (this.nnpEditId) await this.put(`/api/project/${pid}/non-payment-notices/${this.nnpEditId}`, this.nnpForm);
+        else await this.post(`/api/project/${pid}/non-payment-notices`, this.nnpForm);
+        this.showNNPModal = false; this.nnpEditId = null;
+        await this.loadNNPList();
+      } catch(e) { alert(e.message||'Save failed'); }
+    },
+    async printNNP(id) {
+      try {
+        const r = await fetch(`/api/project/${this.currentProject.id}/non-payment-notices/${id}/html`, { headers: { Authorization: 'Bearer ' + this.token } });
+        const html = await r.text();
+        const w = window.open('', '_blank'); w.document.write(html); w.document.close();
+      } catch(e) { alert('Print failed'); }
+    },
+    async saveSPCert() {
+      if (!this.currentProject) return;
+      const pid = this.currentProject.id;
+      try {
+        if (this.spEditId) await this.put(`/api/project/${pid}/substantial-performance/${this.spEditId}`, this.spForm);
+        else await this.post(`/api/project/${pid}/substantial-performance`, this.spForm);
+        this.showSPModal = false; this.spEditId = null;
+        await this.loadSPCerts();
+      } catch(e) { alert(e.message||'Save failed'); }
+    },
+    async validateProperInvoice() {
+      if (!this.currentProject || !this.invoiceToValidate) return;
+      try {
+        this.invoiceValidationResult = await this.post(`/api/project/${this.currentProject.id}/validate-invoice/${this.invoiceToValidate}`, {});
+      } catch(e) { alert(e.message||'Validation failed'); }
+    },
+
+    // ── Quality Inspections ────────────────────────────────────────────
+    async loadQualityInspections() {
+      if (!this.currentProject) return;
+      this.qualityLoading = true;
+      try { this.qualityInspections = await this.get(`/api/project/${this.currentProject.id}/quality-inspections`); } catch(e) { this.qualityInspections = []; }
+      finally { this.qualityLoading = false; }
+    },
+    async createQualityInspection() {
+      if (!this.currentProject || !this.qiForm.inspection_date) return;
+      try {
+        const r = await this.post(`/api/project/${this.currentProject.id}/quality-inspections`, this.qiForm);
+        this.showQIModal = false;
+        await this.loadQualityInspections();
+        const insp = this.qualityInspections.find(i => i.id === r.id);
+        if (insp) await this.openInspection(insp);
+      } catch(e) { alert(e.message||'Save failed'); }
+    },
+    async openInspection(insp) {
+      this.activeInspection = insp; this.view = 'quality-detail';
+      try {
+        const data = await this.get(`/api/project/${this.currentProject.id}/quality-inspections/${insp.id}/items`);
+        this.inspectionItems = data.items;
+      } catch(e) { this.inspectionItems = []; }
+    },
+    async updateInspectionItem(item, result) {
+      try {
+        const r = await this.put(`/api/project/${this.currentProject.id}/quality-inspections/${this.activeInspection.id}/items/${item.id}`, { result });
+        item.result = result;
+        if (this.activeInspection) {
+          this.activeInspection.pass_count = r.pass_count; this.activeInspection.fail_count = r.fail_count;
+        }
+      } catch(e) {}
+    },
+
+    // ── Visitor Log ────────────────────────────────────────────────────
+    async loadVisitors() {
+      if (!this.currentProject) return;
+      this.visitorsLoading = true;
+      try { this.visitors = await this.get(`/api/project/${this.currentProject.id}/visitors`); } catch(e) { this.visitors = []; }
+      finally { this.visitorsLoading = false; }
+    },
+    async saveVisitor() {
+      if (!this.currentProject || !this.visitorForm.visitor_name.trim()) return;
+      const pid = this.currentProject.id;
+      try {
+        if (this.visitorEditId) await this.put(`/api/project/${pid}/visitors/${this.visitorEditId}`, this.visitorForm);
+        else await this.post(`/api/project/${pid}/visitors`, this.visitorForm);
+        this.showVisitorModal = false; this.visitorEditId = null;
+        await this.loadVisitors();
+      } catch(e) { alert(e.message||'Save failed'); }
+    },
+    async deleteVisitor(id) {
+      try { await this.delete(`/api/project/${this.currentProject.id}/visitors/${id}`); await this.loadVisitors(); } catch(e) {}
     },
 
     // ── Loan Syndication ─────────────────────────────────────────────
