@@ -29,7 +29,7 @@ from ..schemas import (
     ClaimCreate, ClaimUpdate, ClaimOut,
     InvoiceCostUpdate, PayrollEntryCreate, PayrollEntryUpdate, PayrollEntryOut,
 )
-from ..dependencies import get_current_user, get_current_org
+from ..dependencies import get_current_user, get_current_org, FINANCE_WRITE_ROLES
 from typing import Tuple
 from .audit import log as audit_log
 
@@ -58,7 +58,13 @@ def _get_proj(
     return q.order_by(Project.created_at).first()
 
 
-def _req_proj(proj: Optional[Project] = Depends(_get_proj)) -> Project:
+def _req_proj(
+    proj: Optional[Project] = Depends(_get_proj),
+    org_ctx: Tuple = Depends(get_current_org),
+) -> Project:
+    _, mem = org_ctx
+    if mem.role not in FINANCE_WRITE_ROLES:
+        raise HTTPException(status_code=403, detail="Finance write access required")
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
     return proj
@@ -86,7 +92,9 @@ def create_project(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new project. Pass ?project_type= to auto-seed the category structure."""
-    org, _ = org_ctx
+    org, mem = org_ctx
+    if mem.role not in FINANCE_WRITE_ROLES:
+        raise HTTPException(status_code=403, detail="Finance write access required")
     proj = Project(user_id=current_user.id, org_id=org.id, **body.model_dump())
     db.add(proj)
     db.commit()
@@ -112,10 +120,14 @@ def update_project(body: ProjectUpdate, proj: Project = Depends(_req_proj), db: 
 
 
 @router.post("/{project_id}/seed-template")
-def apply_template(project_id: int, body: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def apply_template(project_id: int, body: dict, org_ctx: Tuple = Depends(get_current_org), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Apply a category template to an existing project.
     Only seeds if the project has no categories yet (safe to call on empty projects)."""
-    proj = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
+    _, mem = org_ctx
+    if mem.role not in FINANCE_WRITE_ROLES:
+        raise HTTPException(status_code=403, detail="Finance write access required")
+    from sqlalchemy import or_
+    proj = db.query(Project).filter(Project.id == project_id, or_(Project.org_id == mem.org_id, Project.user_id == current_user.id)).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
     project_type = body.get("project_type", "custom")
@@ -127,8 +139,12 @@ def apply_template(project_id: int, body: dict, db: Session = Depends(get_db), c
 
 
 @router.delete("/{project_id}")
-def delete_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    proj = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
+def delete_project(project_id: int, org_ctx: Tuple = Depends(get_current_org), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _, mem = org_ctx
+    if mem.role not in FINANCE_WRITE_ROLES:
+        raise HTTPException(status_code=403, detail="Finance write access required")
+    from sqlalchemy import or_
+    proj = db.query(Project).filter(Project.id == project_id, or_(Project.org_id == mem.org_id, Project.user_id == current_user.id)).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
     org_id, name = proj.org_id, proj.name
@@ -218,9 +234,8 @@ def delete_cost_category(cat_id: int, proj: Project = Depends(_req_proj), db: Se
 # ─── Cost Sub-Categories ─────────────────────────────────────────────────────
 
 @router.post("/categories/{cat_id}/subcategories", response_model=CostSubCategoryOut)
-def create_cost_subcategory(cat_id: int, body: CostSubCategoryCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    cat = (db.query(CostCategory).join(Project, Project.id == CostCategory.project_id)
-            .filter(CostCategory.id == cat_id, Project.user_id == current_user.id).first())
+def create_cost_subcategory(cat_id: int, body: CostSubCategoryCreate, proj: Project = Depends(_req_proj), db: Session = Depends(get_db)):
+    cat = db.query(CostCategory).filter(CostCategory.id == cat_id, CostCategory.project_id == proj.id).first()
     if not cat:
         raise HTTPException(status_code=404, detail="Cost category not found")
     sc = CostSubCategory(category_id=cat_id, name=body.name, description=body.description, budget=body.budget)
@@ -231,11 +246,10 @@ def create_cost_subcategory(cat_id: int, body: CostSubCategoryCreate, db: Sessio
 
 
 @router.delete("/subcategories/{sc_id}")
-def delete_cost_subcategory(sc_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_cost_subcategory(sc_id: int, proj: Project = Depends(_req_proj), db: Session = Depends(get_db)):
     sc = (db.query(CostSubCategory)
           .join(CostCategory, CostCategory.id == CostSubCategory.category_id)
-          .join(Project, Project.id == CostCategory.project_id)
-          .filter(CostSubCategory.id == sc_id, Project.user_id == current_user.id).first())
+          .filter(CostSubCategory.id == sc_id, CostCategory.project_id == proj.id).first())
     if not sc:
         raise HTTPException(status_code=404)
     db.delete(sc)
@@ -246,12 +260,10 @@ def delete_cost_subcategory(sc_id: int, db: Session = Depends(get_db), current_u
 # ─── Sub-Division Budgets (for Fiber Build etc.) ─────────────────────────────
 
 @router.put("/categories/{cat_id}/subdivision-budgets")
-def set_subdivision_budgets(cat_id: int, budgets: List[SubDivisionBudgetSet], db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    cat = (db.query(CostCategory).join(Project, Project.id == CostCategory.project_id)
-            .filter(CostCategory.id == cat_id, Project.user_id == current_user.id).first())
+def set_subdivision_budgets(cat_id: int, budgets: List[SubDivisionBudgetSet], proj: Project = Depends(_req_proj), db: Session = Depends(get_db)):
+    cat = db.query(CostCategory).filter(CostCategory.id == cat_id, CostCategory.project_id == proj.id).first()
     if not cat:
         raise HTTPException(status_code=404)
-    proj = db.query(Project).filter(Project.id == cat.project_id).first()
     # Upsert budgets — verify each subdivision belongs to this project
     for b in budgets:
         sd = db.query(SubDivision).filter(SubDivision.id == b.subdivision_id, SubDivision.project_id == proj.id).first()
