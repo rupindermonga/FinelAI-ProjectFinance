@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from ..database import SessionLocal
-from ..dependencies import get_current_user, require_org_member, FINANCE_READ_ROLES, call_gemini_api
+from ..dependencies import get_current_user, require_org_member, require_project_access, FINANCE_READ_ROLES, FINANCE_WRITE_ROLES, call_gemini_api
 from ..models import APIKey, Webhook, WebhookDelivery, EFTBatch, EFTBatchPayment, User
 
 router = APIRouter(prefix="/api", tags=["platform"])
@@ -48,18 +48,20 @@ async def doc_qa(project_id: int, body: dict,
     Sources: RFIs, Submittals, Meeting Minutes, Daily Logs, Spec Reviews, Change Orders.
     """
     require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
+    require_project_access(db, project_id, current_user.org_id)
     question = body.get("question", "").strip()
     if not question:
         raise HTTPException(400, "question is required")
 
-    # Gather project context from DB (latest 150 records across key tables)
+    oid = current_user.org_id
+    pid = project_id
     context_parts = []
 
     # RFIs
     rfis = db.execute(text("""
         SELECT rfi_number, subject, description, status, response, due_date
-        FROM pm_rfis WHERE project_id=:pid ORDER BY created_at DESC LIMIT 40
-    """), {"pid": project_id}).fetchall()
+        FROM pm_rfis WHERE project_id=:pid AND org_id=:oid ORDER BY created_at DESC LIMIT 40
+    """), {"pid": pid, "oid": oid}).fetchall()
     if rfis:
         context_parts.append("=== RFIs ===")
         for r in rfis:
@@ -68,8 +70,8 @@ async def doc_qa(project_id: int, body: dict,
     # Submittals
     subs = db.execute(text("""
         SELECT submittal_number, title, spec_section, status, review_notes, submitted_date
-        FROM pm_submittals WHERE project_id=:pid ORDER BY created_at DESC LIMIT 40
-    """), {"pid": project_id}).fetchall()
+        FROM pm_submittals WHERE project_id=:pid AND org_id=:oid ORDER BY created_at DESC LIMIT 40
+    """), {"pid": pid, "oid": oid}).fetchall()
     if subs:
         context_parts.append("=== Submittals ===")
         for s in subs:
@@ -78,8 +80,8 @@ async def doc_qa(project_id: int, body: dict,
     # Meeting Minutes
     meetings = db.execute(text("""
         SELECT title, meeting_date, minutes, action_items
-        FROM pm_meetings WHERE project_id=:pid ORDER BY meeting_date DESC LIMIT 20
-    """), {"pid": project_id}).fetchall()
+        FROM pm_meetings WHERE project_id=:pid AND org_id=:oid ORDER BY meeting_date DESC LIMIT 20
+    """), {"pid": pid, "oid": oid}).fetchall()
     if meetings:
         context_parts.append("=== Meeting Minutes ===")
         for m in meetings:
@@ -88,8 +90,8 @@ async def doc_qa(project_id: int, body: dict,
     # Daily Logs (last 30)
     logs = db.execute(text("""
         SELECT log_date, weather, work_summary, issues, delays
-        FROM pm_daily_logs WHERE project_id=:pid ORDER BY log_date DESC LIMIT 30
-    """), {"pid": project_id}).fetchall()
+        FROM pm_daily_logs WHERE project_id=:pid AND org_id=:oid ORDER BY log_date DESC LIMIT 30
+    """), {"pid": pid, "oid": oid}).fetchall()
     if logs:
         context_parts.append("=== Daily Site Logs ===")
         for l in logs:
@@ -98,8 +100,8 @@ async def doc_qa(project_id: int, body: dict,
     # Change Orders
     cos = db.execute(text("""
         SELECT co_number, description, amount, status, date
-        FROM change_orders WHERE project_id=:pid ORDER BY date DESC LIMIT 30
-    """), {"pid": project_id}).fetchall()
+        FROM change_orders WHERE project_id=:pid AND org_id=:oid ORDER BY date DESC LIMIT 30
+    """), {"pid": pid, "oid": oid}).fetchall()
     if cos:
         context_parts.append("=== Change Orders ===")
         for c in cos:
@@ -108,8 +110,8 @@ async def doc_qa(project_id: int, body: dict,
     # Spec Reviews (summaries)
     spec_reviews = db.execute(text("""
         SELECT filename, summary, total_issues, created_at
-        FROM spec_reviews WHERE project_id=:pid ORDER BY created_at DESC LIMIT 5
-    """), {"pid": project_id}).fetchall()
+        FROM spec_reviews WHERE project_id=:pid AND org_id=:oid ORDER BY created_at DESC LIMIT 5
+    """), {"pid": pid, "oid": oid}).fetchall()
     if spec_reviews:
         context_parts.append("=== Spec Reviews ===")
         for s in spec_reviews:
@@ -169,7 +171,7 @@ def list_eft_batches(db: Session = Depends(get_db),
 @router.post("/eft-batches")
 def create_eft_batch(body: dict, db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_WRITE_ROLES)
     payments_data = body.pop("payments", [])
     batch = EFTBatch(
         org_id=current_user.org_id, created_by=current_user.id,
@@ -225,7 +227,7 @@ def delete_eft_batch(batch_id: int, db: Session = Depends(get_db),
 def add_eft_payment(batch_id: int, body: dict,
                     db: Session = Depends(get_db),
                     current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_WRITE_ROLES)
     batch = db.query(EFTBatch).filter(EFTBatch.id == batch_id,
                                       EFTBatch.org_id == current_user.org_id).first()
     if not batch or batch.status != "draft":
@@ -294,7 +296,10 @@ def download_eft_file(batch_id: int, db: Session = Depends(get_db),
     )
 
     content = "\r\n".join(lines) + "\r\n"
-    filename = f"EFT_Batch_{batch.batch_number}_{batch.value_date}.txt"
+    import re as _re
+    safe_num = _re.sub(r'[^\w\-]', '_', str(batch.batch_number or ""))
+    safe_date = _re.sub(r'[^\w\-]', '_', str(batch.value_date or ""))
+    filename = f"EFT_Batch_{safe_num}_{safe_date}.txt"
 
     # Mark batch as generated
     batch.status = "generated"
@@ -303,7 +308,7 @@ def download_eft_file(batch_id: int, db: Session = Depends(get_db),
     return StreamingResponse(
         io.BytesIO(content.encode("ascii")),
         media_type="text/plain",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""}
     )
 
 
@@ -386,6 +391,41 @@ def toggle_api_key(key_id: int, db: Session = Depends(get_db),
 
 # ─── Webhooks ─────────────────────────────────────────────────────────────────
 
+import ipaddress
+import urllib.parse as _urlparse
+
+_PRIVATE_NETS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+]
+
+
+def _validate_webhook_url(url: str) -> None:
+    """Raise 400 if the URL is unsafe (non-HTTPS, localhost, private IP ranges)."""
+    if not url.startswith("https://"):
+        raise HTTPException(400, "Webhook URL must use HTTPS")
+    try:
+        parsed = _urlparse.urlparse(url)
+        hostname = parsed.hostname or ""
+        if hostname.lower() in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+            raise HTTPException(400, "Webhook URL must point to a public host")
+        try:
+            addr = ipaddress.ip_address(hostname)
+            if any(addr in net for net in _PRIVATE_NETS):
+                raise HTTPException(400, "Webhook URL must point to a public host")
+        except ValueError:
+            pass  # hostname is a domain name, not an IP — OK
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "Invalid webhook URL")
+
+
 SUPPORTED_EVENTS = [
     "invoice.created", "invoice.approved", "invoice.paid",
     "draw.submitted", "draw.approved", "draw.funded",
@@ -421,8 +461,7 @@ def create_webhook(body: dict, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
     require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     url = body.get("url", "")
-    if not url.startswith("https://"):
-        raise HTTPException(400, "Webhook URL must use HTTPS")
+    _validate_webhook_url(url)
     signing_secret = secrets.token_hex(32)
     wh = Webhook(
         org_id=current_user.org_id,
@@ -454,6 +493,8 @@ def update_webhook(webhook_id: int, body: dict,
                                   Webhook.org_id == current_user.org_id).first()
     if not wh:
         raise HTTPException(404)
+    if "url" in body:
+        _validate_webhook_url(body["url"])
     for k in ("name", "url", "events", "is_active"):
         if k in body:
             setattr(wh, k, body[k])

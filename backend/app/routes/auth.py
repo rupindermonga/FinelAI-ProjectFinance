@@ -232,7 +232,8 @@ def reset_password(body: dict, db: Session = Depends(get_db)):
 # ── Self-serve Signup ─────────────────────────────────────────────────────────
 
 @router.post("/signup", response_model=Token)
-def signup(body: dict, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def signup(body: dict, background_tasks: BackgroundTasks, request: Request = None, db: Session = Depends(get_db)):
+    _check_register_rate(request)
     """Create a new organisation + owner account in one step."""
     from ..seed_org import ensure_user_org
     username = (body.get("username") or "").strip()
@@ -294,7 +295,8 @@ def get_invite_info(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/accept-invite", response_model=Token)
-def accept_invite(body: dict, db: Session = Depends(get_db)):
+def accept_invite(body: dict, request: Request = None, db: Session = Depends(get_db)):
+    _check_register_rate(request)
     """Accept an email invitation — creates account if needed, adds to org."""
     token_str = (body.get("token") or "").strip()
     username  = (body.get("username") or "").strip()
