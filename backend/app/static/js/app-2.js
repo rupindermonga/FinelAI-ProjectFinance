@@ -915,6 +915,29 @@ function app() {
       if (path === 'signup') { this.view = 'signup'; return; }
       if (path === 'accept-invite') { this.inviteToken = new URLSearchParams(window.location.search).get('token') || ''; this.view = 'accept-invite'; return; }
 
+      // Set initial landing history state so the browser back button works
+      // from within the app back to the marketing page
+      history.replaceState({ view: 'landing' }, '', window.location.href);
+
+      // Browser back/forward: restore view from history state
+      window.addEventListener('popstate', (e) => {
+        const target = e.state?.view;
+        if (target === 'landing' || !target) {
+          // If coming back from app to landing, clear demo sessions but keep real sessions
+          if (this.user?.is_demo) {
+            this.token = null; this.user = null;
+            localStorage.removeItem('invoice_token');
+            localStorage.removeItem('invoice_user');
+            localStorage.removeItem('currentOrgId');
+          }
+          this.view = 'landing';
+        } else if (target === 'app' && this.token) {
+          this.view = 'dashboard';
+        } else if (target === 'login') {
+          this.view = 'login';
+        }
+      });
+
       const saved = localStorage.getItem('invoice_token');
       const savedUser = localStorage.getItem('invoice_user');
       if (saved && savedUser) {
@@ -927,6 +950,8 @@ function app() {
           this.currentOrg = (savedOrgId && this.orgs.find(o => o.id === savedOrgId)) || this.orgs[0] || null;
         } catch(e) { this.orgs = []; }
         this.view = 'dashboard';
+        // Push app state so back button returns to landing
+        history.pushState({ view: 'app' }, '', '/');
         await this.loadProjects();
         await Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions(), this.loadPayroll(), this.loadUsers()]);
         if (this.user?.is_admin) await this.loadApiKeys();
@@ -974,6 +999,8 @@ function app() {
       localStorage.setItem('invoice_user', JSON.stringify(this.user));
       if (this.currentOrg) localStorage.setItem('currentOrgId', this.currentOrg.id);
       this.view = 'dashboard';
+      // Push app state so browser back button returns to marketing page
+      history.pushState({ view: 'app' }, '', '/');
       this.loadProjects().then(() => {
         Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions(), this.loadPayroll(), this.loadUsers()])
           .then(() => { if (this.user?.is_admin) this.loadApiKeys(); });
@@ -1001,6 +1028,7 @@ function app() {
       localStorage.removeItem('currentOrgId');
       if (this.sseSource) this.sseSource.close();
       this.view = 'landing';
+      history.replaceState({ view: 'landing' }, '', '/');
     },
 
     // ── Org management ────────────────────────────────────────────
