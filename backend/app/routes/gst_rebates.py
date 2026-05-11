@@ -255,5 +255,3 @@ def delete_gst_rebate(project_id: int, rebate_id: int,
     db.delete(rebate)
     db.commit()
     return {"msg": "deleted"}
-
-require_project_access(db, project_id, current_user.org_id)

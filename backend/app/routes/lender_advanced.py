@@ -462,5 +462,3 @@ def delete_loan_closing_item(project_id: int, item_id: int,
     db.delete(item)
     db.commit()
     return {"msg": "deleted"}
-
-require_project_access(db, project_id, current_user.org_id)

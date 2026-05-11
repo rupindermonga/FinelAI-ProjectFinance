@@ -582,5 +582,3 @@ def portfolio_stress_dashboard(db: Session = Depends(get_db),
             "rag": "red" if remaining < 0 else "amber" if remaining < remaining * 0.15 else "green",
         })
     return {"projects": results, "total_reserve_remaining": sum(r["reserve_remaining"] for r in results)}
-
-require_project_access(db, project_id, current_user.org_id)

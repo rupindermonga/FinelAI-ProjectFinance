@@ -189,5 +189,3 @@ def delete_adj_document(project_id: int, case_id: int, doc_id: int,
 def get_province_rules():
     """Return all province adjudication rules (no auth needed — public reference)."""
     return PROVINCE_RULES
-
-require_project_access(db, project_id, current_user.org_id)
