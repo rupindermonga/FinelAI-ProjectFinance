@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import SessionLocal
-from ..dependencies import get_current_user, require_org_member, require_project_access
+from ..dependencies import get_current_user, require_org_member, require_project_access, FINANCE_READ_ROLES
 from ..models import GSTRebateApplication, User
 
 router = APIRouter(prefix="/api", tags=["gst-rebates"])
@@ -175,7 +175,7 @@ def calculate_rebate(body: dict):
 @router.get("/project/{project_id}/gst-rebates")
 def list_gst_rebates(project_id: int, db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     rows = (db.query(GSTRebateApplication)
             .filter(GSTRebateApplication.project_id == project_id,
@@ -188,7 +188,7 @@ def list_gst_rebates(project_id: int, db: Session = Depends(get_db),
 def create_gst_rebate(project_id: int, body: dict,
                       db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     # Auto-compute estimated_rebate
     calc = _calculate_rebate(
@@ -217,7 +217,7 @@ def create_gst_rebate(project_id: int, body: dict,
 def update_gst_rebate(project_id: int, rebate_id: int, body: dict,
                       db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     rebate = db.query(GSTRebateApplication).filter(
         GSTRebateApplication.id == rebate_id,
@@ -244,7 +244,7 @@ def update_gst_rebate(project_id: int, rebate_id: int, body: dict,
 def delete_gst_rebate(project_id: int, rebate_id: int,
                       db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     rebate = db.query(GSTRebateApplication).filter(
         GSTRebateApplication.id == rebate_id,

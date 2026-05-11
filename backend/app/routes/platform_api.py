@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from ..database import SessionLocal
-from ..dependencies import get_current_user, require_org_member
+from ..dependencies import get_current_user, require_org_member, FINANCE_READ_ROLES
 from ..models import APIKey, Webhook, WebhookDelivery, EFTBatch, EFTBatchPayment, User
 
 router = APIRouter(prefix="/api", tags=["platform"])
@@ -47,7 +47,7 @@ async def doc_qa(project_id: int, body: dict,
     Answer questions about a project using Gemini, grounded in actual project data.
     Sources: RFIs, Submittals, Meeting Minutes, Daily Logs, Spec Reviews, Change Orders.
     """
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     question = body.get("question", "").strip()
     if not question:
         raise HTTPException(400, "question is required")
@@ -165,7 +165,7 @@ Provide a clear, direct answer with specific references to the source documents.
 @router.get("/eft-batches")
 def list_eft_batches(db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     rows = (db.query(EFTBatch)
             .filter(EFTBatch.org_id == current_user.org_id)
             .order_by(EFTBatch.created_at.desc())
@@ -176,7 +176,7 @@ def list_eft_batches(db: Session = Depends(get_db),
 @router.post("/eft-batches")
 def create_eft_batch(body: dict, db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     payments_data = body.pop("payments", [])
     batch = EFTBatch(
         org_id=current_user.org_id, created_by=current_user.id,
@@ -203,7 +203,7 @@ def create_eft_batch(body: dict, db: Session = Depends(get_db),
 @router.get("/eft-batches/{batch_id}")
 def get_eft_batch(batch_id: int, db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     batch = db.query(EFTBatch).filter(EFTBatch.id == batch_id,
                                       EFTBatch.org_id == current_user.org_id).first()
     if not batch:
@@ -216,7 +216,7 @@ def get_eft_batch(batch_id: int, db: Session = Depends(get_db),
 @router.delete("/eft-batches/{batch_id}")
 def delete_eft_batch(batch_id: int, db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     batch = db.query(EFTBatch).filter(EFTBatch.id == batch_id,
                                       EFTBatch.org_id == current_user.org_id).first()
     if not batch:
@@ -232,7 +232,7 @@ def delete_eft_batch(batch_id: int, db: Session = Depends(get_db),
 def add_eft_payment(batch_id: int, body: dict,
                     db: Session = Depends(get_db),
                     current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     batch = db.query(EFTBatch).filter(EFTBatch.id == batch_id,
                                       EFTBatch.org_id == current_user.org_id).first()
     if not batch or batch.status != "draft":
@@ -252,7 +252,7 @@ def add_eft_payment(batch_id: int, body: dict,
 def download_eft_file(batch_id: int, db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)):
     """Generate CPA Standard 005 (1464-byte fixed-width EFT) file."""
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     batch = db.query(EFTBatch).filter(EFTBatch.id == batch_id,
                                       EFTBatch.org_id == current_user.org_id).first()
     if not batch:
@@ -319,7 +319,7 @@ def download_eft_file(batch_id: int, db: Session = Depends(get_db),
 @router.get("/api-keys")
 def list_api_keys(db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     rows = (db.query(APIKey)
             .filter(APIKey.org_id == current_user.org_id)
             .order_by(APIKey.created_at.desc()).all())
@@ -337,7 +337,7 @@ def list_api_keys(db: Session = Depends(get_db),
 @router.post("/api-keys")
 def create_api_key(body: dict, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     raw_key = "fai_" + secrets.token_urlsafe(32)
     prefix = raw_key[:12]
     from passlib.context import CryptContext
@@ -368,7 +368,7 @@ def create_api_key(body: dict, db: Session = Depends(get_db),
 @router.delete("/api-keys/{key_id}")
 def delete_api_key(key_id: int, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     key = db.query(APIKey).filter(APIKey.id == key_id,
                                   APIKey.org_id == current_user.org_id).first()
     if not key:
@@ -381,7 +381,7 @@ def delete_api_key(key_id: int, db: Session = Depends(get_db),
 @router.put("/api-keys/{key_id}/toggle")
 def toggle_api_key(key_id: int, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     key = db.query(APIKey).filter(APIKey.id == key_id,
                                   APIKey.org_id == current_user.org_id).first()
     if not key:
@@ -407,7 +407,7 @@ SUPPORTED_EVENTS = [
 @router.get("/webhooks")
 def list_webhooks(db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     rows = (db.query(Webhook)
             .filter(Webhook.org_id == current_user.org_id)
             .order_by(Webhook.created_at.desc()).all())
@@ -426,7 +426,7 @@ def list_webhooks(db: Session = Depends(get_db),
 @router.post("/webhooks")
 def create_webhook(body: dict, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     url = body.get("url", "")
     if not url.startswith("https://"):
         raise HTTPException(400, "Webhook URL must use HTTPS")
@@ -456,7 +456,7 @@ def create_webhook(body: dict, db: Session = Depends(get_db),
 def update_webhook(webhook_id: int, body: dict,
                    db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     wh = db.query(Webhook).filter(Webhook.id == webhook_id,
                                   Webhook.org_id == current_user.org_id).first()
     if not wh:
@@ -471,7 +471,7 @@ def update_webhook(webhook_id: int, body: dict,
 @router.delete("/webhooks/{webhook_id}")
 def delete_webhook(webhook_id: int, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     wh = db.query(Webhook).filter(Webhook.id == webhook_id,
                                   Webhook.org_id == current_user.org_id).first()
     if not wh:
@@ -484,7 +484,7 @@ def delete_webhook(webhook_id: int, db: Session = Depends(get_db),
 @router.get("/webhooks/{webhook_id}/deliveries")
 def list_webhook_deliveries(webhook_id: int, db: Session = Depends(get_db),
                             current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     rows = (db.query(WebhookDelivery)
             .filter(WebhookDelivery.webhook_id == webhook_id,
                     WebhookDelivery.org_id == current_user.org_id)
@@ -497,7 +497,7 @@ def list_webhook_deliveries(webhook_id: int, db: Session = Depends(get_db),
 async def test_webhook(webhook_id: int, db: Session = Depends(get_db),
                        current_user: User = Depends(get_current_user)):
     """Send a test ping to the webhook endpoint."""
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     wh = db.query(Webhook).filter(Webhook.id == webhook_id,
                                   Webhook.org_id == current_user.org_id).first()
     if not wh:

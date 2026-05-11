@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from ..database import SessionLocal
-from ..dependencies import get_current_user, require_org_member, require_project_access
+from ..dependencies import get_current_user, require_org_member, require_project_access, FINANCE_READ_ROLES
 from ..models import User
 
 router = APIRouter(prefix="/api", tags=["phase11"])
@@ -45,7 +45,7 @@ def export_qb_iif(project_id: int, db: Session = Depends(get_db),
     Export invoices as QuickBooks Desktop IIF (Intuit Interchange Format).
     Imports directly via QB Desktop → File → Utilities → Import → IIF Files.
     """
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     invoices = db.execute(text("""
         SELECT i.invoice_number, i.vendor_name, i.invoice_date, i.total,
@@ -115,7 +115,7 @@ def export_sage50(project_id: int, db: Session = Depends(get_db),
     Export invoices in Sage 50 Canada Purchase Journal import CSV format.
     Import via Sage 50 → File → Import/Export → Import Transactions.
     """
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     invoices = db.execute(text("""
         SELECT i.invoice_number, i.vendor_name, i.invoice_date, i.total,
@@ -267,7 +267,7 @@ async def parse_bank_statement(
     current_user: User = Depends(get_current_user),
 ):
     """Upload a bank CSV statement; detect format, parse transactions, return for review."""
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     content_bytes = await file.read()
     try:
         content = content_bytes.decode("utf-8-sig", errors="replace")
@@ -290,7 +290,7 @@ async def match_bank_to_invoices(body: dict,
     Match parsed bank transactions to unpaid AP invoices by amount and fuzzy vendor name.
     Returns suggested matches for user review.
     """
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     transactions = body.get("transactions", [])
     project_id = body.get("project_id")
 
@@ -357,7 +357,7 @@ async def ai_co_narrative(project_id: int, co_id: int, body: dict,
     Input: delay_event, impact_description, time_days, cost_amount.
     Output: formal CO letter suitable for owner/lender submission.
     """
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
@@ -480,7 +480,7 @@ def run_stress_test(project_id: int, body: dict,
     Run interest reserve burn scenarios and rate sensitivity analysis.
     Scenarios: base case, rate +100bps, rate +200bps, schedule +3mo, schedule +6mo.
     """
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
 
     # Get interest reserve data
@@ -563,7 +563,7 @@ def run_stress_test(project_id: int, body: dict,
 def portfolio_stress_dashboard(db: Session = Depends(get_db),
                                 current_user: User = Depends(get_current_user)):
     """Cross-portfolio interest reserve stress summary."""
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     reserves = db.execute(text("""
         SELECT ir.project_id, p.name, ir.reserve_amount, ir.drawn_to_date, ir.interest_rate
         FROM interest_reserves ir

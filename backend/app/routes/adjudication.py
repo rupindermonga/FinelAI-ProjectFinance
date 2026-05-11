@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import SessionLocal
-from ..dependencies import get_current_user, require_org_member, require_project_access
+from ..dependencies import get_current_user, require_org_member, require_project_access, FINANCE_READ_ROLES
 from ..models import AdjudicationCase, AdjudicationDocument, User
 
 router = APIRouter(prefix="/api", tags=["adjudication"])
@@ -45,7 +45,7 @@ def get_db():
 @router.get("/project/{project_id}/adjudications")
 def list_adjudications(project_id: int, db: Session = Depends(get_db),
                        current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     rows = (db.query(AdjudicationCase)
             .filter(AdjudicationCase.project_id == project_id,
@@ -63,7 +63,7 @@ def list_adjudications(project_id: int, db: Session = Depends(get_db),
 def create_adjudication(project_id: int, body: dict,
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     province = body.get("province", "ON")
     rules = PROVINCE_RULES.get(province, PROVINCE_RULES["ON"])
@@ -96,7 +96,7 @@ def create_adjudication(project_id: int, body: dict,
 def update_adjudication(project_id: int, case_id: int, body: dict,
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     case = db.query(AdjudicationCase).filter(
         AdjudicationCase.id == case_id,
@@ -124,7 +124,7 @@ def update_adjudication(project_id: int, case_id: int, body: dict,
 def delete_adjudication(project_id: int, case_id: int,
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     case = db.query(AdjudicationCase).filter(
         AdjudicationCase.id == case_id,
@@ -143,7 +143,7 @@ def delete_adjudication(project_id: int, case_id: int,
 def list_adj_documents(project_id: int, case_id: int,
                        db: Session = Depends(get_db),
                        current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     rows = (db.query(AdjudicationDocument)
             .filter(AdjudicationDocument.case_id == case_id,
@@ -156,7 +156,7 @@ def list_adj_documents(project_id: int, case_id: int,
 def create_adj_document(project_id: int, case_id: int, body: dict,
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     doc = AdjudicationDocument(
         case_id=case_id, org_id=current_user.org_id,
@@ -172,7 +172,7 @@ def create_adj_document(project_id: int, case_id: int, body: dict,
 def delete_adj_document(project_id: int, case_id: int, doc_id: int,
                         db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user)):
-    require_org_member(db, current_user.org_id, current_user.id)
+    require_org_member(db, current_user.org_id, current_user.id, FINANCE_READ_ROLES)
     require_project_access(db, project_id, current_user.org_id)
     doc = db.query(AdjudicationDocument).filter(
         AdjudicationDocument.id == doc_id,
