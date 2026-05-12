@@ -1440,9 +1440,12 @@ function app() {
         if (this.view && !['landing','login','forgot-password','reset-password','signup','accept-invite'].includes(this.view)) {
           history.replaceState({}, '', '/' + this.view);
         }
-        // Auto-poll while invoices are still processing
         if ((this.stats.pending || 0) > 0) {
+          // Active processing — poll fast
           setTimeout(() => { this.loadStats(); this.loadInvoices(); }, 4000);
+        } else {
+          // Idle — refresh every 30s so newly uploaded invoices appear automatically
+          setTimeout(() => { this.loadStats(); this.loadInvoices(); }, 30000);
         }
       } catch (e) {}
     },
