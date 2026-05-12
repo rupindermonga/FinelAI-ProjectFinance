@@ -987,10 +987,29 @@ function app() {
           this.view = 'login';
           return;
         }
-        this.view = 'dashboard';
+        // Restore view from URL path if valid
+        const urlView = window.location.pathname.replace(/^\//, '').replace(/\//g, '-') || 'dashboard';
+        const ROUTABLE = new Set(['dashboard','invoices','finance','columns','categories','budget-vs-actual',
+          'holdback','approvals','cashflow','finance-summary','draws','claims','lender','lender-risk',
+          'compliance','pm-tasks','pm-daily-logs','pm-rfis','pm-punch','pm-submittals','pm-meetings',
+          'pm-photos','construction-health','permits','safety','labour','bid-packages','co-approval',
+          'selections','equipment','notifications','lien-release','spec-review','prequalification',
+          'client-hub','syndicate','erp-integrations','cfo-reports','subcontractors','canadian-legal',
+          'quality','crm','assemblies','advanced-reports','lender-advanced','adjudication','gst-rebates',
+          'platform-api','eft-batches','api-keys','webhooks','bank-feed','bank-import','fx-rates',
+          'stress-test','execution-forecast','audit-log','org','vendor-directory','superadmin']);
+        this.view = ROUTABLE.has(urlView) ? urlView : 'dashboard';
+        history.replaceState({}, '', '/' + this.view);
+
         await this.loadProjects();
         await Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions(), this.loadPayroll(), this.loadUsers()]);
         if (this.user?.is_admin) await this.loadApiKeys();
+
+        // Auto-resume polling if invoices are stuck in pending after server restart
+        if ((this.stats.pending || 0) > 0) {
+          this.retryingInvoices = true;
+          this._startProcessingPoll();
+        }
       }
       // Otherwise: stay on landing page (view defaults to 'landing')
     },
@@ -1407,9 +1426,20 @@ function app() {
       } catch (e) { console.error(e); }
     },
 
+    // ── URL routing — call go(view) from sidebar buttons ─────────────
+    go(viewName, fn) {
+      this.view = viewName;
+      history.pushState({}, '', '/' + viewName);
+      if (fn) fn();
+    },
+
     async loadStats() {
       try {
         this.stats = await this.get('/api/invoices/stats');
+        // Sync URL with current view on every stats load
+        if (this.view && !['landing','login','forgot-password','reset-password','signup','accept-invite'].includes(this.view)) {
+          history.replaceState({}, '', '/' + this.view);
+        }
         // Auto-poll while invoices are still processing
         if ((this.stats.pending || 0) > 0) {
           setTimeout(() => { this.loadStats(); this.loadInvoices(); }, 4000);

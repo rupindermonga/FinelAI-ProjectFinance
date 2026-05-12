@@ -883,7 +883,7 @@
         <div class="text-sm font-semibold truncate leading-tight" x-text="currentProject?.name || 'Finel Finance'"></div>
         <div class="text-xs text-slate-400 capitalize truncate leading-tight" x-text="view === 'ai' ? 'AI Insights' : view"></div>
       </div>
-      <button @click="view='approvals'; loadProjectDashboard(); sidebarOpen=false" class="btn-icon-xs relative p-2.5 rounded-lg hover:bg-slate-700 transition">
+      <button @click="go('approvals', ()=>{ loadProjectDashboard() }); sidebarOpen=false" class="btn-icon-xs relative p-2.5 rounded-lg hover:bg-slate-700 transition">
         <i class="fa-solid fa-clipboard-check text-base"></i>
         <span x-show="(projectDash?.approval?.pending||0)>0" class="absolute top-1 right-1 w-3.5 h-3.5 bg-amber-400 text-amber-900 text-xs rounded-full flex items-center justify-center font-bold leading-none" x-text="projectDash.approval.pending"></span>
       </button>
@@ -987,7 +987,7 @@
       <nav class="flex-1 py-3 px-3 overflow-y-auto space-y-0.5">
 
         <!-- ── OVERVIEW ─────────────────────────── -->
-        <button @click="view='dashboard'; sidebarOpen=false" :class="view==='dashboard' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+        <button @click="go('dashboard', ()=>{ sidebarOpen=false" :class="view==='dashboard' ? 'bg-blue-700' : 'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
           <i class="fa-solid fa-table-columns w-4"></i> Dashboard
         </button>
 
@@ -998,7 +998,7 @@
           <!-- Vendor Finance: only sees their invoices -->
           <template x-if="isVendorFinance">
             <div class="space-y-0.5">
-              <button @click="view='invoices'; sidebarOpen=false" :class="view==='invoices'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="view='invoices' }); sidebarOpen=false" :class="view==='invoices'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-file-invoice w-4"></i> My Invoices
               </button>
             </div>
@@ -1007,135 +1007,135 @@
           <!-- Full finance access -->
           <template x-if="!isVendorFinance && canAccessFinance">
             <div class="space-y-0.5">
-              <button @click="view='columns'; sidebarOpen=false" :class="view==='columns'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('columns'); sidebarOpen=false" :class="view==='columns'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-sliders w-4"></i> Columns
               </button>
-              <button @click="view='categories'; loadCategories(); sidebarOpen=false" :class="view==='categories'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('categories', ()=>{ loadCategories() }); sidebarOpen=false" :class="view==='categories'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-tags w-4"></i> Categories
               </button>
-              <button @click="view='budget'; loadProjectDashboard(); sidebarOpen=false" :class="view==='budget'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('budget', ()=>{ loadProjectDashboard() }); sidebarOpen=false" :class="view==='budget'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-scale-balanced w-4"></i> Budget vs Actual
               </button>
-              <button @click="view='holdback'; loadProjectDashboard(); sidebarOpen=false" :class="view==='holdback'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('holdback', ()=>{ loadProjectDashboard() }); sidebarOpen=false" :class="view==='holdback'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-hand-holding-dollar w-4"></i> Holdback
                 <span x-show="(projectDash?.holdback?.unreleased_count||0)>0" class="ml-auto text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold" x-text="projectDash.holdback.unreleased_count"></span>
               </button>
-              <button @click="view='approvals'; loadProjectDashboard(); sidebarOpen=false" :class="view==='approvals'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('approvals', ()=>{ loadProjectDashboard() }); sidebarOpen=false" :class="view==='approvals'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-clipboard-check w-4"></i> Approvals
                 <span x-show="(projectDash?.approval?.pending||0)>0" class="ml-auto text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold" x-text="projectDash.approval.pending"></span>
               </button>
-              <button @click="view='cashflow'; loadCashFlow(); sidebarOpen=false" :class="view==='cashflow'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('cashflow', ()=>{ loadCashFlow() }); sidebarOpen=false" :class="view==='cashflow'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-arrow-trend-up w-4"></i> Cash Flow
               </button>
-              <button @click="view='finance'; loadProjectDashboard(); sidebarOpen=false" :class="view==='finance'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('finance', ()=>{ loadProjectDashboard() }); sidebarOpen=false" :class="view==='finance'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-chart-pie w-4"></i> Finance Summary
               </button>
-              <button @click="view='cost-to-complete'; loadCostToComplete(); sidebarOpen=false" :class="view==='cost-to-complete'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('cost-to-complete', ()=>{ loadCostToComplete() }); sidebarOpen=false" :class="view==='cost-to-complete'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-chart-line w-4"></i> Cost to Complete
               </button>
-              <button @click="view='pay-readiness'; loadPayReadiness(); sidebarOpen=false" :class="view==='pay-readiness'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('pay-readiness', ()=>{ loadPayReadiness() }); sidebarOpen=false" :class="view==='pay-readiness'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-circle-check w-4"></i> Pay Readiness
               </button>
-              <button @click="view='contract-matching'; loadContractMatching(); sidebarOpen=false" :class="view==='contract-matching'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('contract-matching', ()=>{ loadContractMatching() }); sidebarOpen=false" :class="view==='contract-matching'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-link w-4"></i> Contract Matching
               </button>
-              <button @click="view='agedpayables'; loadAgedPayables(); sidebarOpen=false" :class="view==='agedpayables'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('agedpayables', ()=>{ loadAgedPayables() }); sidebarOpen=false" :class="view==='agedpayables'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-clock-rotate-left w-4"></i> Aged Payables
               </button>
-              <button @click="view='lienwaivers'; loadLienWaivers(); sidebarOpen=false" :class="view==='lienwaivers'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('lienwaivers', ()=>{ loadLienWaivers() }); sidebarOpen=false" :class="view==='lienwaivers'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-file-signature w-4"></i> Lien Waivers
               </button>
               <button @click="view='lenderlinks'; loadLenderTokens(); loadOwnerTokens(); sidebarOpen=false" :class="view==='lenderlinks'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-share-nodes w-4"></i> Lender &amp; Owner Links
               </button>
-              <button @click="view='wip-report'; loadWIPReport(); sidebarOpen=false" :class="view==='wip-report'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('wip-report', ()=>{ loadWIPReport() }); sidebarOpen=false" :class="view==='wip-report'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-chart-gantt w-4"></i> WIP Report
               </button>
-              <button @click="view='covenants'; loadCovenants(); sidebarOpen=false" :class="view==='covenants'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('covenants', ()=>{ loadCovenants() }); sidebarOpen=false" :class="view==='covenants'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-shield-halved w-4"></i>
                 <span class="flex-1 text-left">Covenants</span>
                 <span x-show="(covenantsData||[]).filter(c=>c.status==='breach').length>0" x-text="(covenantsData||[]).filter(c=>c.status==='breach').length" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
               </button>
-              <button @click="view='interest-reserve'; loadInterestReserve(); sidebarOpen=false" :class="view==='interest-reserve'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('interest-reserve', ()=>{ loadInterestReserve() }); sidebarOpen=false" :class="view==='interest-reserve'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-piggy-bank w-4"></i> Interest Reserve
               </button>
-              <button @click="view='bonds'; loadBonds(); sidebarOpen=false" :class="view==='bonds'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('bonds', ()=>{ loadBonds() }); sidebarOpen=false" :class="view==='bonds'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-file-contract w-4"></i> Bonds
               </button>
-              <button @click="view='filetools'; sidebarOpen=false" :class="view==='filetools'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('filetools'); sidebarOpen=false" :class="view==='filetools'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-folder-open w-4"></i> File Tools
               </button>
-              <button @click="view='bid-packages'; loadBidPackages(); sidebarOpen=false" :class="view==='bid-packages'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('bid-packages', ()=>{ loadBidPackages() }); sidebarOpen=false" :class="view==='bid-packages'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-gavel w-4"></i> Bid Management
               </button>
-              <button @click="view='cash-flow-scurve'; loadScurve(); sidebarOpen=false" :class="view==='cash-flow-scurve'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('cash-flow-scurve', ()=>{ loadScurve() }); sidebarOpen=false" :class="view==='cash-flow-scurve'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-wave-square w-4"></i> Cash Flow S-Curve
               </button>
-              <button @click="view='syndicate'; loadSyndicates(); sidebarOpen=false" :class="view==='syndicate'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('syndicate', ()=>{ loadSyndicates() }); sidebarOpen=false" :class="view==='syndicate'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-building-columns w-4"></i> Loan Syndication
               </button>
-              <button @click="view='sources-uses'; loadSourcesUses(); sidebarOpen=false" :class="view==='sources-uses'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('sources-uses', ()=>{ loadSourcesUses() }); sidebarOpen=false" :class="view==='sources-uses'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-scale-unbalanced w-4"></i> Sources &amp; Uses
               </button>
-              <button @click="view='subcontracts'; loadSubcontracts(); sidebarOpen=false" :class="view==='subcontracts'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('subcontracts', ()=>{ loadSubcontracts() }); sidebarOpen=false" :class="view==='subcontracts'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-file-signature w-4"></i> Subcontracts
               </button>
-              <button @click="view='estimating'; loadEstimates(); sidebarOpen=false" :class="view==='estimating'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('estimating', ()=>{ loadEstimates() }); sidebarOpen=false" :class="view==='estimating'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-calculator w-4"></i> Estimating
               </button>
-              <button @click="view='cfo-reports'; sidebarOpen=false" :class="view==='cfo-reports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('cfo-reports'); sidebarOpen=false" :class="view==='cfo-reports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-chart-line w-4"></i> CFO Reports
               </button>
-              <button @click="view='prequal'; loadPrequals(); sidebarOpen=false" :class="view==='prequal'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('prequal', ()=>{ loadPrequals() }); sidebarOpen=false" :class="view==='prequal'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-user-check w-4"></i>
                 <span class="flex-1 text-left">Sub Prequalification</span>
                 <span x-show="prequals.filter(p=>p.status==='submitted').length>0" x-text="prequals.filter(p=>p.status==='submitted').length" class="text-xs bg-blue-400 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
               </button>
-              <button @click="view='crm'; loadCRMLeads(); sidebarOpen=false" :class="view==='crm'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('crm', ()=>{ loadCRMLeads() }); sidebarOpen=false" :class="view==='crm'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-funnel w-4"></i>
                 <span class="flex-1 text-left">CRM Pipeline</span>
               </button>
-              <button @click="view='proposals'; loadAllProposals(); sidebarOpen=false" :class="view==='proposals'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('proposals', ()=>{ loadAllProposals() }); sidebarOpen=false" :class="view==='proposals'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-envelope-open-text w-4"></i> Proposals
               </button>
-              <button @click="view='assemblies'; loadAssemblies(); sidebarOpen=false" :class="view==='assemblies'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('assemblies', ()=>{ loadAssemblies() }); sidebarOpen=false" :class="view==='assemblies'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-puzzle-piece w-4"></i> Cost Catalog
               </button>
-              <button @click="view='advanced-reports'; sidebarOpen=false" :class="view==='advanced-reports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('advanced-reports'); sidebarOpen=false" :class="view==='advanced-reports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-table-columns w-4"></i> Advanced Reports
               </button>
-              <button @click="view='qs-reports'; loadQSReports(); sidebarOpen=false" :class="view==='qs-reports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('qs-reports', ()=>{ loadQSReports() }); sidebarOpen=false" :class="view==='qs-reports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-hard-hat w-4"></i> QS / Inspector
               </button>
-              <button @click="view='mezz-tranches'; loadMezzTranches(); sidebarOpen=false" :class="view==='mezz-tranches'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('mezz-tranches', ()=>{ loadMezzTranches() }); sidebarOpen=false" :class="view==='mezz-tranches'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-layer-group w-4"></i> Financing Stack
               </button>
-              <button @click="view='takeout-conversion'; loadTakeoutConversion(); sidebarOpen=false" :class="view==='takeout-conversion'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('takeout-conversion', ()=>{ loadTakeoutConversion() }); sidebarOpen=false" :class="view==='takeout-conversion'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-rotate w-4"></i> CMHC Take-out
               </button>
-              <button @click="view='loan-closing'; loadLoanClosingChecklist(); sidebarOpen=false" :class="view==='loan-closing'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('loan-closing', ()=>{ loadLoanClosingChecklist() }); sidebarOpen=false" :class="view==='loan-closing'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-list-ol w-4"></i> Loan Closing
               </button>
-              <button @click="view='gst-rebates'; loadGSTRebates(); sidebarOpen=false" :class="view==='gst-rebates'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('gst-rebates', ()=>{ loadGSTRebates() }); sidebarOpen=false" :class="view==='gst-rebates'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-percent w-4"></i> GST/HST Rebates
               </button>
-              <button @click="view='eft-payments'; loadEFTBatches(); sidebarOpen=false" :class="view==='eft-payments'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('eft-payments', ()=>{ loadEFTBatches() }); sidebarOpen=false" :class="view==='eft-payments'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-money-bill-transfer w-4"></i> EFT Payments
               </button>
-              <button @click="view='portfolio-risk'; loadPortfolioRisk(); sidebarOpen=false" :class="view==='portfolio-risk'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('portfolio-risk', ()=>{ loadPortfolioRisk() }); sidebarOpen=false" :class="view==='portfolio-risk'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-chart-mixed w-4"></i>
                 <span class="flex-1 text-left">Portfolio Risk</span>
                 <span x-show="(portfolioRisk?.summary?.red_count||0)>0" x-text="portfolioRisk?.summary?.red_count" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
               </button>
-              <button @click="view='portfolio'; loadPortfolio(); sidebarOpen=false" :class="view==='portfolio'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('portfolio', ()=>{ loadPortfolio() }); sidebarOpen=false" :class="view==='portfolio'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-layer-group w-4"></i> Portfolio
               </button>
-              <button @click="view='health-check'; loadHealthCheck(); sidebarOpen=false" :class="view==='health-check'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('health-check', ()=>{ loadHealthCheck() }); sidebarOpen=false" :class="view==='health-check'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-stethoscope w-4"></i>
                 <span class="flex-1 text-left">AI Accountant</span>
                 <span x-show="(healthData?.critical_count||0)>0" x-text="healthData?.critical_count" class="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
               </button>
-              <button @click="view='ai'; loadAiInsights(); sidebarOpen=false" :class="view==='ai'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+              <button @click="go('ai', ()=>{ loadAiInsights() }); sidebarOpen=false" :class="view==='ai'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
                 <i class="fa-solid fa-brain w-4"></i>
                 <span class="flex-1 text-left">AI Insights</span>
                 <span x-show="aiInsights && aiInsights.total_alerts > 0" x-text="aiInsights?.total_alerts" class="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"></span>
@@ -1153,125 +1153,125 @@
               <span class="flex-1 text-left">Tasks</span>
               <span x-show="(pmSummary?.tasks?.overdue||0)>0" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold" x-text="pmSummary.tasks.overdue"></span>
             </button>
-            <button @click="view='pm-daily-logs'; loadDailyLogs(); sidebarOpen=false" :class="view==='pm-daily-logs'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('pm-daily-logs', ()=>{ loadDailyLogs() }); sidebarOpen=false" :class="view==='pm-daily-logs'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-calendar-day w-4"></i> Daily Logs
             </button>
-            <button @click="view='pm-rfis'; loadRFIs(); sidebarOpen=false" :class="view==='pm-rfis'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('pm-rfis', ()=>{ loadRFIs() }); sidebarOpen=false" :class="view==='pm-rfis'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-question-circle w-4"></i>
               <span class="flex-1 text-left">RFIs</span>
               <span x-show="(pmSummary?.open_rfis||0)>0" class="text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold" x-text="pmSummary.open_rfis"></span>
             </button>
-            <button @click="view='pm-punch'; loadPunchList(); sidebarOpen=false" :class="view==='pm-punch'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('pm-punch', ()=>{ loadPunchList() }); sidebarOpen=false" :class="view==='pm-punch'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-circle-exclamation w-4"></i>
               <span class="flex-1 text-left">Punch List</span>
               <span x-show="(pmSummary?.open_punch||0)>0" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold" x-text="pmSummary.open_punch"></span>
             </button>
-            <button @click="view='pm-submittals'; loadSubmittals(); sidebarOpen=false" :class="view==='pm-submittals'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('pm-submittals', ()=>{ loadSubmittals() }); sidebarOpen=false" :class="view==='pm-submittals'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-paper-plane w-4"></i>
               <span class="flex-1 text-left">Submittals</span>
               <span x-show="(pmSummary?.pending_submittals||0)>0" class="text-xs bg-blue-400 text-white px-1.5 py-0.5 rounded-full font-bold" x-text="pmSummary.pending_submittals"></span>
             </button>
-            <button @click="view='pm-meetings'; loadMeetings(); sidebarOpen=false" :class="view==='pm-meetings'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('pm-meetings', ()=>{ loadMeetings() }); sidebarOpen=false" :class="view==='pm-meetings'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-people-group w-4"></i> Meetings
             </button>
-            <button @click="view='pm-photos'; loadPhotos(); sidebarOpen=false" :class="view==='pm-photos'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('pm-photos', ()=>{ loadPhotos() }); sidebarOpen=false" :class="view==='pm-photos'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-images w-4"></i> Photo Logs
             </button>
-            <button @click="view='safety'; loadSafetyIncidents(); sidebarOpen=false" :class="view==='safety'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('safety', ()=>{ loadSafetyIncidents() }); sidebarOpen=false" :class="view==='safety'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-helmet-safety w-4"></i>
               <span class="flex-1 text-left">Safety</span>
               <span x-show="(safetySummary?.open_incidents||0)>0" x-text="safetySummary.open_incidents" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
             </button>
-            <button @click="view='toolbox-talks'; loadToolboxTalks(); sidebarOpen=false" :class="view==='toolbox-talks'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('toolbox-talks', ()=>{ loadToolboxTalks() }); sidebarOpen=false" :class="view==='toolbox-talks'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-clipboard-list w-4"></i> Toolbox Talks
             </button>
-            <button @click="view='permits'; loadPermits(); sidebarOpen=false" :class="view==='permits'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('permits', ()=>{ loadPermits() }); sidebarOpen=false" :class="view==='permits'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-stamp w-4"></i>
               <span class="flex-1 text-left">Permits</span>
               <span x-show="(permitsData||[]).filter(p=>p.status==='expired').length>0" x-text="(permitsData||[]).filter(p=>p.status==='expired').length" class="text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold"></span>
             </button>
-            <button @click="view='warranty'; loadWarranty(); sidebarOpen=false" :class="view==='warranty'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('warranty', ()=>{ loadWarranty() }); sidebarOpen=false" :class="view==='warranty'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-house-circle-check w-4"></i> Warranty
             </button>
-            <button @click="view='timecards'; loadTimecards(); sidebarOpen=false" :class="view==='timecards'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('timecards', ()=>{ loadTimecards() }); sidebarOpen=false" :class="view==='timecards'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-clock w-4"></i> Labour / Timecards
             </button>
-            <button @click="view='lien-releases'; loadLienReleases(); sidebarOpen=false" :class="view==='lien-releases'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('lien-releases', ()=>{ loadLienReleases() }); sidebarOpen=false" :class="view==='lien-releases'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-hand-holding-dollar w-4"></i>
               <span class="flex-1 text-left">Lien Releases</span>
             </button>
-            <button @click="view='vendor-scorecard'; loadVendorScores(); sidebarOpen=false" :class="view==='vendor-scorecard'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('vendor-scorecard', ()=>{ loadVendorScores() }); sidebarOpen=false" :class="view==='vendor-scorecard'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-star w-4"></i> Vendor Scorecard
             </button>
-            <button @click="view='client-selections'; loadSelections(); sidebarOpen=false" :class="view==='client-selections'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('client-selections', ()=>{ loadSelections() }); sidebarOpen=false" :class="view==='client-selections'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-palette w-4"></i> Client Selections
             </button>
             <button @click="view='client-hub'; loadHubPosts(); loadHubMessages(); sidebarOpen=false" :class="view==='client-hub'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-comments w-4"></i> Client Hub
             </button>
-            <button @click="view='drawings'; loadDrawings(); sidebarOpen=false" :class="view==='drawings'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('drawings', ()=>{ loadDrawings() }); sidebarOpen=false" :class="view==='drawings'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-drafting-compass w-4"></i> Drawing Register
             </button>
-            <button @click="view='spec-review'; loadSpecReviews(); sidebarOpen=false" :class="view==='spec-review'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('spec-review', ()=>{ loadSpecReviews() }); sidebarOpen=false" :class="view==='spec-review'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-file-magnifying-glass w-4"></i> AI Spec Review
             </button>
-            <button @click="view='ai-schedule'; generatedSchedule=null; sidebarOpen=false" :class="view==='ai-schedule'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('ai-schedule', ()=>{ generatedSchedule=null }); sidebarOpen=false" :class="view==='ai-schedule'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-calendar-days w-4"></i> AI Schedule Gen
             </button>
-            <button @click="view='quality-inspections'; loadQualityInspections(); sidebarOpen=false" :class="view==='quality-inspections'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('quality-inspections', ()=>{ loadQualityInspections() }); sidebarOpen=false" :class="view==='quality-inspections'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-clipboard-check w-4"></i>
               <span class="flex-1 text-left">Quality Inspections</span>
               <span x-show="qualityInspections.filter(i=>i.status==='failed').length>0" x-text="qualityInspections.filter(i=>i.status==='failed').length" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
             </button>
-            <button @click="view='visitors'; loadVisitors(); sidebarOpen=false" :class="view==='visitors'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('visitors', ()=>{ loadVisitors() }); sidebarOpen=false" :class="view==='visitors'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-id-badge w-4"></i> Visitor Log
             </button>
-            <button @click="view='procurement'; loadProcurement(); sidebarOpen=false" :class="view==='procurement'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('procurement', ()=>{ loadProcurement() }); sidebarOpen=false" :class="view==='procurement'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-truck-fast w-4"></i>
               <span class="flex-1 text-left">Procurement</span>
               <span x-show="procurementItems.filter(i=>i.is_delayed).length>0" x-text="procurementItems.filter(i=>i.is_delayed).length" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
             </button>
-            <button @click="view='ve-log'; loadVELog(); sidebarOpen=false" :class="view==='ve-log'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('ve-log', ()=>{ loadVELog() }); sidebarOpen=false" :class="view==='ve-log'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-circle-minus w-4"></i> Value Engineering
             </button>
-            <button @click="view='ccdc'; loadCCDCContracts(); sidebarOpen=false" :class="view==='ccdc'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('ccdc', ()=>{ loadCCDCContracts() }); sidebarOpen=false" :class="view==='ccdc'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-file-lines w-4"></i> CCDC Contracts
             </button>
-            <button @click="view='units'; loadUnits(); sidebarOpen=false" :class="view==='units'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('units', ()=>{ loadUnits() }); sidebarOpen=false" :class="view==='units'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-building w-4"></i> Unit Sales
             </button>
-            <button @click="view='client-payments'; loadClientPayments(); sidebarOpen=false" :class="view==='client-payments'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('client-payments', ()=>{ loadClientPayments() }); sidebarOpen=false" :class="view==='client-payments'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-money-bill-wave w-4"></i> Client Payments
             </button>
-            <button @click="view='ai-spec-tools'; sidebarOpen=false" :class="view==='ai-spec-tools'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('ai-spec-tools'); sidebarOpen=false" :class="view==='ai-spec-tools'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-robot w-4"></i> AI Spec Tools
             </button>
-            <button @click="view='union'; loadUnions(); sidebarOpen=false" :class="view==='union'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('union', ()=>{ loadUnions() }); sidebarOpen=false" :class="view==='union'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-people-group w-4"></i> Union Compliance
             </button>
-            <button @click="view='closeout'; loadCloseout(); sidebarOpen=false" :class="view==='closeout'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('closeout', ()=>{ loadCloseout() }); sidebarOpen=false" :class="view==='closeout'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-flag-checkered w-4"></i>
               <span class="flex-1 text-left">Closeout</span>
               <span x-show="closeoutSummary && closeoutSummary.pct_complete<100 && closeoutSummary.total>0" x-text="closeoutSummary?.pct_complete+'%'" class="text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold"></span>
             </button>
-            <button @click="view='adjudication'; loadAdjudications(); sidebarOpen=false" :class="view==='adjudication'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('adjudication', ()=>{ loadAdjudications() }); sidebarOpen=false" :class="view==='adjudication'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-gavel w-4"></i>
               <span class="flex-1 text-left">Adjudication</span>
               <span x-show="adjudications.filter(a=>a.status==='initiated'||a.status==='adjudicator_appointed').length>0" x-text="adjudications.filter(a=>a.status==='initiated'||a.status==='adjudicator_appointed').length" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
             </button>
-            <button @click="view='doc-qa'; sidebarOpen=false" :class="view==='doc-qa'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('doc-qa'); sidebarOpen=false" :class="view==='doc-qa'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-message-question w-4"></i> Doc Q&amp;A (AI)
             </button>
-            <button @click="view='ai-client-update'; sidebarOpen=false" :class="view==='ai-client-update'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('ai-client-update'); sidebarOpen=false" :class="view==='ai-client-update'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-envelope-circle-check w-4"></i> AI Client Update
             </button>
-            <button x-show="canAccessFinance" @click="view='subcontractors'; loadSubcontractors(); sidebarOpen=false" :class="view==='subcontractors'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button x-show="canAccessFinance" @click="go('subcontractors', ()=>{ loadSubcontractors() }); sidebarOpen=false" :class="view==='subcontractors'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-hard-hat w-4"></i> Subcontractors
             </button>
-            <button @click="view='milestones'; loadMilestones(); sidebarOpen=false" :class="view==='milestones'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('milestones', ()=>{ loadMilestones() }); sidebarOpen=false" :class="view==='milestones'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-flag-checkered w-4"></i> Milestones
             </button>
-            <button @click="view='documents'; loadDocuments(); sidebarOpen=false" :class="view==='documents'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+            <button @click="go('documents', ()=>{ loadDocuments() }); sidebarOpen=false" :class="view==='documents'?'bg-green-700':'hover:bg-green-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
               <i class="fa-solid fa-paperclip w-4"></i> Documents
             </button>
           </div>
@@ -1280,75 +1280,75 @@
         <!-- ── ADMIN / ORG ──────────────────────── -->
         <div class="mt-3 space-y-0.5">
           <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-400/60">Account</p>
-          <button @click="view='compliance'; loadVendorCompliance(); sidebarOpen=false" :class="view==='compliance'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('compliance', ()=>{ loadVendorCompliance() }); sidebarOpen=false" :class="view==='compliance'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-shield-check w-4"></i>
             <span class="flex-1 text-left">CA Compliance</span>
             <span x-show="(vendorCompliance?.summary?.critical||0)>0" x-text="vendorCompliance?.summary?.critical" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
           </button>
-          <button @click="view='t5018'; loadT5018(); sidebarOpen=false" :class="view==='t5018'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('t5018', ()=>{ loadT5018() }); sidebarOpen=false" :class="view==='t5018'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-file-invoice-dollar w-4"></i> T5018 Report
           </button>
-          <button @click="view='ai-risk'; loadAIRiskScore(); sidebarOpen=false" :class="view==='ai-risk'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('ai-risk', ()=>{ loadAIRiskScore() }); sidebarOpen=false" :class="view==='ai-risk'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-triangle-exclamation w-4"></i>
             <span class="flex-1 text-left">AI Risk Score</span>
             <span x-show="aiRiskData?.rag==='red'" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold">!</span>
           </button>
-          <button @click="view='canadian-legal'; sidebarOpen=false" :class="view==='canadian-legal'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('canadian-legal', ()=>{ sidebarOpen=false" :class="view==='canadian-legal'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-landmark w-4"></i> Canadian Legal
           </button>
-          <button @click="view='accounting-exports'; sidebarOpen=false" :class="view==='accounting-exports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="view='accounting-exports' }); sidebarOpen=false" :class="view==='accounting-exports'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-file-export w-4"></i> ERP Exports
           </button>
-          <button @click="view='notifications-center'; loadNotifications(); sidebarOpen=false" :class="view==='notifications-center'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('notifications-center', ()=>{ loadNotifications() }); sidebarOpen=false" :class="view==='notifications-center'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-bell w-4"></i>
             <span class="flex-1 text-left">Notifications</span>
             <span x-show="(notifData?.counts?.critical||0)>0" x-text="notifData?.counts?.critical" class="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
           </button>
-          <button @click="view='equipment'; loadEquipment(); sidebarOpen=false" :class="view==='equipment'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('equipment', ()=>{ loadEquipment() }); sidebarOpen=false" :class="view==='equipment'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-truck-pickup w-4"></i> Equipment
           </button>
-          <button @click="view='org-settings'; loadOrgMembers(); sidebarOpen=false" :class="view==='org-settings'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('org-settings', ()=>{ loadOrgMembers() }); sidebarOpen=false" :class="view==='org-settings'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-building w-4"></i> Organization
           </button>
-          <button @click="view='vendors'; loadOrgVendors(); sidebarOpen=false" :class="view==='vendors'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('vendors', ()=>{ loadOrgVendors() }); sidebarOpen=false" :class="view==='vendors'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-address-book w-4"></i> Vendor Directory
           </button>
-          <button x-show="user?.is_admin" @click="view='superadmin'; loadAllOrgs(); sidebarOpen=false" :class="view==='superadmin'?'bg-red-700':'hover:bg-red-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition text-red-200">
+          <button x-show="user?.is_admin" @click="go('superadmin', ()=>{ loadAllOrgs() }); sidebarOpen=false" :class="view==='superadmin'?'bg-red-700':'hover:bg-red-900'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition text-red-200">
             <i class="fa-solid fa-shield-halved w-4"></i> Super Admin
           </button>
-          <button x-show="['owner','admin','finance_admin','pm_admin'].includes(currentOrg?.role) || user?.is_admin" @click="view='audit-log'; loadAuditLog(); sidebarOpen=false" :class="view==='audit-log'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button x-show="['owner','admin','finance_admin','pm_admin'].includes(currentOrg?.role) || user?.is_admin" @click="go('audit-log', ()=>{ loadAuditLog() }); sidebarOpen=false" :class="view==='audit-log'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-scroll w-4"></i> Audit Log
           </button>
-          <button x-show="['owner','admin','finance_admin'].includes(currentOrg?.role) || user?.is_admin" @click="view='erp-integrations'; loadERPCredentials(); sidebarOpen=false" :class="view==='erp-integrations'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button x-show="['owner','admin','finance_admin'].includes(currentOrg?.role) || user?.is_admin" @click="go('erp-integrations', ()=>{ loadERPCredentials() }); sidebarOpen=false" :class="view==='erp-integrations'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-plug w-4"></i>
             <span class="flex-1 text-left">ERP Integrations</span>
             <span x-show="erpCredentials.filter(c=>c.is_active).length>0" x-text="erpCredentials.filter(c=>c.is_active).length" class="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold"></span>
           </button>
-          <button @click="view='execution-forecast'; loadExecutionForecast(); sidebarOpen=false" :class="view==='execution-forecast'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('execution-forecast', ()=>{ loadExecutionForecast() }); sidebarOpen=false" :class="view==='execution-forecast'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-chart-gantt w-4"></i>
             <span class="flex-1 text-left">Execution Forecast</span>
           </button>
-          <button @click="view='bank-feed'; loadBankFeedConnections(); sidebarOpen=false" :class="view==='bank-feed'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('bank-feed', ()=>{ loadBankFeedConnections() }); sidebarOpen=false" :class="view==='bank-feed'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-building-columns w-4"></i>
             <span class="flex-1 text-left">Bank Feed</span>
             <span x-show="bankFeedUnmatched>0" x-text="bankFeedUnmatched" class="text-xs bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full font-bold"></span>
           </button>
-          <button @click="view='bank-import'; sidebarOpen=false" :class="view==='bank-import'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('bank-import'); sidebarOpen=false" :class="view==='bank-import'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-file-csv w-4"></i> Bank CSV Import
           </button>
-          <button @click="view='fx-rates'; loadFXRates(); sidebarOpen=false" :class="view==='fx-rates'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('fx-rates', ()=>{ loadFXRates() }); sidebarOpen=false" :class="view==='fx-rates'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-dollar-sign w-4"></i> FX / Currency
           </button>
-          <button @click="view='stress-test'; sidebarOpen=false" :class="view==='stress-test'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('stress-test'); sidebarOpen=false" :class="view==='stress-test'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-chart-line w-4"></i> Stress Testing
           </button>
-          <button x-show="['owner','admin','finance_admin'].includes(currentOrg?.role) || user?.is_admin" @click="view='api-keys'; loadAPIKeys(); sidebarOpen=false" :class="view==='api-keys'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button x-show="['owner','admin','finance_admin'].includes(currentOrg?.role) || user?.is_admin" @click="go('api-keys', ()=>{ loadAPIKeys() }); sidebarOpen=false" :class="view==='api-keys'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-key w-4"></i> API Keys
           </button>
-          <button x-show="['owner','admin','finance_admin'].includes(currentOrg?.role) || user?.is_admin" @click="view='webhooks'; loadWebhooks(); sidebarOpen=false" :class="view==='webhooks'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button x-show="['owner','admin','finance_admin'].includes(currentOrg?.role) || user?.is_admin" @click="go('webhooks', ()=>{ loadWebhooks() }); sidebarOpen=false" :class="view==='webhooks'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-webhook w-4"></i> Webhooks
           </button>
-          <button @click="view='settings'; sidebarOpen=false" :class="view==='settings'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
+          <button @click="go('settings'); sidebarOpen=false" :class="view==='settings'?'bg-blue-700':'hover:bg-blue-800'" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition">
             <i class="fa-solid fa-gear w-4"></i> Settings
           </button>
         </div>
@@ -10365,7 +10365,7 @@
        class="block w-full px-5 py-3.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold text-left transition-colors">
       Try Demo →
     </a>
-    <button @click="view='login'; history.pushState({}, '', '/login')"
+    <button @click="go('login', ()=>{ history.pushState({}, '', '/login')"
             class="w-full px-5 py-3 text-sm font-medium text-slate-700 text-left hover:bg-gray-50 transition-colors border-t border-gray-100">
       Sign in
     </button>
@@ -10389,14 +10389,14 @@
      class="lg:hidden fixed bottom-0 inset-x-0 z-50 bottom-nav-shadow bg-white pb-safe">
   <div class="flex items-stretch h-16">
 
-    <button @click="view='dashboard'; sidebarOpen=false"
+    <button @click="view='dashboard' }); sidebarOpen=false"
             class="flex-1 flex flex-col items-center justify-center gap-0.5 px-1 transition"
             :class="view==='dashboard' ? 'text-blue-600' : 'text-gray-500'">
       <i class="fa-solid fa-table-columns text-xl"></i>
       <span class="text-xs font-medium">Home</span>
     </button>
 
-    <button @click="view='invoices'; sidebarOpen=false"
+    <button @click="go('invoices'); sidebarOpen=false"
             class="flex-1 flex flex-col items-center justify-center gap-0.5 px-1 transition"
             :class="view==='invoices' ? 'text-blue-600' : 'text-gray-500'">
       <i class="fa-solid fa-file-invoice text-xl"></i>
@@ -10411,7 +10411,7 @@
       </div>
     </button>
 
-    <button @click="view='approvals'; loadProjectDashboard(); sidebarOpen=false"
+    <button @click="go('approvals', ()=>{ loadProjectDashboard() }); sidebarOpen=false"
             class="flex-1 flex flex-col items-center justify-center gap-0.5 px-1 relative transition"
             :class="view==='approvals' ? 'text-blue-600' : 'text-gray-500'">
       <div class="relative">
@@ -10423,7 +10423,7 @@
       <span class="text-xs font-medium">Approve</span>
     </button>
 
-    <button @click="view='ai'; loadAiInsights(); sidebarOpen=false"
+    <button @click="go('ai', ()=>{ loadAiInsights() }); sidebarOpen=false"
             class="flex-1 flex flex-col items-center justify-center gap-0.5 px-1 relative transition"
             :class="view==='ai' ? 'text-blue-600' : 'text-gray-500'">
       <div class="relative">
