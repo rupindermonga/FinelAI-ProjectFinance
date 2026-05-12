@@ -2354,7 +2354,7 @@ function app() {
     // ── User Management (admin) ─────────────────────────────────
     adminUsers: [],
     showCreateUserModal: false,
-    createUserForm: { username: '', email: '', password: '', is_admin: false },
+    createUserForm: { username: '', email: '', password: '', is_admin: false, org_role: 'editor' },
     createUserError: '',
     changePwForm: { current_password: '', new_password: '' },
     changePwMsg: '',
@@ -2367,10 +2367,22 @@ function app() {
     async createUser() {
       this.createUserError = '';
       try {
-        await this.post('/api/admin/users', this.createUserForm);
+        // Username = email (same field)
+        this.createUserForm.username = this.createUserForm.email;
+        const newUser = await this.post('/api/admin/users', this.createUserForm);
+        // Optionally add to current org with selected role
+        if (this.createUserForm.org_role && this.currentOrg) {
+          try {
+            await this.post('/api/org/members', {
+              username: newUser.username,
+              role: this.createUserForm.org_role,
+            });
+          } catch(e) { /* user created, org add failed — not fatal */ }
+        }
         this.showCreateUserModal = false;
-        this.createUserForm = { username: '', email: '', password: '', is_admin: false };
+        this.createUserForm = { username: '', email: '', password: '', is_admin: false, org_role: 'editor' };
         await this.loadUsers();
+        await this.loadOrgMembers();
       } catch(e) { this.createUserError = e.message; }
     },
     async toggleUserActive(u) {
