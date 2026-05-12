@@ -574,6 +574,7 @@ def reprocess_bulk(
         if inv.source_file and os.path.isfile(inv.source_file):
             inv.status = "error"
             inv.error_message = "Queued for re-extraction"
+            inv.retry_count = 0  # reset so max-retry invoices get another chance
             queued += 1
     db.commit()
     return {"message": f"Queued {queued} invoices", "queued": queued}
@@ -598,5 +599,6 @@ def reprocess_invoice(
         raise HTTPException(status_code=400, detail="Source file missing — cannot reprocess")
     inv.status = "error"
     inv.error_message = "Queued for re-extraction"
+    inv.retry_count = 0
     db.commit()
     return {"message": "Queued", "invoice_id": invoice_id}

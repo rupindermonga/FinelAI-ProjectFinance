@@ -191,7 +191,7 @@ class ColumnConfigOut(BaseModel):
     field_type: str
     is_active: bool
     is_viewable: bool = True
-    is_system: bool
+    is_system: bool = False
     is_exportable: bool = True
     display_order: int
 
