@@ -971,13 +971,22 @@ function app() {
         } catch(e) {}
       }
       if (saved && savedUser) {
+        // Clean any deep-link URL (forgot-password, etc.) — always go back to root
+        if (window.location.pathname !== '/') history.replaceState({}, '', '/');
         this.token = saved;
         this.user = JSON.parse(savedUser);
         try {
           this.orgs = await this.get('/api/org');
           const savedOrgId = parseInt(localStorage.getItem('currentOrgId'));
           this.currentOrg = (savedOrgId && this.orgs.find(o => o.id === savedOrgId)) || this.orgs[0] || null;
-        } catch(e) { this.orgs = []; }
+        } catch(e) {
+          // Token likely expired — clear and show login
+          localStorage.removeItem('invoice_token');
+          localStorage.removeItem('invoice_user');
+          localStorage.removeItem('currentOrgId');
+          this.view = 'login';
+          return;
+        }
         this.view = 'dashboard';
         await this.loadProjects();
         await Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions(), this.loadPayroll(), this.loadUsers()]);
