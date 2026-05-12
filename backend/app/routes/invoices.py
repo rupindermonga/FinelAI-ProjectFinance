@@ -91,7 +91,7 @@ def list_invoices(
         allocated_ids = db.query(InvoiceAllocation.invoice_id).distinct().subquery()
         query = query.filter(~Invoice.id.in_(db.query(allocated_ids)))
     total = query.count()
-    items = query.order_by(Invoice.processed_at.desc()).offset((page - 1) * limit).limit(limit).all()
+    items = query.order_by(Invoice.id.desc()).offset((page - 1) * limit).limit(limit).all()
     return InvoiceListResponse(
         items=items,
         total=total,
