@@ -431,15 +431,12 @@ def delete_invoice(
 
 @router.post("/retry-errors")
 def retry_error_invoices(
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Re-queue error invoices one-at-a-time with 15s gaps to avoid rate limits."""
-    from ..services.extractor import process_invoice_file
-    import asyncio
+    """Re-queue error/pending invoices via a real thread (reliable across restarts)."""
+    import threading, asyncio
 
-    # Pick up both error AND stuck-pending invoices (pending = queued but task died)
     stale_invoices = db.query(Invoice).filter(
         Invoice.user_id == current_user.id,
         Invoice.status.in_(["error", "pending"]),
@@ -449,28 +446,40 @@ def retry_error_invoices(
 
     valid = [(inv.id, inv.source_file) for inv in stale_invoices
              if inv.source_file and os.path.isfile(inv.source_file)]
+    if not valid:
+        return {"message": "Invoice files not found on disk", "queued": 0}
 
-    # Reset all to pending so UI counters show immediately
+    user_id = current_user.id
     for inv in stale_invoices:
         if inv.source_file and os.path.isfile(inv.source_file):
             inv.status = "pending"
             inv.error_message = None
     db.commit()
 
-    async def _process_sequentially():
+    def _run_in_thread():
+        from ..services.extractor import process_invoice_file
         from ..database import SessionLocal
-        for i, (inv_id, src_file) in enumerate(valid):
-            if i > 0:
-                await asyncio.sleep(15)  # 15s gap — stays within paid key per-min limit
-            fresh_db = SessionLocal()
-            try:
-                await process_invoice_file(
-                    inv_id, src_file, current_user.id, fresh_db, processing_store,
-                )
-            except Exception:
-                pass
-            finally:
-                fresh_db.close()
 
-    background_tasks.add_task(_process_sequentially)
-    return {"message": f"Processing {len(valid)} invoices one-by-one (15s apart to avoid rate limits). Watch the Processing counter.", "queued": len(valid)}
+        async def _sequential():
+            for i, (inv_id, src_file) in enumerate(valid):
+                if i > 0:
+                    await asyncio.sleep(12)
+                fresh_db = SessionLocal()
+                try:
+                    await process_invoice_file(inv_id, src_file, user_id, fresh_db, processing_store)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error("Retry failed invoice %s: %s", inv_id, e)
+                finally:
+                    fresh_db.close()
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_sequential())
+        finally:
+            loop.close()
+
+    t = threading.Thread(target=_run_in_thread, daemon=True)
+    t.start()
+    return {"message": f"Processing {len(valid)} invoices (12s apart). Watch the counter.", "queued": len(valid)}
