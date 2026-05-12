@@ -1544,7 +1544,7 @@
             <i class="fa-solid fa-spinner fa-spin text-blue-500"></i>
             <span class="text-sm text-blue-800">Worker processing <strong x-text="stats.pending"></strong> invoice<span x-show="stats.pending>1">s</span>…</span>
           </div>
-          <span class="text-xs text-blue-600" x-text="'~' + Math.ceil((stats.pending||0) * 13 / 60) + ' min remaining'"></span>
+          <span class="text-xs text-blue-600" x-text="(stats.pending||0) > 0 ? '~' + Math.ceil((stats.pending||0) * 13 / 60) + ' min remaining (' + (stats.pending||0) + ' left)' : ''"></span>
         </div>
         <div x-show="retryingInvoices" class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 flex items-center gap-3">
           <i class="fa-solid fa-spinner fa-spin text-blue-500"></i>

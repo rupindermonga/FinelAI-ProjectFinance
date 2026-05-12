@@ -38,6 +38,23 @@ async def run():
 
     logger.info("Worker started (pid=%s). Polling every %ds.", pid, POLL_INTERVAL)
 
+    # On startup: reset any orphaned 'processing' or 'pending' invoices back to 'error'
+    # so this worker (or a previous crashed one) doesn't leave invoices permanently stuck.
+    startup_db = SessionLocal()
+    try:
+        orphaned = startup_db.execute(text(
+            "SELECT COUNT(*) FROM invoices WHERE status IN ('processing', 'pending') AND source_file IS NOT NULL"
+        )).fetchone()[0]
+        if orphaned:
+            startup_db.execute(text(
+                "UPDATE invoices SET status='error', error_message='Re-queued after worker restart' "
+                "WHERE status IN ('processing', 'pending') AND source_file IS NOT NULL"
+            ))
+            startup_db.commit()
+            logger.info("Reset %d orphaned invoices to 'error' for reprocessing.", orphaned)
+    finally:
+        startup_db.close()
+
     while True:
         db = SessionLocal()
         try:
