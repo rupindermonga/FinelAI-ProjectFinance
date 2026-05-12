@@ -497,3 +497,26 @@ def retry_error_invoices(
     t = threading.Thread(target=_run_in_thread, daemon=True)
     t.start()
     return {"message": f"Processing {len(valid)} invoices (12s apart). Watch the counter.", "queued": len(valid)}
+
+
+@router.post("/{invoice_id}/reprocess")
+def reprocess_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reset a single processed invoice back to error so the worker re-extracts it."""
+    inv = db.query(Invoice).filter(
+        Invoice.id == invoice_id,
+        Invoice.user_id == current_user.id,
+    ).first()
+    if not inv:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if not inv.source_file or not os.path.isfile(inv.source_file):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Source file missing — cannot reprocess")
+    inv.status = "error"
+    inv.error_message = "Queued for re-extraction"
+    db.commit()
+    return {"message": "Queued", "invoice_id": invoice_id}

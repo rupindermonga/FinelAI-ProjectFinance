@@ -9984,6 +9984,10 @@
           <span :class="statusBadge(selectedInvoice?.status)" class="px-2 py-0.5 rounded-full text-xs font-medium" x-text="selectedInvoice?.status"></span>
         </div>
         <div class="flex items-center gap-2">
+          <button @click="reprocessInvoice(selectedInvoice)"
+            class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-semibold rounded-lg transition">
+            <i class="fa-solid fa-rotate-right"></i> Re-extract
+          </button>
           <button @click="closeInvoiceDetail()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
         </div>
       </div>

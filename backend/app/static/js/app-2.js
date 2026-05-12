@@ -1601,6 +1601,16 @@ function app() {
       } catch (e) { alert('Could not delete invoice: ' + e.message); }
     },
 
+    async reprocessInvoice(inv) {
+      if (!inv) return;
+      try {
+        await this.post(`/api/invoices/${inv.id}/reprocess`, {});
+        inv.status = 'pending';
+        this.loadStats();
+        alert('Queued for re-extraction. The worker will pick it up within 10 seconds.');
+      } catch (e) { alert('Could not queue for reprocessing: ' + e.message); }
+    },
+
     // Line-items flat view: each line item becomes its own row
     // ── Line Item Column Config ──────────────────────────────────
     lineItemColumns: JSON.parse(localStorage.getItem('lineItemColumns') || 'null') || [
