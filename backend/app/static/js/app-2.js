@@ -469,6 +469,7 @@ function app() {
     // ── Invoices ──────────────────────────────────────────────────
     invoices: [],
     stats: {},
+    _statsTimer: null,
     filters: { start_date: '', end_date: '', vendor: '', currency: '', status: '', draw_id: '', claim_id: '' },
     exportDates: { start: '', end: '' },
     exportMode: 'summary',
@@ -1453,19 +1454,17 @@ function app() {
     },
 
     async loadStats() {
+      // Cancel any existing timer — prevents multiple concurrent polling chains
+      clearTimeout(this._statsTimer);
+      this._statsTimer = null;
       try {
         this.stats = await this.get('/api/invoices/stats');
         // Sync URL with current view on every stats load
         if (this.view && !['landing','login','forgot-password','reset-password','signup','accept-invite'].includes(this.view)) {
           history.replaceState({}, '', '/' + this.view);
         }
-        if ((this.stats.pending || 0) > 0 || (this.stats.errors || 0) > 0) {
-          // Active processing or worker retrying errors — poll fast
-          setTimeout(() => { this.loadStats(); this.loadInvoices(); }, 4000);
-        } else {
-          // Idle — refresh every 30s so newly uploaded invoices appear automatically
-          setTimeout(() => { this.loadStats(); this.loadInvoices(); }, 30000);
-        }
+        const delay = ((this.stats.pending || 0) > 0 || (this.stats.errors || 0) > 0) ? 4000 : 30000;
+        this._statsTimer = setTimeout(() => { this.loadStats(); this.loadInvoices(); }, delay);
       } catch (e) {}
     },
 
