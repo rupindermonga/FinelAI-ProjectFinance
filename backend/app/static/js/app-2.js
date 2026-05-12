@@ -1648,26 +1648,19 @@ function app() {
         this.selectedInvoiceIds = this.invoices.map(i => i.id);
     },
     async selectAllPages() {
-      // Fetch ALL invoice IDs across all pages in chunks of 500 (API max)
+      // Use lightweight /ids endpoint — returns only IDs, no heavy extracted_data serialization
       try {
-        const allIds = [];
-        const PAGE_SIZE = 500;
-        let page = 1;
-        while (true) {
-          const params = new URLSearchParams({ page, limit: PAGE_SIZE });
-          if (this.filters.start_date) params.set('start_date', this.filters.start_date);
-          if (this.filters.end_date)   params.set('end_date',   this.filters.end_date);
-          if (this.filters.vendor)     params.set('vendor',     this.filters.vendor);
-          if (this.filters.currency)   params.set('currency',   this.filters.currency);
-          if (this.filters.status)     params.set('status',     this.filters.status);
-          if (this.filters.draw_id)    params.set('draw_id',    this.filters.draw_id);
-          if (this.filters.claim_id)   params.set('claim_id',   this.filters.claim_id);
-          const data = await this.get(`/api/invoices?${params}`);
-          allIds.push(...data.items.map(i => i.id));
-          if (allIds.length >= data.total || data.items.length < PAGE_SIZE) break;
-          page++;
-        }
-        this.selectedInvoiceIds = allIds;
+        const params = new URLSearchParams();
+        if (this.filters.start_date) params.set('start_date', this.filters.start_date);
+        if (this.filters.end_date)   params.set('end_date',   this.filters.end_date);
+        if (this.filters.vendor)     params.set('vendor',     this.filters.vendor);
+        if (this.filters.currency)   params.set('currency',   this.filters.currency);
+        if (this.filters.status)     params.set('status',     this.filters.status);
+        if (this.filters.draw_id)    params.set('draw_id',    this.filters.draw_id);
+        if (this.filters.claim_id)   params.set('claim_id',   this.filters.claim_id);
+        const qs = params.toString();
+        const data = await this.get(`/api/invoices/ids${qs ? '?' + qs : ''}`);
+        this.selectedInvoiceIds = data.ids;
         this.selectedAllPages = true;
       } catch(e) { alert('Could not select all: ' + (e.message || JSON.stringify(e))); }
     },

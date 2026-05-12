@@ -51,6 +51,40 @@ def _apply_filters(query, user_id, start_date, end_date, vendor, currency, statu
     return query
 
 
+@router.get("/ids")
+def list_invoice_ids(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    vendor: Optional[str] = None,
+    currency: Optional[str] = None,
+    status: Optional[str] = None,
+    draw_id: Optional[str] = None,
+    claim_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    org_ctx=Depends(get_current_org),
+):
+    """Return only invoice IDs (no heavy extracted_data) — used for select-all."""
+    org, _ = org_ctx
+    query = db.query(Invoice.id)
+    query = _apply_filters(query, current_user.id, start_date, end_date, vendor, currency, status, org_id=org.id)
+    if draw_id == "none":
+        query = query.filter(Invoice.draw_id.is_(None))
+    elif draw_id:
+        try: query = query.filter(Invoice.draw_id == int(draw_id))
+        except ValueError: pass
+    if claim_id == "none":
+        query = query.filter(Invoice.provincial_claim_id.is_(None), Invoice.federal_claim_id.is_(None))
+    elif claim_id:
+        try:
+            cid = int(claim_id)
+            from sqlalchemy import or_
+            query = query.filter(or_(Invoice.provincial_claim_id == cid, Invoice.federal_claim_id == cid))
+        except ValueError: pass
+    ids = [row[0] for row in query.order_by(Invoice.id.desc()).all()]
+    return {"ids": ids, "total": len(ids)}
+
+
 @router.get("", response_model=InvoiceListResponse)
 def list_invoices(
     page: int = Query(1, ge=1),
