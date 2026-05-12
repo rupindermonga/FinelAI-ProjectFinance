@@ -65,6 +65,7 @@ def _run_migrations():
             "ALTER TABLE invoices ADD COLUMN approved_by TEXT",
             "ALTER TABLE invoices ADD COLUMN approved_at TEXT",
             "ALTER TABLE invoices ADD COLUMN file_hash VARCHAR",
+            "ALTER TABLE invoices ADD COLUMN retry_count INTEGER DEFAULT 0",
             """CREATE TABLE IF NOT EXISTS milestones (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL REFERENCES projects(id),

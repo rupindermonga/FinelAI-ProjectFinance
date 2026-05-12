@@ -373,8 +373,29 @@ async def extract_invoice_from_file(
                 raw_text = raw_text.split("\n", 1)[-1]
                 raw_text = raw_text.rsplit("```", 1)[0]
 
+            # Try to parse; if truncated JSON, attempt recovery by truncating to last valid close brace
+            try:
+                result = json.loads(raw_text)
+            except json.JSONDecodeError:
+                # Gemini truncated the response — close any open arrays/objects and retry parse
+                fixed = raw_text.rstrip().rstrip(',')
+                depth_map = {'{': '}', '[': ']'}
+                stack = []
+                for ch in fixed:
+                    if ch in ('{', '['):
+                        stack.append(depth_map[ch])
+                    elif ch in ('}', ']') and stack and stack[-1] == ch:
+                        stack.pop()
+                while stack:
+                    fixed += stack.pop()
+                try:
+                    result = json.loads(fixed)
+                    logger.warning("Gemini %s: recovered truncated JSON.", tag)
+                except json.JSONDecodeError as je:
+                    raise ValueError(f"Invalid JSON from Gemini: {je}") from je
+
             logger.info("Gemini %s succeeded.", tag)
-            return json.loads(raw_text)
+            return result
 
         except Exception as e:
             last_error = e

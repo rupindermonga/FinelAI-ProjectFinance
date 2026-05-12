@@ -39,6 +39,7 @@ class Invoice(Base):
     processed_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="pending")  # pending | processing | processed | error
     error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, default=0)
     confidence_score = Column(Float, nullable=True)
 
     # Key indexed fields for fast filtering

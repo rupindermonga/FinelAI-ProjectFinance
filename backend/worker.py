@@ -41,8 +41,9 @@ async def run():
         db = SessionLocal()
         try:
             row = db.execute(text(
-                "SELECT id, source_file, user_id FROM invoices "
+                "SELECT id, source_file, user_id, COALESCE(retry_count,0) FROM invoices "
                 "WHERE status='error' AND source_file IS NOT NULL "
+                "AND COALESCE(retry_count,0) < 4 "
                 "ORDER BY id LIMIT 1"
             )).fetchone()
 
@@ -51,7 +52,7 @@ async def run():
                 await asyncio.sleep(POLL_INTERVAL)
                 continue
 
-            inv_id, src_file, user_id = row[0], row[1], row[2]
+            inv_id, src_file, user_id, retry_count = row[0], row[1], row[2], row[3]
 
             if not os.path.isfile(src_file):
                 db.execute(text(
@@ -61,19 +62,24 @@ async def run():
                 db.close()
                 continue
 
-            # Claim the invoice: mark pending so no other worker picks it
-            db.execute(text("UPDATE invoices SET status='pending' WHERE id=:id"), {"id": inv_id})
+            # Claim the invoice: mark processing so no other worker picks it
+            db.execute(text(
+                "UPDATE invoices SET status='processing', retry_count=COALESCE(retry_count,0)+1 WHERE id=:id"
+            ), {"id": inv_id})
             db.commit()
             db.close()
             db = None
 
-            logger.info("Processing invoice id=%s file=%s", inv_id, os.path.basename(src_file))
+            logger.info("Processing invoice id=%s file=%s (attempt %s)", inv_id, os.path.basename(src_file), retry_count + 1)
             fresh_db = SessionLocal()
             try:
                 await process_invoice_file(inv_id, src_file, user_id, fresh_db, processing_store)
                 logger.info("Invoice %s done.", inv_id)
             except Exception as exc:
                 logger.error("Invoice %s failed: %s", inv_id, exc)
+                # After max retries, leave as error permanently (don't auto-retry)
+                if retry_count + 1 >= 4:
+                    logger.warning("Invoice %s reached max retries — giving up.", inv_id)
             finally:
                 fresh_db.close()
 
