@@ -1703,7 +1703,7 @@
                     <td class="px-3 py-2 text-gray-500" x-text="row.inv.currency || '—'"></td>
                     <td class="px-3 py-2 text-right font-medium text-gray-800" x-text="fmtNum(row.inv.total_due)"></td>
                     <template x-for="lc in visibleLineItemCols" :key="lc.key + '-' + i">
-                      <td class="px-3 py-2 text-gray-700 whitespace-nowrap" x-text="row.item ? (row.item[lc.key] ?? '—') : '—'"></td>
+                      <td class="px-3 py-2 text-gray-700 whitespace-nowrap" x-text="(row.item?.[lc.key] ?? row.inv.extracted_data?.[lc.key] ?? row.inv[lc.key]) || '—'"></td>
                     </template>
                   </tr>
                 </template>

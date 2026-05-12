@@ -924,12 +924,15 @@ function app() {
     // ── Init ──────────────────────────────────────────────────────
     async init() {
       // Migrate lineItemColumns: add any new columns not in saved config
-      const LI_DEFAULT_KEYS = ['line_no','sku','description','qty','unit','unit_price','discount_amount','tax_rate','line_total','manufacturer','sub_division','cost_sub_category'];
       const savedLI = JSON.parse(localStorage.getItem('lineItemColumns') || 'null');
       if (savedLI) {
         const savedKeys = new Set(savedLI.map(c => c.key));
         if (!savedKeys.has('cost_sub_category'))
           savedLI.push({ key: 'cost_sub_category', label: 'Sub-Category', active: true, visible: true, exportable: true });
+        if (!savedKeys.has('cost_category'))
+          savedLI.splice(savedLI.findIndex(c => c.key === 'sub_division') + 1, 0, { key: 'cost_category', label: 'Category', active: true, visible: true, exportable: true });
+        if (!savedKeys.has('olt_id'))
+          savedLI.push({ key: 'olt_id', label: 'OLT', active: true, visible: true, exportable: true });
         this.lineItemColumns = savedLI;
         localStorage.setItem('lineItemColumns', JSON.stringify(this.lineItemColumns));
       }
@@ -1612,7 +1615,9 @@ function app() {
       { key: 'line_total', label: 'Line Total', active: true, visible: true, exportable: true },
       { key: 'manufacturer', label: 'Manufacturer', active: false, visible: false, exportable: true },
       { key: 'sub_division', label: 'Sub-Division', active: true, visible: true, exportable: true },
+      { key: 'cost_category', label: 'Category', active: true, visible: true, exportable: true },
       { key: 'cost_sub_category', label: 'Sub-Category', active: true, visible: true, exportable: true },
+      { key: 'olt_id', label: 'OLT', active: true, visible: true, exportable: true },
     ],
     get visibleLineItemCols() { return this.lineItemColumns.filter(c => c.active !== false && c.visible); },
     toggleLineItemCol(col, field) {
