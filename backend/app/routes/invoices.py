@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
@@ -427,3 +427,36 @@ def delete_invoice(
             pass  # File already gone or no permission — DB record is already removed
 
     return {"message": "Invoice deleted"}
+
+
+@router.post("/retry-errors")
+def retry_error_invoices(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Re-queue all error-status invoices for AI re-processing."""
+    from ..services.extractor import process_invoice_file
+    from .invoices import _UPLOAD_DIR
+    from . import processing_store
+
+    error_invoices = db.query(Invoice).filter(
+        Invoice.user_id == current_user.id,
+        Invoice.status == "error",
+    ).all()
+    if not error_invoices:
+        return {"message": "No error invoices to retry", "queued": 0}
+
+    queued = 0
+    for inv in error_invoices:
+        if inv.source_file and os.path.isfile(inv.source_file):
+            inv.status = "pending"
+            inv.error_message = None
+            db.commit()
+            background_tasks.add_task(
+                process_invoice_file,
+                inv.id, inv.source_file, current_user.id, db, processing_store,
+            )
+            queued += 1
+
+    return {"message": f"Re-queued {queued} invoices for processing", "queued": queued}

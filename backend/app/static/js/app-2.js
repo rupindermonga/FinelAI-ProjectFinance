@@ -1026,6 +1026,8 @@ function app() {
       localStorage.setItem('invoice_token', this.token);
       localStorage.setItem('invoice_user', JSON.stringify(this.user));
       if (this.currentOrg) localStorage.setItem('currentOrgId', this.currentOrg.id);
+      // Clean URL — remove any deep-link path (forgot-password, etc.) after login
+      if (window.location.pathname !== '/') history.replaceState({}, '', '/');
       this.view = 'dashboard';
       this.loadProjects().then(() => {
         Promise.all([this.loadInvoices(), this.loadColumns(), this.loadStats(), this.loadCategories(), this.loadProjectDashboard(), this.loadSubdivisions(), this.loadPayroll(), this.loadUsers()])
@@ -1397,7 +1399,22 @@ function app() {
     },
 
     async loadStats() {
-      try { this.stats = await this.get('/api/invoices/stats'); } catch (e) {}
+      try {
+        this.stats = await this.get('/api/invoices/stats');
+        // Auto-poll while invoices are still processing
+        if ((this.stats.processing || 0) > 0) {
+          setTimeout(() => { this.loadStats(); this.loadInvoices(); }, 4000);
+        }
+      } catch (e) {}
+    },
+
+    async retryErrorInvoices() {
+      try {
+        const r = await this.post('/api/invoices/retry-errors', {});
+        alert(r.message);
+        await this.loadStats();
+        await this.loadInvoices();
+      } catch(e) { alert('Retry failed: ' + e.message); }
     },
 
     clearFilters() {

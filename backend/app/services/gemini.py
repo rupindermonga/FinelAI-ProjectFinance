@@ -22,17 +22,22 @@ SUPPORTED_MIME = {
 def _env_keys() -> list:
     """
     Return all valid Gemini API keys from the environment.
-    Reads GEMINI_API_KEYS (comma-separated) first, then falls back to GEMINI_API_KEY.
+    Order: free keys (GEMINI_API_KEYS) first, then paid key (GEMINI_PAID_KEY) as final fallback.
     """
+    _PLACEHOLDER = "your_gemini_api_key_here"
+    keys: list[str] = []
     multi = os.getenv("GEMINI_API_KEYS", "")
     if multi:
-        keys = [k.strip() for k in multi.split(",") if k.strip() and k.strip() != "your_gemini_api_key_here"]
-        if keys:
-            return keys
-    single = os.getenv("GEMINI_API_KEY", "").strip()
-    if single and single != "your_gemini_api_key_here":
-        return [single]
-    return []
+        keys = [k.strip() for k in multi.split(",") if k.strip() and k.strip() != _PLACEHOLDER]
+    if not keys:
+        single = os.getenv("GEMINI_API_KEY", "").strip()
+        if single and single != _PLACEHOLDER:
+            keys = [single]
+    # Always append paid key at the end so it's the last resort
+    paid = os.getenv("GEMINI_PAID_KEY", "").strip()
+    if paid and paid != _PLACEHOLDER and paid not in keys:
+        keys.append(paid)
+    return keys
 
 
 def _env_key() -> str:
