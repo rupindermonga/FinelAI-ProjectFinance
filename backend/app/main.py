@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .database import engine, Base
-from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit, pm, construction_health, compliance, lender_plus, lender_risk, permits, safety, labour, bid, ai_risk, co_approval, selections, equipment, notifications, lien_release, spec_review, prequalification, client_hub, syndicate, erp_integration, cfo_reports, subcontract, canadian_legal, quality, crm, assemblies, advanced_reports, lender_advanced, adjudication, gst_rebates, platform_api, phase11, bank_feed
+from .routes import auth, invoices, upload, columns, export, categories, admin, project, filetools, org, audit, pm, construction_health, compliance, lender_plus, lender_risk, permits, safety, labour, bid, ai_risk, co_approval, selections, equipment, notifications, lien_release, spec_review, prequalification, client_hub, syndicate, erp_integration, cfo_reports, subcontract, canadian_legal, quality, crm, assemblies, advanced_reports, lender_advanced, adjudication, gst_rebates, platform_api, phase11, bank_feed, execution_forecast
 
 
 def _run_migrations():
@@ -1329,6 +1329,58 @@ def _run_migrations():
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )""",
             "CREATE INDEX IF NOT EXISTS ix_bank_feed_transactions_org ON bank_feed_transactions(org_id, status, transaction_date)",
+            # Execution Forecast — generic construction progress tracking
+            """CREATE TABLE IF NOT EXISTS wf_workstreams (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                name TEXT NOT NULL,
+                unit TEXT NOT NULL DEFAULT 'units',
+                display_order INTEGER DEFAULT 100,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS wf_nodes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                sd_code TEXT,
+                node_code TEXT NOT NULL,
+                node_name TEXT,
+                vendor TEXT,
+                display_order INTEGER DEFAULT 100,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS wf_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                node_id INTEGER NOT NULL REFERENCES wf_nodes(id) ON DELETE CASCADE,
+                workstream_id INTEGER NOT NULL REFERENCES wf_workstreams(id),
+                vendor TEXT,
+                start_date TEXT,
+                deadline TEXT,
+                total_scope REAL DEFAULT 0,
+                remaining REAL DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            """CREATE TABLE IF NOT EXISTS wf_progress (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL REFERENCES wf_tasks(id) ON DELETE CASCADE,
+                org_id INTEGER NOT NULL REFERENCES organizations(id),
+                project_id INTEGER NOT NULL REFERENCES projects(id),
+                period TEXT NOT NULL,
+                period_type TEXT DEFAULT 'monthly',
+                planned_qty REAL DEFAULT 0,
+                actual_qty REAL,
+                entered_by INTEGER REFERENCES users(id),
+                entered_at DATETIME,
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(task_id, period)
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_wf_tasks_project ON wf_tasks(project_id, node_id)",
+            "CREATE INDEX IF NOT EXISTS ix_wf_progress_project ON wf_progress(project_id, period)",
+            "CREATE INDEX IF NOT EXISTS ix_wf_nodes_project ON wf_nodes(project_id, sd_code)",
         ]:
             try:
                 conn.execute(text(stmt))
@@ -1508,6 +1560,7 @@ app.include_router(gst_rebates.router)
 app.include_router(platform_api.router)
 app.include_router(phase11.router)
 app.include_router(bank_feed.router)
+app.include_router(execution_forecast.router)
 
 # Serve static frontend
 static_dir = os.path.join(os.path.dirname(__file__), "static")

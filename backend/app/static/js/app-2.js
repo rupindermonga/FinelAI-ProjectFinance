@@ -347,6 +347,19 @@ function app() {
     showCloseoutModal: false,
     closeoutForm: { category:'documents', item_name:'', responsible_party:'', due_date:'', status:'pending', notes:'' },
 
+    // ── Execution Forecast ────────────────────────────────────────
+    efTab: 'grid',                   // 'grid' | 'actuals' | 'summary' | 'import'
+    efImporting: false, efImportResult: null, efImportFile: null,
+    efGrid: [], efPeriods: [],        // full plan vs actual table
+    efSummary: [], efSummaryPeriods: [],
+    efFilterSD: '', efFilterPeriod: '',
+    efSDs: [],                        // available subdivisions
+    efActualsPeriod: '', efActualsEntries: [], efActualsSaving: false,
+    efWorkstreams: [], efNodes: [],   // master lists for manual entry
+    efShowAddNode: false, efShowAddWS: false,
+    efNewNode: { sd_code:'', node_code:'', vendor:'' },
+    efNewWS: { name:'', unit:'km' },
+
     // ── Bank Feed (Flinks + AI Matching) ─────────────────────────
     bankFeedConnections: [], bankFeedTxns: [], bankFeedFilter: 'unmatched',
     bankFeedUnmatched: 0, showBankFeedModal: false, flinksLoginId: false,
@@ -4881,6 +4894,138 @@ ${d.participant_shares?.map(p=>`<tr><td>${p.lender}</td><td>${p.pct}%</td><td>$$
     async copyClientUpdate() {
       if (!this.clientUpdateText) return;
       try { await navigator.clipboard.writeText(this.clientUpdateText); alert('Copied to clipboard!'); } catch(e) {}
+    },
+
+    // ═══════════════ EXECUTION FORECAST ════════════════════════════════════════
+
+    async loadExecutionForecast() {
+      if (!this.currentProject) return;
+      const pid = this.currentProject.id;
+      try {
+        const [sds, periods] = await Promise.all([
+          this.get(`/api/project/${pid}/execution/subdivisions`),
+          this.get(`/api/project/${pid}/execution/periods`),
+        ]);
+        this.efSDs = sds || [];
+        this.efPeriods = periods || [];
+        if (this.efTab === 'grid') await this.loadEFGrid();
+        if (this.efTab === 'summary') await this.loadEFSummary();
+        if (this.efTab === 'actuals') await this.loadEFActualsForm();
+      } catch(e) { console.error('EF load error', e); }
+    },
+
+    async loadEFGrid() {
+      if (!this.currentProject) return;
+      const pid = this.currentProject.id;
+      let url = `/api/project/${pid}/execution/grid`;
+      const qs = [];
+      if (this.efFilterSD) qs.push(`sd_code=${encodeURIComponent(this.efFilterSD)}`);
+      if (qs.length) url += '?' + qs.join('&');
+      try {
+        const data = await this.get(url);
+        this.efGrid = data.tasks || [];
+        this.efPeriods = data.periods || [];
+      } catch(e) { this.efGrid = []; }
+    },
+
+    async loadEFSummary() {
+      if (!this.currentProject) return;
+      const pid = this.currentProject.id;
+      let url = `/api/project/${pid}/execution/summary`;
+      if (this.efFilterSD) url += `?sd_code=${encodeURIComponent(this.efFilterSD)}`;
+      try {
+        const data = await this.get(url);
+        this.efSummary = data.workstreams || [];
+        this.efSummaryPeriods = data.periods || [];
+      } catch(e) { this.efSummary = []; }
+    },
+
+    async loadEFActualsForm() {
+      if (!this.currentProject || !this.efActualsPeriod) return;
+      const pid = this.currentProject.id;
+      let url = `/api/project/${pid}/execution/grid`;
+      if (this.efFilterSD) url += `?sd_code=${encodeURIComponent(this.efFilterSD)}`;
+      try {
+        const data = await this.get(url);
+        this.efActualsEntries = (data.tasks || []).map(t => ({
+          task_id: t.task_id,
+          node_code: t.node_code,
+          sd_code: t.sd_code,
+          workstream: t.workstream,
+          unit: t.unit,
+          vendor: t.vendor,
+          planned: (t.periods[this.efActualsPeriod] || {}).plan || 0,
+          actual: (t.periods[this.efActualsPeriod] || {}).actual ?? '',
+          notes: '',
+        }));
+      } catch(e) { this.efActualsEntries = []; }
+    },
+
+    async switchEFTab(tab) {
+      this.efTab = tab;
+      if (tab === 'grid') await this.loadEFGrid();
+      if (tab === 'summary') await this.loadEFSummary();
+      if (tab === 'actuals' && this.efActualsPeriod) await this.loadEFActualsForm();
+    },
+
+    async importEFExcel() {
+      if (!this.efImportFile || !this.currentProject) return;
+      this.efImporting = true; this.efImportResult = null;
+      try {
+        const fd = new FormData();
+        fd.append('file', this.efImportFile);
+        const resp = await fetch(`/api/project/${this.currentProject.id}/execution/import`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + this.token,
+                     'X-Organization-Id': String(this.activeOrgId || '') },
+          body: fd,
+        });
+        if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Import failed'); }
+        this.efImportResult = await resp.json();
+        await this.loadExecutionForecast();
+        this.efTab = 'grid';
+      } catch(e) { alert('Import error: ' + e.message); }
+      this.efImporting = false;
+    },
+
+    async clearEFData() {
+      if (!this.currentProject) return;
+      if (!confirm('Clear ALL execution forecast data for this project? This cannot be undone.')) return;
+      await this.delete(`/api/project/${this.currentProject.id}/execution/clear`);
+      this.efGrid = []; this.efSummary = []; this.efPeriods = []; this.efSDs = [];
+      this.efImportResult = null;
+    },
+
+    async saveEFActuals() {
+      if (!this.currentProject || !this.efActualsPeriod) return;
+      this.efActualsSaving = true;
+      const entries = this.efActualsEntries
+        .filter(e => e.actual !== '' && e.actual !== null)
+        .map(e => ({ task_id: e.task_id, actual_qty: parseFloat(e.actual) || 0, notes: e.notes }));
+      try {
+        const r = await this.post(`/api/project/${this.currentProject.id}/execution/actuals`, {
+          period: this.efActualsPeriod, entries,
+        });
+        alert(r.msg || 'Saved');
+        await this.loadEFGrid();
+      } catch(e) { alert('Save failed: ' + e.message); }
+      this.efActualsSaving = false;
+    },
+
+    downloadEFExcel() {
+      if (!this.currentProject) return;
+      window.open(`/api/project/${this.currentProject.id}/execution/export?_t=${this.token}`, '_blank');
+    },
+
+    efVariance(planned, actual) {
+      if (actual === null || actual === undefined || actual === '') return '—';
+      const v = parseFloat(actual) - parseFloat(planned || 0);
+      return (v >= 0 ? '+' : '') + v.toFixed(1);
+    },
+
+    efPct(planned, actual) {
+      if (!planned || planned == 0 || actual === null || actual === undefined || actual === '') return '—';
+      return Math.round((parseFloat(actual) / parseFloat(planned)) * 100) + '%';
     },
 
   };
