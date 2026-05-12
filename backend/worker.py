@@ -114,9 +114,14 @@ async def run():
 
             fresh_db = SessionLocal()
             try:
-                await process_invoice_file(inv_id, src_file, user_id, fresh_db, processing_store)
+                await asyncio.wait_for(
+                    process_invoice_file(inv_id, src_file, user_id, fresh_db, processing_store),
+                    timeout=180  # 3 minutes hard limit per invoice
+                )
                 processed_session += 1
                 logger.info("Invoice %s done. Session total: %s", inv_id, processed_session)
+            except asyncio.TimeoutError:
+                logger.error("Invoice %s TIMED OUT after 180s — marking error.", inv_id)
             except Exception as exc:
                 logger.error("Invoice %s failed (attempt %s): %s", inv_id, attempt, exc)
                 if attempt >= MAX_RETRIES:

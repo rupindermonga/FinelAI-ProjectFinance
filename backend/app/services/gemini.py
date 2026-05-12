@@ -350,12 +350,17 @@ async def extract_invoice_from_file(
             logger.info("Gemini %s skipped (rate-limited, recovers in %.0fs)", tag, retry_at - now)
             continue
         try:
+            import asyncio as _asyncio
             genai.configure(api_key=key)
             model = genai.GenerativeModel(model_name)
 
-            uploaded_file = genai.upload_file(path=file_path, mime_type=mime_type)
+            # Run blocking SDK calls in a thread so asyncio can cancel them on timeout
+            uploaded_file = await _asyncio.to_thread(
+                genai.upload_file, path=file_path, mime_type=mime_type
+            )
             try:
-                response = model.generate_content(
+                response = await _asyncio.to_thread(
+                    model.generate_content,
                     [uploaded_file, prompt],
                     generation_config=genai.GenerationConfig(
                         response_mime_type="application/json",
@@ -364,7 +369,7 @@ async def extract_invoice_from_file(
                 )
             finally:
                 try:
-                    genai.delete_file(uploaded_file.name)
+                    await _asyncio.to_thread(genai.delete_file, uploaded_file.name)
                 except Exception:
                     pass
 
