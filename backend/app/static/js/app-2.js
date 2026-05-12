@@ -923,6 +923,17 @@ function app() {
 
     // ── Init ──────────────────────────────────────────────────────
     async init() {
+      // Migrate lineItemColumns: add any new columns not in saved config
+      const LI_DEFAULT_KEYS = ['line_no','sku','description','qty','unit','unit_price','discount_amount','tax_rate','line_total','manufacturer','sub_division','cost_sub_category'];
+      const savedLI = JSON.parse(localStorage.getItem('lineItemColumns') || 'null');
+      if (savedLI) {
+        const savedKeys = new Set(savedLI.map(c => c.key));
+        if (!savedKeys.has('cost_sub_category'))
+          savedLI.push({ key: 'cost_sub_category', label: 'Sub-Category', active: true, visible: true, exportable: true });
+        this.lineItemColumns = savedLI;
+        localStorage.setItem('lineItemColumns', JSON.stringify(this.lineItemColumns));
+      }
+
       const path = window.location.pathname.replace(/^\//, '');
 
       // ── Dedicated /demo route — auto-launch demo ──────────────────
@@ -1597,10 +1608,11 @@ function app() {
       { key: 'unit', label: 'Unit', active: true, visible: true, exportable: true },
       { key: 'unit_price', label: 'Unit Price', active: true, visible: true, exportable: true },
       { key: 'discount_amount', label: 'Discount', active: true, visible: false, exportable: true },
-      { key: 'tax_rate', label: 'Tax %', active: true, visible: true, exportable: true },
+      { key: 'tax_rate', label: 'Tax %', active: true, visible: false, exportable: true },
       { key: 'line_total', label: 'Line Total', active: true, visible: true, exportable: true },
       { key: 'manufacturer', label: 'Manufacturer', active: false, visible: false, exportable: true },
       { key: 'sub_division', label: 'Sub-Division', active: true, visible: true, exportable: true },
+      { key: 'cost_sub_category', label: 'Sub-Category', active: true, visible: true, exportable: true },
     ],
     get visibleLineItemCols() { return this.lineItemColumns.filter(c => c.active !== false && c.visible); },
     toggleLineItemCol(col, field) {
@@ -1609,11 +1621,13 @@ function app() {
     },
 
     get lineItemsFlat() {
+      const TAX_RE = /^\s*(HST|GST|PST|QST|RST|HST\s*\(|GST\s*\/|sales\s*tax|tax\s+on)/i;
       const rows = [];
       for (const inv of this.invoices) {
         const items = inv.extracted_data?.line_items;
         if (Array.isArray(items) && items.length > 0) {
-          for (const item of items) {
+          const billable = items.filter(it => !TAX_RE.test(it.description || ''));
+          for (const item of billable) {
             rows.push({ inv, item });
           }
         } else {
