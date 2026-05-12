@@ -499,6 +499,30 @@ def retry_error_invoices(
     return {"message": f"Processing {len(valid)} invoices (12s apart). Watch the counter.", "queued": len(valid)}
 
 
+@router.post("/reprocess-bulk")
+def reprocess_bulk(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reset multiple invoices to error status so the worker re-extracts them."""
+    ids = body.get("ids", [])
+    if not ids:
+        return {"message": "No ids provided", "queued": 0}
+    invs = db.query(Invoice).filter(
+        Invoice.id.in_(ids),
+        Invoice.user_id == current_user.id,
+    ).all()
+    queued = 0
+    for inv in invs:
+        if inv.source_file and os.path.isfile(inv.source_file):
+            inv.status = "error"
+            inv.error_message = "Queued for re-extraction"
+            queued += 1
+    db.commit()
+    return {"message": f"Queued {queued} invoices", "queued": queued}
+
+
 @router.post("/{invoice_id}/reprocess")
 def reprocess_invoice(
     invoice_id: int,

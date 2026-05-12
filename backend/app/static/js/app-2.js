@@ -474,6 +474,7 @@ function app() {
     exportMode: 'summary',
     pagination: { page: 1, limit: 50, total: 0, pages: 0 },
     viewMode: 'summary',   // 'summary' | 'lines'
+    selectedInvoiceIds: [],
 
     // ── Upload ────────────────────────────────────────────────────
     showUploadModal: false,
@@ -1609,6 +1610,29 @@ function app() {
         this.loadStats();
         alert('Queued for re-extraction. The worker will pick it up within 10 seconds.');
       } catch (e) { alert('Could not queue for reprocessing: ' + e.message); }
+    },
+
+    toggleInvoiceSelect(id, e) {
+      e.stopPropagation();
+      const idx = this.selectedInvoiceIds.indexOf(id);
+      if (idx === -1) this.selectedInvoiceIds.push(id);
+      else this.selectedInvoiceIds.splice(idx, 1);
+    },
+    toggleSelectAll(e) {
+      e.stopPropagation();
+      if (this.selectedInvoiceIds.length === this.invoices.length)
+        this.selectedInvoiceIds = [];
+      else
+        this.selectedInvoiceIds = this.invoices.map(i => i.id);
+    },
+    async reprocessSelected() {
+      if (!this.selectedInvoiceIds.length) return;
+      try {
+        const r = await this.post('/api/invoices/reprocess-bulk', { ids: this.selectedInvoiceIds });
+        this.selectedInvoiceIds = [];
+        this.loadStats();
+        alert(`Queued ${r.queued} invoice(s) for re-extraction.`);
+      } catch (e) { alert('Could not queue: ' + e.message); }
     },
 
     // Line-items flat view: each line item becomes its own row
