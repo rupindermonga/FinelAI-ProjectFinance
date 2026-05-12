@@ -208,10 +208,20 @@ def build_extraction_prompt(columns: List[ColumnConfig], categories: List[Catego
     # Add cost category classification fields
     if cost_categories:
         cat_names = [c["name"] for c in cost_categories]
+        # Build category decision guide with examples
+        cat_guide = "; ".join(
+            f"'{c['name']}' → for {', '.join(s['name'] for s in c.get('sub_categories',[])[:3]) or 'this type of work'}"
+            for c in cost_categories
+        )
         fields_desc["cost_category"] = (
             f"Project cost category for this invoice. Must be EXACTLY one of: [{', '.join(cat_names)}]. "
-            "Choose the BEST match based on the invoice description — do NOT return null unless the invoice "
-            "is completely unrelated to any category. Examples: electrical/civil/vault/cabinet/splicing/fibre work → pick the closest match. (string or null)"
+            "Choose the BEST single match — never return null, always pick the closest category. "
+            f"Guide: {cat_guide}. "
+            "Rules: vault/civil/underground work → usually Make Ready or Fiber Build; "
+            "OLT/cabinet/optical equipment → Electronics; "
+            "fibre cable/conduit/materials → Material; "
+            "labour/wages/crew costs → Payroll; "
+            "installation/build/construction work → Fiber Build. (string, required)"
         )
         # Build sub-category hints per cost category
         sc_parts = []
