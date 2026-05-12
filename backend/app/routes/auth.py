@@ -96,7 +96,10 @@ def register(body: dict, request: Request = None, db: Session = Depends(get_db))
 @router.post("/login", response_model=Token)
 def login(body: UserLogin, request: Request = None, db: Session = Depends(get_db)):
     _check_rate_limit(request)
-    user = db.query(User).filter(User.username == body.username).first()
+    identifier = body.username.strip()
+    user = db.query(User).filter(
+        (User.username == identifier) | (User.email == identifier)
+    ).first()
     if not user or not pwd_context.verify(body.password, user.hashed_password):
         _record_failed_attempt(request)
         raise HTTPException(status_code=401, detail="Invalid username or password")
