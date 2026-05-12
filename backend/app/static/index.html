@@ -9199,19 +9199,19 @@
               <span><i class="fa-solid fa-shield-halved mr-1"></i>Sees <strong>all modules</strong> — Finance + PM + Settings</span>
             </template>
             <template x-if="memberForm.role === 'finance_admin'">
-              <span><i class="fa-solid fa-file-invoice-dollar mr-1"></i>Sees Finance module (full write) + PM module (read only)</span>
+              <span><i class="fa-solid fa-file-invoice-dollar mr-1"></i><strong>Finance only</strong> — full write access. PM module is completely hidden.</span>
             </template>
             <template x-if="memberForm.role === 'finance_viewer'">
-              <span><i class="fa-solid fa-eye mr-1"></i>Sees Finance module (read only) — cannot see PM module</span>
+              <span><i class="fa-solid fa-eye mr-1"></i><strong>Finance only</strong> — read-only. PM module is completely hidden.</span>
             </template>
             <template x-if="memberForm.role === 'pm_admin'">
-              <span><i class="fa-solid fa-hard-hat mr-1"></i>Sees PM module (full write) + Finance module (read only)</span>
+              <span><i class="fa-solid fa-hard-hat mr-1"></i><strong>PM only</strong> — full write access. Finance module is completely hidden.</span>
             </template>
             <template x-if="memberForm.role === 'pm_viewer'">
-              <span><i class="fa-solid fa-eye mr-1"></i>Sees PM module (read only) — cannot see Finance module</span>
+              <span><i class="fa-solid fa-eye mr-1"></i><strong>PM only</strong> — read-only. Finance module is completely hidden.</span>
             </template>
             <template x-if="memberForm.role === 'site_supervisor'">
-              <span><i class="fa-solid fa-helmet-safety mr-1"></i>Sees PM module (full write) + Finance module (read only)</span>
+              <span><i class="fa-solid fa-helmet-safety mr-1"></i>PM module (full write) + Finance module (read-only). Useful for field supervisors who need budget visibility.</span>
             </template>
             <template x-if="memberForm.role === 'editor'">
               <span><i class="fa-solid fa-pencil mr-1"></i>Sees both Finance + PM modules with full write access</span>

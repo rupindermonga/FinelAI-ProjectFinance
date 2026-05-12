@@ -2799,11 +2799,11 @@ function app() {
 
     // ── PM helpers ────────────────────────────────────────────────
     get canAccessPM() {
-      const pm = ['owner','admin','pm_admin','site_supervisor','vendor_pm','finance_admin','editor','viewer','pm_viewer'];
+      const pm = ['owner','admin','pm_admin','pm_viewer','site_supervisor','vendor_pm','editor','viewer'];
       return pm.includes(this.currentOrg?.role);
     },
     get canAccessFinance() {
-      const f = ['owner','admin','finance_admin','finance_viewer','editor','viewer'];
+      const f = ['owner','admin','finance_admin','finance_viewer','site_supervisor','editor','viewer'];
       return f.includes(this.currentOrg?.role);
     },
     get isVendorFinance() { return this.currentOrg?.role === 'vendor_finance'; },

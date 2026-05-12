@@ -263,9 +263,13 @@ def require_org_role(*roles: str):
 
 # ── Module access helpers ─────────────────────────────────────────────────────
 
-FINANCE_READ_ROLES  = {"owner","admin","finance_admin","finance_viewer","editor","viewer"}
+# Strict silos: finance_admin/finance_viewer see Finance only (no PM).
+# pm_admin/pm_viewer see PM only (no Finance).
+# site_supervisor = PM write + Finance read (field supervisor who needs budget visibility).
+# editor/viewer = both modules (general staff).
+FINANCE_READ_ROLES  = {"owner","admin","finance_admin","finance_viewer","site_supervisor","editor","viewer"}
 FINANCE_WRITE_ROLES = {"owner","admin","finance_admin","editor"}
-PM_READ_ROLES       = {"owner","admin","pm_admin","pm_viewer","site_supervisor","vendor_pm","finance_admin","editor","viewer"}
+PM_READ_ROLES       = {"owner","admin","pm_admin","pm_viewer","site_supervisor","vendor_pm","editor","viewer"}
 PM_WRITE_ROLES      = {"owner","admin","pm_admin","site_supervisor","vendor_pm","editor"}
 VENDOR_FINANCE_ROLES = {"vendor_finance"}
 VENDOR_PM_ROLES      = {"vendor_pm"}
