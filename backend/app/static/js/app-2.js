@@ -1832,26 +1832,17 @@ function app() {
         if (this.uploadProvClaimId) localStorage.setItem('lastProvClaimId', this.uploadProvClaimId);
         if (this.uploadFedClaimId) localStorage.setItem('lastFedClaimId', this.uploadFedClaimId);
 
-        // Assign uploaded invoices to selected draw/claim
+        // Assign uploaded invoices to selected draw/claim — all in parallel, no blocking GET
         const invoiceIds = data.results.filter(r => r.invoice_id).map(r => r.invoice_id);
         if (invoiceIds.length > 0) {
-          if (this.uploadDrawId) {
-            try { await this.put(`/api/project/draws/${this.uploadDrawId}/invoices`, invoiceIds); } catch(e) { console.warn('Draw assign:', e); }
-          }
-          if (this.uploadProvClaimId) {
-            try {
-              const existing = await this.get(`/api/project/claims/${this.uploadProvClaimId}/invoices`);
-              const existingIds = existing.map(i => i.id);
-              await this.put(`/api/project/claims/${this.uploadProvClaimId}/invoices`, [...existingIds, ...invoiceIds]);
-            } catch(e) { console.warn('Prov claim assign:', e); }
-          }
-          if (this.uploadFedClaimId) {
-            try {
-              const existing = await this.get(`/api/project/claims/${this.uploadFedClaimId}/invoices`);
-              const existingIds = existing.map(i => i.id);
-              await this.put(`/api/project/claims/${this.uploadFedClaimId}/invoices`, [...existingIds, ...invoiceIds]);
-            } catch(e) { console.warn('Fed claim assign:', e); }
-          }
+          const assigns = [];
+          if (this.uploadDrawId)
+            assigns.push(this.put(`/api/project/draws/${this.uploadDrawId}/invoices`, invoiceIds).catch(e => console.warn('Draw assign:', e)));
+          if (this.uploadProvClaimId)
+            assigns.push(this.post('/api/invoices/bulk-assign-claim', { ids: invoiceIds, claim_id: this.uploadProvClaimId, claim_type: 'provincial' }).catch(e => console.warn('Prov claim assign:', e)));
+          if (this.uploadFedClaimId)
+            assigns.push(this.post('/api/invoices/bulk-assign-claim', { ids: invoiceIds, claim_id: this.uploadFedClaimId, claim_type: 'federal' }).catch(e => console.warn('Fed claim assign:', e)));
+          if (assigns.length) await Promise.all(assigns);
         }
 
         // Add to processing queue
