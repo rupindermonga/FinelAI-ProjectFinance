@@ -1526,7 +1526,7 @@
         </div>
 
         <!-- Error invoices banner + retry -->
-        <div x-show="(stats.errors||0) > 0 && processingQueue.length === 0" class="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex items-center justify-between gap-3">
+        <div x-show="(stats.errors||0) > 0 && !retryingInvoices" class="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex items-center justify-between gap-3">
           <div class="flex items-center gap-2 text-sm text-red-700">
             <i class="fa-solid fa-circle-xmark text-red-500"></i>
             <span><strong x-text="stats.errors"></strong> invoice<span x-show="stats.errors>1">s</span> failed AI processing — usually a temporary API rate limit.</span>
@@ -1534,6 +1534,13 @@
           <button @click="retryErrorInvoices()" class="shrink-0 px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700">
             <i class="fa-solid fa-rotate-right mr-1"></i>Retry Now
           </button>
+        </div>
+        <div x-show="retryingInvoices" class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 flex items-center gap-3">
+          <i class="fa-solid fa-spinner fa-spin text-blue-500"></i>
+          <div class="text-sm text-blue-800">
+            <strong>Processing invoices one-by-one…</strong>
+            <span class="text-blue-600 ml-2">Each invoice takes ~15 seconds. Processing: <strong x-text="stats.processing||0"></strong> · Processed: <strong x-text="stats.processed||0"></strong> · Remaining errors: <strong x-text="stats.errors||0"></strong></span>
+          </div>
         </div>
 
         <!-- Processing live feed -->

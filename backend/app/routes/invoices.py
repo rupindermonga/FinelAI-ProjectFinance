@@ -435,8 +435,9 @@ def retry_error_invoices(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Re-queue all error-status invoices for AI re-processing."""
+    """Re-queue error invoices one-at-a-time with 15s gaps to avoid rate limits."""
     from ..services.extractor import process_invoice_file
+    import asyncio
 
     error_invoices = db.query(Invoice).filter(
         Invoice.user_id == current_user.id,
@@ -445,16 +446,31 @@ def retry_error_invoices(
     if not error_invoices:
         return {"message": "No error invoices to retry", "queued": 0}
 
-    queued = 0
+    valid = [(inv.id, inv.source_file) for inv in error_invoices
+             if inv.source_file and os.path.isfile(inv.source_file)]
+
+    # Mark all as pending immediately so the UI shows them
     for inv in error_invoices:
         if inv.source_file and os.path.isfile(inv.source_file):
             inv.status = "pending"
             inv.error_message = None
-            db.commit()
-            background_tasks.add_task(
-                process_invoice_file,
-                inv.id, inv.source_file, current_user.id, db, processing_store,
-            )
-            queued += 1
+    db.commit()
 
-    return {"message": f"Re-queued {queued} invoices for processing", "queued": queued}
+    async def _process_sequentially():
+        from ..database import SessionLocal
+        for i, (inv_id, src_file) in enumerate(valid):
+            if i > 0:
+                await asyncio.sleep(15)  # 15s gap — stays within paid key per-min limit
+            fresh_db = SessionLocal()
+            try:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, process_invoice_file,
+                    inv_id, src_file, current_user.id, fresh_db, processing_store,
+                )
+            except Exception:
+                pass
+            finally:
+                fresh_db.close()
+
+    background_tasks.add_task(_process_sequentially)
+    return {"message": f"Processing {len(valid)} invoices one-by-one (15s apart to avoid rate limits). Watch the Processing counter.", "queued": len(valid)}

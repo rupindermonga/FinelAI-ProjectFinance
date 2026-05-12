@@ -1418,12 +1418,27 @@ function app() {
     },
 
     async retryErrorInvoices() {
+      this.retryingInvoices = true;
       try {
         const r = await this.post('/api/invoices/retry-errors', {});
-        alert(r.message);
+        // Start polling every 3 seconds automatically
+        this._startProcessingPoll();
+      } catch(e) { alert('Retry failed: ' + e.message); this.retryingInvoices = false; }
+    },
+
+    _startProcessingPoll() {
+      const poll = async () => {
         await this.loadStats();
         await this.loadInvoices();
-      } catch(e) { alert('Retry failed: ' + e.message); }
+        const processing = this.stats.processing || 0;
+        const pending = (this.invoices || []).filter(i => i.status === 'pending').length;
+        if (processing > 0 || pending > 0) {
+          setTimeout(poll, 3000);
+        } else {
+          this.retryingInvoices = false;
+        }
+      };
+      setTimeout(poll, 2000);
     },
 
     clearFilters() {
@@ -2380,6 +2395,7 @@ function app() {
     // ── User Management (admin) ─────────────────────────────────
     adminUsers: [],
     showCreateUserModal: false,
+    retryingInvoices: false,
     createUserForm: { username: '', email: '', password: '', is_admin: false, org_role: 'editor' },
     createUserError: '',
     changePwForm: { current_password: '', new_password: '' },
