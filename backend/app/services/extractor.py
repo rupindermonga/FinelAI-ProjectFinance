@@ -115,9 +115,7 @@ async def process_invoice_file(
                     "sub_categories": [{"name": sc.name} for sc in cc.sub_categories],
                 })
 
-        logger.info("DEBUG cost_cats_data for invoice %s: %s", invoice_id, cost_cats_data)
         data = await extract_invoice_from_file(file_path, columns, cats, db_keys, corrections, cost_cats_data)
-        logger.info("DEBUG extracted cost_category for invoice %s: %s", invoice_id, data.get("cost_category"))
 
         # Populate indexed fields from extracted data
         invoice.invoice_number = _str(data.get("invoice_number"))
