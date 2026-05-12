@@ -980,11 +980,11 @@ function app() {
           const savedOrgId = parseInt(localStorage.getItem('currentOrgId'));
           this.currentOrg = (savedOrgId && this.orgs.find(o => o.id === savedOrgId)) || this.orgs[0] || null;
         } catch(e) {
-          // Token likely expired — clear and show login
+          // Token likely expired — clear storage and show marketing page
           localStorage.removeItem('invoice_token');
           localStorage.removeItem('invoice_user');
           localStorage.removeItem('currentOrgId');
-          this.view = 'login';
+          this.view = 'landing';
           return;
         }
         // Restore view from URL path if valid
