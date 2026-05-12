@@ -511,11 +511,11 @@ def bulk_assign_draw(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Assign a draw to multiple invoices at once."""
+    """Assign or unassign a draw on multiple invoices. draw_id=null removes the assignment."""
     ids = body.get("ids", [])
-    draw_id = body.get("draw_id")
-    if not ids or not draw_id:
-        return {"message": "No ids or draw_id provided", "updated": 0}
+    draw_id = body.get("draw_id")  # None = unassign
+    if not ids:
+        return {"message": "No ids provided", "updated": 0}
     invs = db.query(Invoice).filter(
         Invoice.id.in_(ids),
         Invoice.user_id == current_user.id,
@@ -534,12 +534,12 @@ def bulk_assign_claim(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Assign a claim to multiple invoices at once."""
+    """Assign or unassign a claim on multiple invoices. claim_id=null removes the assignment."""
     ids = body.get("ids", [])
-    claim_id = body.get("claim_id")
+    claim_id = body.get("claim_id")  # None = unassign
     claim_type = body.get("claim_type", "provincial")
-    if not ids or not claim_id:
-        return {"message": "No ids or claim_id provided", "updated": 0}
+    if not ids:
+        return {"message": "No ids provided", "updated": 0}
     invs = db.query(Invoice).filter(
         Invoice.id.in_(ids),
         Invoice.user_id == current_user.id,

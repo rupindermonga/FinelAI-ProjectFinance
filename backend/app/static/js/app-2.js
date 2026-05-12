@@ -478,6 +478,7 @@ function app() {
     pagination: { page: 1, limit: 50, total: 0, pages: 0 },
     viewMode: 'summary',   // 'summary' | 'lines'
     selectedInvoiceIds: [],
+    selectedAllPages: false,
 
     // ── Upload ────────────────────────────────────────────────────
     showUploadModal: false,
@@ -1633,44 +1634,63 @@ function app() {
 
     toggleInvoiceSelect(id, e) {
       e.stopPropagation();
+      this.selectedAllPages = false;
       const idx = this.selectedInvoiceIds.indexOf(id);
       if (idx === -1) this.selectedInvoiceIds.push(id);
       else this.selectedInvoiceIds.splice(idx, 1);
     },
     toggleSelectAll(e) {
       e.stopPropagation();
+      this.selectedAllPages = false;
       if (this.selectedInvoiceIds.length === this.invoices.length)
         this.selectedInvoiceIds = [];
       else
         this.selectedInvoiceIds = this.invoices.map(i => i.id);
     },
+    async selectAllPages() {
+      // Fetch ALL invoice IDs across all pages matching current filters
+      try {
+        const params = new URLSearchParams({ page: 1, limit: 5000 });
+        if (this.filters.start_date) params.set('start_date', this.filters.start_date);
+        if (this.filters.end_date)   params.set('end_date',   this.filters.end_date);
+        if (this.filters.vendor)     params.set('vendor',     this.filters.vendor);
+        if (this.filters.currency)   params.set('currency',   this.filters.currency);
+        if (this.filters.status)     params.set('status',     this.filters.status);
+        if (this.filters.draw_id)    params.set('draw_id',    this.filters.draw_id);
+        if (this.filters.claim_id)   params.set('claim_id',   this.filters.claim_id);
+        const data = await this.get(`/api/invoices?${params}`);
+        this.selectedInvoiceIds = data.items.map(i => i.id);
+        this.selectedAllPages = true;
+      } catch(e) { alert('Could not select all: ' + e.message); }
+    },
     async bulkAssignDraw(drawId) {
-      if (!this.selectedInvoiceIds.length || !drawId) return;
+      if (!this.selectedInvoiceIds.length) return;
       try {
         const r = await this.post('/api/invoices/bulk-assign-draw', { ids: this.selectedInvoiceIds, draw_id: drawId });
         for (const inv of this.invoices) {
-          if (this.selectedInvoiceIds.includes(inv.id)) inv.draw_id = drawId;
+          if (this.selectedInvoiceIds.includes(inv.id)) inv.draw_id = drawId || null;
         }
-        this.selectedInvoiceIds = [];
-        alert(`Draw assigned to ${r.updated} invoice(s).`);
+        this.selectedInvoiceIds = []; this.selectedAllPages = false;
+        await this.loadInvoices();
+        alert(drawId ? `Draw assigned to ${r.updated} invoice(s).` : `Draw removed from ${r.updated} invoice(s).`);
       } catch (e) { alert('Could not assign draw: ' + e.message); }
     },
 
     async bulkAssignClaim(claimId, claimType) {
-      if (!this.selectedInvoiceIds.length || !claimId) return;
+      if (!this.selectedInvoiceIds.length) return;
       try {
         const r = await this.post('/api/invoices/bulk-assign-claim', {
           ids: this.selectedInvoiceIds,
           claim_id: claimId,
           claim_type: claimType,
         });
-        // Update local state immediately
         const field = claimType === 'provincial' ? 'provincial_claim_id' : 'federal_claim_id';
         for (const inv of this.invoices) {
-          if (this.selectedInvoiceIds.includes(inv.id)) inv[field] = claimId;
+          if (this.selectedInvoiceIds.includes(inv.id)) inv[field] = claimId || null;
         }
-        this.selectedInvoiceIds = [];
-        alert(`Claim assigned to ${r.updated} invoice(s).`);
+        this.selectedInvoiceIds = []; this.selectedAllPages = false;
+        await this.loadInvoices();
+        alert(claimId ? `Claim assigned to ${r.updated} invoice(s).` : `Claim removed from ${r.updated} invoice(s).`);
       } catch (e) { alert('Could not assign claim: ' + e.message); }
     },
 
