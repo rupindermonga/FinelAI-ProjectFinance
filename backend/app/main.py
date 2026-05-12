@@ -66,6 +66,13 @@ def _run_migrations():
             "ALTER TABLE invoices ADD COLUMN approved_at TEXT",
             "ALTER TABLE invoices ADD COLUMN file_hash VARCHAR",
             "ALTER TABLE invoices ADD COLUMN retry_count INTEGER DEFAULT 0",
+            """CREATE TABLE IF NOT EXISTS worker_heartbeats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts DATETIME DEFAULT CURRENT_TIMESTAMP,
+                queue_depth INTEGER DEFAULT 0,
+                processed_session INTEGER DEFAULT 0,
+                worker_pid INTEGER
+            )""",
             """CREATE TABLE IF NOT EXISTS milestones (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL REFERENCES projects(id),

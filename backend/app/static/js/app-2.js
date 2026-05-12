@@ -470,6 +470,8 @@ function app() {
     invoices: [],
     stats: {},
     _statsTimer: null,
+    // ── System Health ─────────────────────────────────────────────
+    systemHealth: null, _healthTimer: null,
     filters: { start_date: '', end_date: '', vendor: '', currency: '', status: '', draw_id: '', claim_id: '' },
     exportDates: { start: '', end: '' },
     exportMode: 'summary',
@@ -996,7 +998,7 @@ function app() {
           'client-hub','syndicate','erp-integrations','cfo-reports','subcontractors','canadian-legal',
           'quality','crm','assemblies','advanced-reports','lender-advanced','adjudication','gst-rebates',
           'platform-api','eft-batches','api-keys','webhooks','bank-feed','bank-import','fx-rates',
-          'stress-test','execution-forecast','audit-log','org','vendor-directory','superadmin']);
+          'stress-test','execution-forecast','audit-log','org','vendor-directory','superadmin','system-health']);
         const rawPath = window.location.pathname.replace(/^\//, '').replace(/\//g, '-');
         const intendedView = ROUTABLE.has(rawPath) ? rawPath : 'dashboard';
 
@@ -1466,6 +1468,18 @@ function app() {
         const delay = ((this.stats.pending || 0) > 0 || (this.stats.errors || 0) > 0) ? 4000 : 30000;
         this._statsTimer = setTimeout(() => { this.loadStats(); this.loadInvoices(); }, delay);
       } catch (e) {}
+    },
+
+    async loadSystemHealth() {
+      clearTimeout(this._healthTimer);
+      this._healthTimer = null;
+      try {
+        this.systemHealth = await this.get('/api/admin/health');
+      } catch(e) { console.error('Health check failed:', e); }
+      // Auto-refresh every 15s while on the health page
+      if (this.view === 'system-health') {
+        this._healthTimer = setTimeout(() => this.loadSystemHealth(), 15000);
+      }
     },
 
     async retryErrorInvoices() {

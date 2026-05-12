@@ -1,4 +1,5 @@
 """Admin-only routes: manage Gemini API keys and user accounts."""
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
@@ -211,3 +212,81 @@ def delete_user(user_id: int, db: Session = Depends(get_db), admin: User = Depen
         audit_log(db, org_id, admin, "delete_user", entity_type="user",
                   entity_id=user_id, detail=f"Admin deleted user '{uname}'")
     return {"message": f"User {uname} deleted"}
+
+
+# ── System Health Endpoint ────────────────────────────────────────────────────
+
+@router.get("/health")
+def system_health(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Full system health check — accessible to any authenticated user."""
+    from sqlalchemy import text
+    import time as _time
+    from ..services.gemini import _rate_limited_until, _env_keys
+
+    # Worker heartbeat
+    hb = db.execute(text(
+        "SELECT ts, queue_depth, processed_session, worker_pid "
+        "FROM worker_heartbeats ORDER BY id DESC LIMIT 1"
+    )).fetchone()
+    if hb:
+        from datetime import datetime
+        ts = datetime.fromisoformat(str(hb[0])) if hb[0] else None
+        secs_ago = int((datetime.utcnow() - ts).total_seconds()) if ts else 9999
+        worker = {
+            "alive": secs_ago < 90,
+            "last_heartbeat_secs_ago": secs_ago,
+            "queue_depth": hb[1],
+            "processed_session": hb[2],
+            "pid": hb[3],
+        }
+    else:
+        worker = {"alive": False, "last_heartbeat_secs_ago": None, "queue_depth": None, "processed_session": 0, "pid": None}
+
+    # Invoice pipeline stats
+    base = db.execute(text(
+        "SELECT status, COUNT(*) FROM invoices GROUP BY status"
+    )).fetchall()
+    counts = {r[0]: r[1] for r in base}
+    total   = sum(counts.values())
+    errors  = counts.get("error", 0)
+    pending = counts.get("pending", 0) + counts.get("processing", 0)
+    done    = counts.get("processed", 0)
+
+    # Invoices stuck on retry_count >= MAX
+    stuck = db.execute(text(
+        "SELECT COUNT(*) FROM invoices WHERE status='error' AND COALESCE(retry_count,0) >= 4"
+    )).fetchone()[0]
+
+    # Gemini key health
+    all_keys  = _env_keys()
+    now_ts    = _time.time()
+    blacklisted = [k for k, exp in _rate_limited_until.items() if exp > now_ts]
+    available   = len(all_keys) - len(blacklisted)
+    gemini = {
+        "keys_total": len(all_keys),
+        "keys_available": max(0, available),
+        "keys_blacklisted": len(blacklisted),
+        "paid_key_configured": bool(os.getenv("GEMINI_PAID_KEY")),
+    }
+
+    # Recent error rate (last 50 processed)
+    recent = db.execute(text(
+        "SELECT status FROM invoices WHERE status IN ('processed','error') "
+        "ORDER BY id DESC LIMIT 50"
+    )).fetchall()
+    recent_errors = sum(1 for r in recent if r[0] == "error")
+    error_rate_pct = round(recent_errors / max(len(recent), 1) * 100, 1)
+
+    return {
+        "worker": worker,
+        "pipeline": {
+            "total": total,
+            "processed": done,
+            "pending": pending,
+            "errors": errors,
+            "stuck": stuck,
+            "error_rate_pct_recent50": error_rate_pct,
+        },
+        "gemini": gemini,
+        "db": {"connected": True},
+    }
