@@ -505,6 +505,29 @@ def retry_error_invoices(
     return {"message": f"Processing {len(valid)} invoices (12s apart). Watch the counter.", "queued": len(valid)}
 
 
+@router.post("/bulk-assign-draw")
+def bulk_assign_draw(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Assign a draw to multiple invoices at once."""
+    ids = body.get("ids", [])
+    draw_id = body.get("draw_id")
+    if not ids or not draw_id:
+        return {"message": "No ids or draw_id provided", "updated": 0}
+    invs = db.query(Invoice).filter(
+        Invoice.id.in_(ids),
+        Invoice.user_id == current_user.id,
+    ).all()
+    updated = 0
+    for inv in invs:
+        inv.draw_id = draw_id
+        updated += 1
+    db.commit()
+    return {"message": f"Updated {updated} invoices", "updated": updated}
+
+
 @router.post("/bulk-assign-claim")
 def bulk_assign_claim(
     body: dict,

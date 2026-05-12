@@ -1644,6 +1644,18 @@ function app() {
       else
         this.selectedInvoiceIds = this.invoices.map(i => i.id);
     },
+    async bulkAssignDraw(drawId) {
+      if (!this.selectedInvoiceIds.length || !drawId) return;
+      try {
+        const r = await this.post('/api/invoices/bulk-assign-draw', { ids: this.selectedInvoiceIds, draw_id: drawId });
+        for (const inv of this.invoices) {
+          if (this.selectedInvoiceIds.includes(inv.id)) inv.draw_id = drawId;
+        }
+        this.selectedInvoiceIds = [];
+        alert(`Draw assigned to ${r.updated} invoice(s).`);
+      } catch (e) { alert('Could not assign draw: ' + e.message); }
+    },
+
     async bulkAssignClaim(claimId, claimType) {
       if (!this.selectedInvoiceIds.length || !claimId) return;
       try {

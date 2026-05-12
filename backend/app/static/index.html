@@ -1588,29 +1588,70 @@
               <template x-if="selectedInvoiceIds.length > 0">
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-xs text-blue-700 font-semibold" x-text="`${selectedInvoiceIds.length} selected`"></span>
-                  <!-- Bulk Assign Claim -->
+
+                  <!-- Bulk Assign Draw -->
                   <div class="relative" x-data="{ open: false }">
                     <button @click="open=!open"
-                      class="flex items-center gap-1.5 px-3 py-1 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition">
-                      <i class="fa-solid fa-file-invoice-dollar"></i> Assign Claim
+                      class="flex items-center gap-1.5 px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition">
+                      <i class="fa-solid fa-building-columns"></i> Draw
                       <i class="fa-solid fa-chevron-down text-[10px]"></i>
                     </button>
                     <div x-show="open" @click.outside="open=false" x-cloak
-                      class="absolute left-0 top-7 z-50 bg-white border rounded-xl shadow-xl min-w-[180px] py-1">
-                      <div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide border-b">Select Claim</div>
-                      <template x-if="claims.length === 0">
-                        <div class="px-3 py-2 text-xs text-gray-400">No claims found</div>
+                      class="absolute left-0 top-7 z-50 bg-white border rounded-xl shadow-xl min-w-[160px] py-1">
+                      <div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide border-b">Assign Draw</div>
+                      <template x-if="draws.length === 0">
+                        <div class="px-3 py-2 text-xs text-gray-400">No draws found</div>
                       </template>
-                      <template x-for="c in claims" :key="c.id">
-                        <button @click="bulkAssignClaim(c.id, c.claim_type); open=false"
-                          class="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 transition flex items-center gap-2">
-                          <span :class="c.claim_type==='provincial' ? 'text-purple-700 font-bold' : 'text-indigo-700 font-bold'"
-                            x-text="(c.claim_type==='provincial' ? 'P' : 'F') + ' ' + c.claim_number"></span>
-                          <span class="text-gray-400 truncate" x-text="c.claim_type"></span>
-                        </button>
+                      <template x-for="d in draws" :key="d.id">
+                        <button @click="bulkAssignDraw(d.id); open=false"
+                          class="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition font-semibold text-blue-700"
+                          x-text="'Draw ' + d.draw_number"></button>
                       </template>
                     </div>
                   </div>
+
+                  <!-- Bulk Assign Provincial Claim -->
+                  <div class="relative" x-data="{ open: false }">
+                    <button @click="open=!open"
+                      class="flex items-center gap-1.5 px-3 py-1 bg-purple-600 text-white text-xs font-semibold rounded-lg hover:bg-purple-700 transition">
+                      <i class="fa-solid fa-landmark"></i> Prov. Claim
+                      <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                    </button>
+                    <div x-show="open" @click.outside="open=false" x-cloak
+                      class="absolute left-0 top-7 z-50 bg-white border rounded-xl shadow-xl min-w-[160px] py-1">
+                      <div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide border-b">Provincial Claim</div>
+                      <template x-if="claims.filter(c=>c.claim_type==='provincial').length === 0">
+                        <div class="px-3 py-2 text-xs text-gray-400">No provincial claims</div>
+                      </template>
+                      <template x-for="c in claims.filter(c=>c.claim_type==='provincial')" :key="c.id">
+                        <button @click="bulkAssignClaim(c.id, 'provincial'); open=false"
+                          class="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 transition font-semibold text-purple-700"
+                          x-text="'P ' + c.claim_number"></button>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Bulk Assign Federal Claim -->
+                  <div class="relative" x-data="{ open: false }">
+                    <button @click="open=!open"
+                      class="flex items-center gap-1.5 px-3 py-1 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition">
+                      <i class="fa-solid fa-flag"></i> Fed. Claim
+                      <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                    </button>
+                    <div x-show="open" @click.outside="open=false" x-cloak
+                      class="absolute left-0 top-7 z-50 bg-white border rounded-xl shadow-xl min-w-[160px] py-1">
+                      <div class="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide border-b">Federal Claim</div>
+                      <template x-if="claims.filter(c=>c.claim_type==='federal').length === 0">
+                        <div class="px-3 py-2 text-xs text-gray-400">No federal claims</div>
+                      </template>
+                      <template x-for="c in claims.filter(c=>c.claim_type==='federal')" :key="c.id">
+                        <button @click="bulkAssignClaim(c.id, 'federal'); open=false"
+                          class="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 transition font-semibold text-indigo-700"
+                          x-text="'F ' + c.claim_number"></button>
+                      </template>
+                    </div>
+                  </div>
+
                   <button @click="reprocessSelected()"
                     class="flex items-center gap-1.5 px-3 py-1 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 transition">
                     <i class="fa-solid fa-rotate-right"></i> Re-extract
