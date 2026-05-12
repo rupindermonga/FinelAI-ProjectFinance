@@ -9,8 +9,14 @@ Never crashes when the web server restarts. Survives indefinitely.
 """
 import os, sys, asyncio, logging, time
 
-# Must be set before any app imports
-os.environ.setdefault("DATABASE_URL", "sqlite:////var/lib/finel-pf/db/project_finance.db")
+# Force SQLite path — Doppler may inject a postgres URL but this worker
+# always uses the local DB directly. os.environ[] overrides Doppler.
+db_url = os.environ.get("DATABASE_URL", "")
+if not db_url or db_url.startswith("postgres"):
+    os.environ["DATABASE_URL"] = "sqlite:////var/lib/finel-pf/db/project_finance.db"
+# SQLAlchemy 1.4+ requires 'postgresql://' not 'postgres://'
+elif db_url.startswith("postgres://"):
+    os.environ["DATABASE_URL"] = db_url.replace("postgres://", "postgresql://", 1)
 
 logging.basicConfig(
     level=logging.INFO,
