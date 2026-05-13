@@ -180,6 +180,7 @@ def build_extraction_prompt(columns: List[ColumnConfig], categories: List[Catego
                     "Mobiliz/Travel Day/Setup/Move-In/Move-Out/Float → 'Mobilization'; "
                     "Design/Engineering/Drawing/Survey/As-Built → 'Drawings / Design and Engineering'; "
                     "Supervision/Support/Inspection/QA/Safety/Breaker/Traffic → 'Construction Support'; "
+                    "Hydro/Electricity/Utility/Power/kWh/Delivery/Regulatory/Global Adjustment → 'Construction Support'; "
                     "Material/Supply/Hardware/Equipment (for Material category) → pick best sub-category based on item type: "
                     "vault/handhole/manhole → 'Vaults and Handholes'; "
                     "fibre/fiber/cable/conduit/duct → 'Fibre and Cable Infrastructure'; "
@@ -238,10 +239,11 @@ def build_extraction_prompt(columns: List[ColumnConfig], categories: List[Catego
             f"Category guide: {cat_guide}. "
             "FTTH/telecom decision rules (in priority order): "
             "1. If majority of lines are hours/perdiem/travel/wages with no materials → Payroll. "
-            "2. If invoice is primarily supply of physical materials (cable, vaults, conduit, equipment) → Material. "
-            "3. If invoice is primarily optical/network equipment (OLT, ONT, chassis, modules) → Electronics. "
-            "4. If invoice is preliminary/prep work (permits, design, make-ready, clearing) → Make Ready. "
-            "5. If invoice is construction/installation (plow, bore, aerial, drops, pole work) → Fiber Build. "
+            "2. If invoice is for hydro/electricity/utility/power/kWh/Hydro One/hydro bill → Fiber Build (site utility cost). "
+            "3. If invoice is primarily supply of physical materials (cable, vaults, conduit, hardware) → Material. "
+            "4. If invoice is primarily optical/network equipment (OLT, ONT, chassis, modules) → Electronics. "
+            "5. If invoice is preliminary/prep work (permits, design, make-ready, clearing) → Make Ready. "
+            "6. If invoice is construction/installation (plow, bore, aerial, drops, pole work) → Fiber Build. "
             "(string, required)"
         )
         # Build sub-category hints per cost category
