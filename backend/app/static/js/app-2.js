@@ -348,8 +348,9 @@ function app() {
     closeoutForm: { category:'documents', item_name:'', responsible_party:'', due_date:'', status:'pending', notes:'' },
 
     // ── Execution Forecast ────────────────────────────────────────
-    efTab: 'grid',                   // 'grid' | 'actuals' | 'summary' | 'import'
+    efTab: 'grid',                   // 'grid' | 'summary' | 'actuals' | 'import' | 'dashboard'
     efImporting: false, efImportResult: null, efImportFile: null,
+    _efCharts: {},
     efGrid: [], efPeriods: [],        // full plan vs actual table
     efSummary: [], efSummaryPeriods: [],
     efFilterSD: '', efFilterPeriod: '',
@@ -5218,6 +5219,11 @@ ${d.participant_shares?.map(p=>`<tr><td>${p.lender}</td><td>${p.pct}%</td><td>$$
       if (tab === 'grid') await this.loadEFGrid();
       if (tab === 'summary') await this.loadEFSummary();
       if (tab === 'actuals' && this.efActualsPeriod) await this.loadEFActualsForm();
+      if (tab === 'dashboard') {
+        if (!this.efSummary.length) await this.loadEFSummary();
+        if (!this.efGrid.length) await this.loadEFGrid();
+        setTimeout(() => this.renderEFCharts(), 120);
+      }
     },
 
     async importEFExcel() {
@@ -5278,6 +5284,151 @@ ${d.participant_shares?.map(p=>`<tr><td>${p.lender}</td><td>${p.pct}%</td><td>$$
     efPct(planned, actual) {
       if (!planned || planned == 0 || actual === null || actual === undefined || actual === '') return '—';
       return Math.round((parseFloat(actual) / parseFloat(planned)) * 100) + '%';
+    },
+
+    renderEFCharts() {
+      if (typeof Chart === 'undefined') return;
+      const periods = this.efSummaryPeriods;
+      const summary = this.efSummary;
+
+      // S-Curve: cumulative plan vs actual
+      const cumPlanData = [], cumActualData = [];
+      let cPlan = 0, cActual = 0;
+      for (const p of periods) {
+        let pSum = 0, aSum = 0, hasActual = false;
+        for (const ws of summary) {
+          pSum += ws.periods[p.iso]?.plan || 0;
+          if (ws.periods[p.iso]?.actual != null) {
+            aSum += parseFloat(ws.periods[p.iso].actual);
+            hasActual = true;
+          }
+        }
+        cPlan += pSum;
+        if (hasActual) cActual += aSum;
+        cumPlanData.push(parseFloat(cPlan.toFixed(1)));
+        cumActualData.push(hasActual ? parseFloat(cActual.toFixed(1)) : null);
+      }
+      const scCtx = document.getElementById('ef-scurve-chart');
+      if (scCtx) {
+        if (this._efCharts.scurve) this._efCharts.scurve.destroy();
+        this._efCharts.scurve = new Chart(scCtx, {
+          type: 'line',
+          data: {
+            labels: periods.map(p => p.label),
+            datasets: [
+              { label: 'Planned', data: cumPlanData, borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)', fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2 },
+              { label: 'Actual',  data: cumActualData, borderColor: '#10b981', backgroundColor: 'transparent', fill: false, tension: 0.3, borderDash: [6,3], pointRadius: 3, borderWidth: 2, spanGaps: false },
+            ],
+          },
+          options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } },
+        });
+      }
+
+      // Workstream progress horizontal bars
+      const wsLabels = summary.map(ws => ws.workstream);
+      const wsActPct = summary.map(ws => {
+        const tot = Object.values(ws.periods).reduce((s, p) => s + (p.actual != null ? parseFloat(p.actual) : 0), 0);
+        return ws.total_scope > 0 ? parseFloat((tot / ws.total_scope * 100).toFixed(1)) : 0;
+      });
+      const wsPlanPct = summary.map(ws => {
+        const tot = Object.values(ws.periods).reduce((s, p) => s + (p.plan || 0), 0);
+        return ws.total_scope > 0 ? parseFloat((tot / ws.total_scope * 100).toFixed(1)) : 0;
+      });
+      const wsCtx = document.getElementById('ef-workstream-chart');
+      if (wsCtx) {
+        if (this._efCharts.workstream) this._efCharts.workstream.destroy();
+        this._efCharts.workstream = new Chart(wsCtx, {
+          type: 'bar',
+          data: {
+            labels: wsLabels,
+            datasets: [
+              { label: 'Plan %',   data: wsPlanPct, backgroundColor: 'rgba(99,102,241,0.25)', borderColor: '#6366f1', borderWidth: 1 },
+              { label: 'Actual %', data: wsActPct,  backgroundColor: wsActPct.map((v, i) => v >= wsPlanPct[i] ? 'rgba(16,185,129,0.65)' : 'rgba(239,68,68,0.65)'), borderColor: wsActPct.map((v, i) => v >= wsPlanPct[i] ? '#10b981' : '#ef4444'), borderWidth: 1 },
+            ],
+          },
+          options: {
+            indexAxis: 'y', responsive: true,
+            plugins: { legend: { position: 'top' } },
+            scales: { x: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } },
+          },
+        });
+      }
+
+      // Monthly plan vs actual (last 12 periods)
+      const recent = periods.slice(-12);
+      const mPlan = [], mActual = [];
+      for (const p of recent) {
+        let ps = 0, as = 0;
+        for (const ws of summary) {
+          ps += ws.periods[p.iso]?.plan || 0;
+          if (ws.periods[p.iso]?.actual != null) as += parseFloat(ws.periods[p.iso].actual);
+        }
+        mPlan.push(parseFloat(ps.toFixed(1)));
+        mActual.push(parseFloat(as.toFixed(1)));
+      }
+      const mCtx = document.getElementById('ef-monthly-chart');
+      if (mCtx) {
+        if (this._efCharts.monthly) this._efCharts.monthly.destroy();
+        this._efCharts.monthly = new Chart(mCtx, {
+          type: 'bar',
+          data: {
+            labels: recent.map(p => p.label),
+            datasets: [
+              { label: 'Planned', data: mPlan,   backgroundColor: 'rgba(99,102,241,0.4)',  borderColor: '#6366f1', borderWidth: 1 },
+              { label: 'Actual',  data: mActual, backgroundColor: 'rgba(16,185,129,0.5)',  borderColor: '#10b981', borderWidth: 1 },
+            ],
+          },
+          options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } },
+        });
+      }
+    },
+
+    efOverallPct() {
+      let totalScope = 0, totalActual = 0;
+      for (const t of this.efGrid) {
+        totalScope += t.total_scope || 0;
+        for (const p of Object.values(t.periods)) {
+          if (p.actual != null) totalActual += parseFloat(p.actual);
+        }
+      }
+      return totalScope > 0 ? Math.round(totalActual / totalScope * 100) : 0;
+    },
+
+    efTotalScope() {
+      return Math.round(this.efSummary.reduce((s, ws) => s + (ws.total_scope || 0), 0));
+    },
+
+    efTotalRemaining() {
+      return Math.round(this.efGrid.reduce((s, t) => s + (t.remaining || 0), 0));
+    },
+
+    efBehindCount() {
+      if (!this.efSummaryPeriods.length || !this.efSummary.length) return 0;
+      let latestPeriod = null;
+      for (let i = this.efSummaryPeriods.length - 1; i >= 0; i--) {
+        const p = this.efSummaryPeriods[i];
+        if (this.efSummary.some(ws => ws.periods[p.iso]?.actual != null)) { latestPeriod = p; break; }
+      }
+      if (!latestPeriod) return 0;
+      return this.efSummary.filter(ws => {
+        const p = ws.periods[latestPeriod.iso];
+        return p && p.plan != null && p.actual != null && parseFloat(p.actual) < (p.plan || 0);
+      }).length;
+    },
+
+    efUniqueWorkstreams() {
+      return [...new Set(this.efGrid.map(t => t.workstream))];
+    },
+
+    efUniqueNodes() {
+      return [...new Set(this.efGrid.map(t => t.node_code))];
+    },
+
+    efNodeWsPct(node, ws) {
+      const t = this.efGrid.find(r => r.node_code === node && r.workstream === ws);
+      if (!t || !t.total_scope) return 0;
+      const totalActual = Object.values(t.periods).reduce((s, p) => s + (p.actual != null ? parseFloat(p.actual) : 0), 0);
+      return Math.round(totalActual / t.total_scope * 100);
     },
 
   };
