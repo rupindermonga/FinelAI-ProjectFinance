@@ -203,10 +203,13 @@ async def import_excel(project_id: int,
         raise HTTPException(400, f"Cannot open Excel file: {e}")
 
     ws = None
-    for sname in wb.sheetnames:
-        if "detailed" in sname.lower() or "plan" in sname.lower():
-            ws = wb[sname]
-            break
+    for sname in wb.sheetnames:          # prefer "detailed" first
+        if "detailed" in sname.lower():
+            ws = wb[sname]; break
+    if ws is None:
+        for sname in wb.sheetnames:      # fallback: any sheet with "plan"
+            if "plan" in sname.lower():
+                ws = wb[sname]; break
     if ws is None:
         ws = wb[wb.sheetnames[0]]
 
