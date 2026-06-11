@@ -1371,6 +1371,14 @@
           <a x-show="currentOrg?.plan==='starter' && !user?.is_admin" href="https://finel.ai/pricing" target="_blank"
              class="text-xs text-amber-300 hover:text-amber-200 underline underline-offset-2 transition">Upgrade →</a>
         </div>
+        <div class="mt-2">
+          <a href="https://books.finel.ai/" target="_blank" rel="noopener"
+             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-200 hover:text-white transition text-xs font-medium">
+            <i class="fa-solid fa-book-open w-4"></i>
+            <span>Finel Books</span>
+            <i class="fa-solid fa-arrow-up-right-from-square ml-auto text-indigo-400 text-[10px]"></i>
+          </a>
+        </div>
         <div class="flex items-center gap-3 mt-2">
           <button @click="logout()" class="text-xs text-blue-300 hover:text-white transition">
             <i class="fa-solid fa-right-from-bracket mr-1"></i> Sign out
