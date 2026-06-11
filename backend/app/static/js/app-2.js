@@ -818,6 +818,15 @@ function app() {
     assignedInvoiceIds: [],
     fxRateLoading: false,
 
+    // ── Books Sync ────────────────────────────────────────────────
+    booksSyncItems: [],
+    booksSyncLoading: false,
+    booksSyncError: '',
+    booksSyncSelected: [],
+    booksSyncHideImported: true,
+    booksSyncImporting: false,
+    booksSyncResult: null,
+
     // ── AI Intelligence ───────────────────────────────────────────
     aiInsights: null,
     aiLoading: false,
@@ -846,6 +855,51 @@ function app() {
     costConsultantLoading: false,
     // Feature 12: CO radar (in aiInsights.co_radar)
     // Feature 13: vendor risk (in aiInsights.vendor_risk)
+
+    async loadBooksSyncPreview() {
+      this.booksSyncLoading = true;
+      this.booksSyncError = '';
+      this.booksSyncResult = null;
+      this.booksSyncSelected = [];
+      try {
+        this.booksSyncItems = await this.get('/api/books/preview?limit=500');
+      } catch(e) {
+        this.booksSyncError = e.message || 'Failed to load Books transactions';
+        this.booksSyncItems = [];
+      } finally {
+        this.booksSyncLoading = false;
+      }
+    },
+    booksSyncToggle(id) {
+      const i = this.booksSyncSelected.indexOf(id);
+      if (i >= 0) this.booksSyncSelected.splice(i, 1);
+      else this.booksSyncSelected.push(id);
+    },
+    booksSyncToggleAll(e) {
+      if (e.target.checked) {
+        this.booksSyncSelected = this.booksSyncItems
+          .filter(t => !t.already_imported)
+          .map(t => t.id);
+      } else {
+        this.booksSyncSelected = [];
+      }
+    },
+    async runBooksImport() {
+      if (!this.booksSyncSelected.length) return;
+      this.booksSyncImporting = true;
+      this.booksSyncResult = null;
+      try {
+        const res = await this.post('/api/books/import', { transaction_ids: this.booksSyncSelected });
+        this.booksSyncResult = res;
+        this.booksSyncSelected = [];
+        // Refresh to mark imported ones
+        await this.loadBooksSyncPreview();
+      } catch(e) {
+        this.booksSyncError = e.message || 'Import failed';
+      } finally {
+        this.booksSyncImporting = false;
+      }
+    },
 
     async loadAiInsights() {
       if (!this.currentProject) return;

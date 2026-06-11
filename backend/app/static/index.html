@@ -1371,12 +1371,17 @@
           <a x-show="currentOrg?.plan==='starter' && !user?.is_admin" href="https://finel.ai/pricing" target="_blank"
              class="text-xs text-amber-300 hover:text-amber-200 underline underline-offset-2 transition">Upgrade →</a>
         </div>
-        <div class="mt-2">
+        <div class="mt-2 flex items-center gap-1.5">
+          <button @click="go('books-sync', ()=>{ loadBooksSyncPreview() }); sidebarOpen=false"
+                  :class="view==='books-sync'?'bg-indigo-700':'hover:bg-indigo-700/50'"
+                  class="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-200 hover:text-white transition text-xs font-medium">
+            <i class="fa-solid fa-rotate w-4"></i>
+            <span>Sync from Books</span>
+          </button>
           <a href="https://books.finel.ai/" target="_blank" rel="noopener"
-             class="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-200 hover:text-white transition text-xs font-medium">
-            <i class="fa-solid fa-book-open w-4"></i>
-            <span>Finel Books</span>
-            <i class="fa-solid fa-arrow-up-right-from-square ml-auto text-indigo-400 text-[10px]"></i>
+             class="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-300 hover:text-white transition"
+             title="Open Finel Books">
+            <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
           </a>
         </div>
         <div class="flex items-center gap-3 mt-2">
@@ -4329,6 +4334,118 @@
 
 
       <!-- ── AI INSIGHTS ───────────────────────────────────────────── -->
+      <!-- ── BOOKS SYNC ─────────────────────────────────── -->
+      <div x-show="view==='books-sync'" class="p-6">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-rotate mr-2 text-indigo-600"></i>Sync from Finel Books</h2>
+            <p class="text-sm text-gray-500">Import vendor transactions from <a href="https://books.finel.ai" target="_blank" class="text-indigo-600 hover:underline">books.finel.ai</a> into this project.</p>
+          </div>
+          <button @click="loadBooksSyncPreview()" :disabled="booksSyncLoading"
+                  class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm disabled:opacity-50">
+            <i class="fa-solid" :class="booksSyncLoading ? 'fa-spinner fa-spin' : 'fa-rotate-right'"></i>
+            <span x-text="booksSyncLoading ? 'Loading…' : 'Refresh'"></span>
+          </button>
+        </div>
+
+        <!-- Error -->
+        <div x-show="booksSyncError" class="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm mb-4" x-text="booksSyncError"></div>
+
+        <!-- Not configured -->
+        <div x-show="!booksSyncLoading && booksSyncError && booksSyncError.includes('not configured')" class="bg-amber-50 border border-amber-200 rounded-xl p-5 text-sm text-amber-800">
+          <p class="font-semibold mb-1"><i class="fa-solid fa-circle-info mr-1"></i> Setup required</p>
+          <p>Set <code class="bg-amber-100 px-1 rounded">BOOKS_DB_PATH=/opt/bookkeeping/app/bookkeeping.db</code> in the server environment via Doppler, then restart the service.</p>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="booksSyncLoading" class="text-center text-gray-400 text-sm py-16">
+          <i class="fa-solid fa-rotate fa-spin text-3xl text-indigo-300 mb-3 block"></i>
+          Loading transactions from Books…
+        </div>
+
+        <!-- Results -->
+        <template x-if="!booksSyncLoading && booksSyncItems.length > 0">
+          <div>
+            <!-- Filters & actions -->
+            <div class="flex items-center gap-3 mb-4 flex-wrap">
+              <label class="flex items-center gap-1.5 text-sm text-gray-600">
+                <input type="checkbox" @change="booksSyncToggleAll($event)"
+                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                <span>Select all</span>
+              </label>
+              <span class="text-xs text-gray-400" x-text="`${booksSyncSelected.length} selected`"></span>
+              <label class="flex items-center gap-1.5 text-sm text-gray-600 ml-auto">
+                <input type="checkbox" x-model="booksSyncHideImported" class="rounded border-gray-300">
+                <span>Hide already imported</span>
+              </label>
+              <button @click="runBooksImport()" :disabled="booksSyncSelected.length===0 || booksSyncImporting"
+                      class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm disabled:opacity-50 font-medium">
+                <i class="fa-solid" :class="booksSyncImporting ? 'fa-spinner fa-spin' : 'fa-file-import'"></i>
+                <span x-text="booksSyncImporting ? 'Importing…' : `Import ${booksSyncSelected.length || ''}`"></span>
+              </button>
+            </div>
+
+            <!-- Result banner -->
+            <div x-show="booksSyncResult" class="mb-4 bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+              <i class="fa-solid fa-circle-check mr-1"></i>
+              <span x-text="`Imported ${booksSyncResult?.imported} invoices. ${booksSyncResult?.skipped ? booksSyncResult.skipped+' duplicates skipped.' : ''}`"></span>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto rounded-xl border border-gray-200">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 text-xs font-semibold">
+                  <tr>
+                    <th class="px-3 py-2 text-left w-8"></th>
+                    <th class="px-3 py-2 text-left">Vendor</th>
+                    <th class="px-3 py-2 text-left">Date</th>
+                    <th class="px-3 py-2 text-right">Total</th>
+                    <th class="px-3 py-2 text-left">Category</th>
+                    <th class="px-3 py-2 text-left">Status</th>
+                    <th class="px-3 py-2 text-left">Source</th>
+                    <th class="px-3 py-2 text-left"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="tx in booksSyncItems.filter(t => !booksSyncHideImported || !t.already_imported)" :key="tx.id">
+                    <tr class="border-t border-gray-100 hover:bg-gray-50"
+                        :class="tx.already_imported ? 'opacity-50' : ''">
+                      <td class="px-3 py-2">
+                        <input type="checkbox"
+                               :disabled="tx.already_imported"
+                               :checked="booksSyncSelected.includes(tx.id)"
+                               @change="booksSyncToggle(tx.id)"
+                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                      </td>
+                      <td class="px-3 py-2 font-medium text-gray-800" x-text="tx.vendor || '(no vendor)'"></td>
+                      <td class="px-3 py-2 text-gray-600" x-text="tx.date"></td>
+                      <td class="px-3 py-2 text-right font-medium"
+                          x-text="(tx.currency||'CAD')+' '+(tx.total?.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2})||'0.00')"></td>
+                      <td class="px-3 py-2 text-gray-500 text-xs" x-text="tx.category"></td>
+                      <td class="px-3 py-2">
+                        <span class="text-xs px-2 py-0.5 rounded-full"
+                              :class="tx.approval_status==='approved'?'bg-green-100 text-green-700':tx.status==='processed'?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-600'"
+                              x-text="tx.approval_status || tx.status || 'pending'"></span>
+                      </td>
+                      <td class="px-3 py-2 text-gray-400 text-xs" x-text="tx.source"></td>
+                      <td class="px-3 py-2 text-xs text-indigo-500" x-show="tx.already_imported">Imported</td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+
+        <!-- Empty -->
+        <div x-show="!booksSyncLoading && !booksSyncError && booksSyncItems.length===0" class="text-center text-gray-400 text-sm py-16">
+          <i class="fa-solid fa-book-open text-4xl text-indigo-200 mb-3 block"></i>
+          <p class="font-medium text-gray-500 mb-1">No transactions in Finel Books yet</p>
+          <p>Once receipts and vendor bills are processed in <a href="https://books.finel.ai" target="_blank" class="text-indigo-600 hover:underline">books.finel.ai</a>, they will appear here for import.</p>
+        </div>
+      </div>
+
+      <!-- ── AI INSIGHTS ─────────────────────────────────── -->
       <div x-show="view==='ai'" class="p-6">
         <div class="flex items-center justify-between mb-6">
           <div>
@@ -10474,7 +10591,7 @@
        ADD API KEY MODAL (admin only)
   ══════════════════════════════════════════════════════════════ -->
 
-  <script src="/static/js/app-2.js?v=3"></script>
+  <script src="/static/js/app-2.js?v=4"></script>
 
 <!-- Funding Conditions Modal -->
 <div x-show="showConditionModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="showConditionModal=false">
